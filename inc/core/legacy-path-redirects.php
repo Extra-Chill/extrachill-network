@@ -11,9 +11,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 add_action( 'template_redirect', 'ec_handle_legacy_path_redirects', 1 );
 
+/**
+ * Handle legacy path redirects on the main site.
+ *
+ * Forwards legacy /festival-wire/* paths to the wire subsite, validating the
+ * requested slug against wire before redirecting so stale or duplicate slugs
+ * fall through to a natural 404 instead of forwarding to a guaranteed 404.
+ *
+ * @return void
+ */
 function ec_handle_legacy_path_redirects() {
 	$main_blog_id = function_exists( 'ec_get_blog_id' ) ? ec_get_blog_id( 'main' ) : null;
-	if ( null === $main_blog_id || (int) $main_blog_id !== (int) get_current_blog_id() ) {
+	if ( null === $main_blog_id || (int) get_current_blog_id() !== (int) $main_blog_id ) {
 		return;
 	}
 
