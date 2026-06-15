@@ -29,14 +29,17 @@ const EXTRACHILL_CROSS_SITE_LINKS_CACHE_GROUP = 'extrachill_cross_site_links';
  *
  * Object-cache wrapper around extrachill_get_cross_site_term_links_uncached().
  *
- * The uncached computation loops every site mapped to the taxonomy and fires an
- * in-process REST dispatch (or switch_to_blog + WP_Query) per site — up to
- * ~5-6 cross-site dispatches for the `artist` taxonomy. This is a shared hot
- * path: it runs on archive pages (renderers.php) and, since extrachill-blog#7,
- * on single posts via the network bridge. The single-term path of every
- * per-site REST endpoint (events/wire/community/blog/shop taxonomy-counts) is
- * UNCACHED at the endpoint level — only their bulk paths use transients — so
- * without this layer each call pays the full cross-site cost every time.
+ * The uncached computation loops every site mapped to the taxonomy and resolves
+ * each site's single-term count in-process — up to ~5-6 cross-site lookups for
+ * the `artist` taxonomy. This is a shared hot path: it runs on archive pages
+ * (renderers.php) and, since extrachill-blog#7, on single posts via the network
+ * bridge. The blog/shop/wire/community lookups call the network-active
+ * `extrachill/taxonomy-post-counts` ability directly (switch_to_blog + WP_Query,
+ * no HTTP); the events lookup reads the events-site bulk warmer transient and
+ * only falls back to an HTTP loopback when that cache is cold (see
+ * extrachill_get_events_upcoming_count_via_api() and
+ * Extra-Chill/extrachill-multisite#50). Without this caching layer each render
+ * would repeat the full cross-site cost every time.
  *
  * Results are cached in the persistent object cache keyed by
  * taxonomy + term_id + current_site_key (the output is site-relative because
@@ -192,15 +195,155 @@ function extrachill_get_cross_site_term_links_uncached( $term, $taxonomy ) {
 }
 
 /**
- * Get upcoming event count via internal REST API
+ * Resolve a single term's published-post count on a target site, in-process.
  *
- * Uses rest_do_request() for zero HTTP overhead internal call.
+ * Calls the network-active `extrachill/taxonomy-post-counts` ability directly.
+ * The ability switches to the target blog internally and runs a plain WP_Query
+ * — no REST dispatch, so the route-affinity middleware never fires and no HTTP
+ * loopback to 127.0.0.1 is made. This is the path that previously tripped the
+ * nginx `wpjson` rate-limit zone (see Extra-Chill/extrachill-multisite#50).
+ *
+ * The ability's handler depends only on network-shared primitives (taxonomy
+ * registration, the posts/terms tables, get_term_link), all of which resolve
+ * correctly under switch_to_blog() — so unlike the events upcoming-count path,
+ * this never needs the target site's per-site plugin stack.
+ *
+ * @param string      $term_slug Term slug.
+ * @param string      $taxonomy  Taxonomy slug.
+ * @param string      $site_key  Target site key (e.g. 'main', 'shop', 'wire').
+ * @param string|null $post_type Optional explicit post type to count.
+ * @return array|null Array with 'count' and 'url', or null if not found.
+ */
+function extrachill_get_taxonomy_count_via_ability( $term_slug, $taxonomy, $site_key, $post_type = null ) {
+	if ( ! function_exists( 'wp_get_ability' ) ) {
+		return null;
+	}
+
+	$ability = wp_get_ability( 'extrachill/taxonomy-post-counts' );
+	if ( ! $ability ) {
+		return null;
+	}
+
+	$input = array(
+		'taxonomy' => $taxonomy,
+		'site'     => $site_key,
+		'slug'     => $term_slug,
+	);
+	if ( $post_type ) {
+		$input['post_type'] = $post_type;
+	}
+
+	$result = $ability->execute( $input );
+
+	if ( is_wp_error( $result ) || empty( $result['terms'] ) ) {
+		return null;
+	}
+
+	$term = $result['terms'][0];
+	if ( ! isset( $term['count'] ) || (int) $term['count'] < 1 ) {
+		return null;
+	}
+
+	return array(
+		'term_id' => isset( $term['term_id'] ) ? (int) $term['term_id'] : null,
+		'count'   => (int) $term['count'],
+		'url'     => isset( $term['url'] ) ? $term['url'] : null,
+	);
+}
+
+/**
+ * Get shop product count for a term (in-process).
+ *
+ * @param string $term_slug Term slug.
+ * @param string $taxonomy  Taxonomy slug.
+ * @return array|null Array with 'count' and 'url', or null if not found.
+ */
+function extrachill_get_shop_taxonomy_count_via_api( $term_slug, $taxonomy ) {
+	return extrachill_get_taxonomy_count_via_ability( $term_slug, $taxonomy, 'shop', 'product' );
+}
+
+/**
+ * Get wire (festival_wire) post count for a term (in-process).
+ *
+ * @param string $term_slug Term slug.
+ * @param string $taxonomy  Taxonomy slug.
+ * @return array|null Array with 'count' and 'url', or null if not found.
+ */
+function extrachill_get_wire_taxonomy_count_via_api( $term_slug, $taxonomy ) {
+	return extrachill_get_taxonomy_count_via_ability( $term_slug, $taxonomy, 'wire', 'festival_wire' );
+}
+
+/**
+ * Get community content count for a term (in-process).
+ *
+ * @param string $term_slug Term slug.
+ * @param string $taxonomy  Taxonomy slug.
+ * @return array|null Array with 'count' and 'url', or null if not found.
+ */
+function extrachill_get_community_taxonomy_count_via_api( $term_slug, $taxonomy ) {
+	return extrachill_get_taxonomy_count_via_ability( $term_slug, $taxonomy, 'community' );
+}
+
+/**
+ * Get blog post count for a term (in-process).
+ *
+ * @param string $term_slug Term slug.
+ * @param string $taxonomy  Taxonomy slug.
+ * @return array|null Array with 'count' and 'url', or null if not found.
+ */
+function extrachill_get_blog_taxonomy_count_via_api( $term_slug, $taxonomy ) {
+	return extrachill_get_taxonomy_count_via_ability( $term_slug, $taxonomy, 'main' );
+}
+
+/**
+ * Get upcoming event count for a term on the events site.
+ *
+ * Upcoming-event counting is genuinely events business logic: it filters the
+ * `datamachine_event_dates` table by start date and is implemented by the
+ * `extrachill/events-upcoming-counts` ability, which is registered ONLY on the
+ * events site (extrachill-events / data-machine-events are per-site, not
+ * network-activated). So unlike the blog/shop/wire/community paths above, this
+ * cannot be answered in-process from another site — switch_to_blog() swaps the
+ * DB context but does not load the events plugin code that registers the
+ * ability. Duplicating that SQL here would be a layering violation.
+ *
+ * To avoid the per-term HTTP loopback that tripped nginx rate-limiting
+ * (Extra-Chill/extrachill-multisite#50), this resolves from the bulk
+ * `ec_upcoming_counts_<taxonomy>` transient that the badge-count warmer
+ * populates on the events site every 4 hours (see badge-count-warmer.php).
+ * The transient lives in the events blog's object-cache namespace, so we read
+ * it under switch_to_blog(). Only when that bulk cache is genuinely cold do we
+ * fall back to a single HTTP loopback request — at most once per taxonomy per
+ * warm cycle, not once per term per page — and we negative-cache a throttled
+ * failure briefly so a rate-limited response never silently drops the card on
+ * subsequent terms in the same render.
  *
  * @param string $term_slug Term slug.
  * @param string $taxonomy  Taxonomy slug.
  * @return array|null Array with 'count' and 'url', or null if not found.
  */
 function extrachill_get_events_upcoming_count_via_api( $term_slug, $taxonomy ) {
+	$events_blog_id = function_exists( 'ec_get_blog_id' ) ? ec_get_blog_id( 'events' ) : null;
+	if ( ! $events_blog_id ) {
+		return null;
+	}
+
+	// 1. Try the bulk transient the events-site warmer maintains. This is the
+	// common path on any page and involves zero HTTP.
+	$from_bulk = extrachill_get_events_count_from_bulk_cache( $term_slug, $taxonomy, (int) $events_blog_id );
+	if ( null !== $from_bulk ) {
+		// Sentinel: an empty array means "warm cache, term has no upcoming
+		// events" — a definitive negative, so don't fall through to HTTP.
+		return empty( $from_bulk ) ? null : $from_bulk;
+	}
+
+	// 2. Bulk cache is cold. Fall back to the affinity-forwarded REST route
+	// (HTTP loopback to the events site) — but guard it so a throttled
+	// response doesn't get retried for every remaining term on the page.
+	if ( extrachill_events_loopback_is_backing_off() ) {
+		return null;
+	}
+
 	$request = new WP_REST_Request( 'GET', '/extrachill/v1/events/upcoming-counts' );
 	$request->set_query_params(
 		array(
@@ -212,6 +355,17 @@ function extrachill_get_events_upcoming_count_via_api( $term_slug, $taxonomy ) {
 	$response = rest_do_request( $request );
 
 	if ( $response->is_error() ) {
+		$error  = $response->as_error();
+		$data   = $error->get_error_data();
+		$status = is_array( $data ) && isset( $data['status'] ) ? (int) $data['status'] : 0;
+
+		// 429 (Too Many Requests) / 503 mean the loopback got throttled.
+		// Back off so the remaining terms in this render don't each retry and
+		// amplify the burst that tripped the limiter in the first place.
+		if ( 429 === $status || 503 === $status || 502 === $status ) {
+			extrachill_events_loopback_set_backoff();
+		}
+
 		return null;
 	}
 
@@ -228,148 +382,87 @@ function extrachill_get_events_upcoming_count_via_api( $term_slug, $taxonomy ) {
 }
 
 /**
- * Get shop product count via internal REST API
+ * Resolve a single term's upcoming-event count from the events-site bulk cache.
  *
- * Uses rest_do_request() for zero HTTP overhead internal call.
+ * Reads the `ec_upcoming_counts_<taxonomy>` transient maintained by the badge
+ * warmer on the events site (read under switch_to_blog so we hit the events
+ * blog's object-cache namespace). Returns:
+ *   - a populated array when the term is present with upcoming events,
+ *   - an empty array when the cache is warm but the term has no upcoming events
+ *     (a definitive negative — caller must NOT fall through to HTTP), or
+ *   - null when the bulk cache is cold/absent (caller may fall back to HTTP).
  *
- * @param string $term_slug Term slug.
- * @param string $taxonomy  Taxonomy slug.
- * @return array|null Array with 'count' and 'url', or null if not found.
+ * @param string $term_slug      Term slug.
+ * @param string $taxonomy       Taxonomy slug.
+ * @param int    $events_blog_id Events blog ID.
+ * @return array|null Term data array, empty array (warm negative), or null (cold).
  */
-function extrachill_get_shop_taxonomy_count_via_api( $term_slug, $taxonomy ) {
-	$request = new WP_REST_Request( 'GET', '/extrachill/v1/shop/taxonomy-counts' );
-	$request->set_query_params(
-		array(
-			'taxonomy' => $taxonomy,
-			'slug'     => $term_slug,
-		)
-	);
-
-	$response = rest_do_request( $request );
-
-	if ( $response->is_error() ) {
-		return null;
+function extrachill_get_events_count_from_bulk_cache( $term_slug, $taxonomy, $events_blog_id ) {
+	$switched = false;
+	if ( (int) get_current_blog_id() !== (int) $events_blog_id ) {
+		switch_to_blog( $events_blog_id );
+		$switched = true;
 	}
 
-	$data = $response->get_data();
-	if ( empty( $data ) || ! isset( $data['count'] ) ) {
-		return null;
+	try {
+		$terms = get_transient( 'ec_upcoming_counts_' . $taxonomy );
+	} finally {
+		if ( $switched ) {
+			restore_current_blog();
+		}
 	}
 
-	return array(
-		'term_id' => null,
-		'count'   => (int) $data['count'],
-		'url'     => isset( $data['url'] ) ? $data['url'] : null,
-	);
+	if ( false === $terms || ! is_array( $terms ) ) {
+		return null; // Cold cache.
+	}
+
+	foreach ( $terms as $term ) {
+		if ( isset( $term['slug'] ) && $term['slug'] === $term_slug ) {
+			if ( ! isset( $term['count'] ) || (int) $term['count'] < 1 ) {
+				return array(); // Warm negative.
+			}
+
+			return array(
+				'term_id' => isset( $term['term_id'] ) ? (int) $term['term_id'] : null,
+				'count'   => (int) $term['count'],
+				'url'     => isset( $term['url'] ) ? $term['url'] : null,
+			);
+		}
+	}
+
+	// Warm cache but term not listed → no upcoming events for this term.
+	return array();
 }
 
 /**
- * Get wire post count via internal REST API
+ * Whether the events HTTP-loopback fallback is currently backing off.
  *
- * Uses rest_do_request() for zero HTTP overhead internal call.
- *
- * @param string $term_slug Term slug.
- * @param string $taxonomy  Taxonomy slug.
- * @return array|null Array with 'count' and 'url', or null if not found.
+ * @return bool True if a recent loopback call was throttled.
  */
-function extrachill_get_wire_taxonomy_count_via_api( $term_slug, $taxonomy ) {
-	$request = new WP_REST_Request( 'GET', '/extrachill/v1/wire/taxonomy-counts' );
-	$request->set_query_params(
-		array(
-			'taxonomy' => $taxonomy,
-			'slug'     => $term_slug,
-		)
-	);
-
-	$response = rest_do_request( $request );
-
-	if ( $response->is_error() ) {
-		return null;
-	}
-
-	$data = $response->get_data();
-	if ( empty( $data ) || ! isset( $data['count'] ) ) {
-		return null;
-	}
-
-	return array(
-		'term_id' => null,
-		'count'   => (int) $data['count'],
-		'url'     => isset( $data['url'] ) ? $data['url'] : null,
-	);
+function extrachill_events_loopback_is_backing_off() {
+	return (bool) get_transient( 'ec_events_loopback_backoff' );
 }
 
 /**
- * Get community forum data via internal REST API
+ * Engage a short back-off window for the events HTTP-loopback fallback.
  *
- * Uses rest_do_request() for zero HTTP overhead internal call.
- * Returns forum URL and topic count (forums are location hubs).
+ * Set after a throttled (429/503/502) loopback response so the remaining terms
+ * in the same page render — and other requests in the immediate window — skip
+ * the loopback instead of hammering the already-rate-limited route. Short TTL
+ * because the bulk warmer refreshes the cache and the limiter window is brief.
  *
- * @param string $term_slug Term slug.
- * @param string $taxonomy  Taxonomy slug.
- * @return array|null Array with 'count' and 'url', or null if not found.
+ * @return void
  */
-function extrachill_get_community_taxonomy_count_via_api( $term_slug, $taxonomy ) {
-	$request = new WP_REST_Request( 'GET', '/extrachill/v1/community/taxonomy-counts' );
-	$request->set_query_params(
-		array(
-			'taxonomy' => $taxonomy,
-			'slug'     => $term_slug,
-		)
-	);
-
-	$response = rest_do_request( $request );
-
-	if ( $response->is_error() ) {
-		return null;
-	}
-
-	$data = $response->get_data();
-	if ( empty( $data ) || ! isset( $data['count'] ) ) {
-		return null;
-	}
-
-	return array(
-		'term_id' => null,
-		'count'   => (int) $data['count'],
-		'url'     => isset( $data['url'] ) ? $data['url'] : null,
-	);
-}
-
-/**
- * Get blog post count via internal REST API
- *
- * Uses rest_do_request() for zero HTTP overhead internal call.
- *
- * @param string $term_slug Term slug.
- * @param string $taxonomy  Taxonomy slug.
- * @return array|null Array with 'count' and 'url', or null if not found.
- */
-function extrachill_get_blog_taxonomy_count_via_api( $term_slug, $taxonomy ) {
-	$request = new WP_REST_Request( 'GET', '/extrachill/v1/blog/taxonomy-counts' );
-	$request->set_query_params(
-		array(
-			'taxonomy' => $taxonomy,
-			'slug'     => $term_slug,
-		)
-	);
-
-	$response = rest_do_request( $request );
-
-	if ( $response->is_error() ) {
-		return null;
-	}
-
-	$data = $response->get_data();
-	if ( empty( $data ) || ! isset( $data['count'] ) ) {
-		return null;
-	}
-
-	return array(
-		'term_id' => null,
-		'count'   => (int) $data['count'],
-		'url'     => isset( $data['url'] ) ? $data['url'] : null,
-	);
+function extrachill_events_loopback_set_backoff() {
+	/**
+	 * Filters the events loopback back-off window in seconds.
+	 *
+	 * @since 1.15.0
+	 *
+	 * @param int $seconds Back-off duration. Default 120.
+	 */
+	$ttl = (int) apply_filters( 'extrachill_events_loopback_backoff_ttl', 2 * MINUTE_IN_SECONDS );
+	set_transient( 'ec_events_loopback_backoff', 1, $ttl );
 }
 
 /**
