@@ -29,6 +29,10 @@ function register_extrachill_multisite_category(): void {
 		return;
 	}
 
+	if ( function_exists( 'wp_has_ability_category' ) && wp_has_ability_category( 'extrachill-multisite' ) ) {
+		return;
+	}
+
 	wp_register_ability_category(
 		'extrachill-multisite',
 		array(
