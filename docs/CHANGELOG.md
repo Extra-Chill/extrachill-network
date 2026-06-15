@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.16.1] - 2026-06-15
+
+### Fixed
+- resolve cross-site term counts in-process to stop nginx loopback rate-limiting
+
 ## [1.16.0] - 2026-06-06
 
 ### Added
