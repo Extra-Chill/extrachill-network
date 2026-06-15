@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.17.0] - 2026-06-15
+
+### Added
+- register cross-site Coverage section on artist profile hub
+
+### Changed
+- clear pre-existing phpcs errors in legacy-path-redirects
+
+### Fixed
+- validate festival-wire slug before forwarding to wire subsite
+
 ## [1.16.1] - 2026-06-15
 
 ### Fixed
