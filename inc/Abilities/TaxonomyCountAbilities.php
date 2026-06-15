@@ -57,6 +57,10 @@ class TaxonomyCountAbilities {
 							'type'        => 'string',
 							'description' => __( 'Post type to count. If omitted, uses all post types registered for the taxonomy.', 'extrachill-multisite' ),
 						),
+						'slug'      => array(
+							'type'        => array( 'string', 'null' ),
+							'description' => __( 'Optional term slug. When provided, the result contains only that single term (still returned under the "terms" array). Omit for the full bulk listing.', 'extrachill-multisite' ),
+						),
 					),
 				),
 				'output_schema'       => array(
@@ -106,6 +110,7 @@ class TaxonomyCountAbilities {
 		$taxonomy  = $input['taxonomy'];
 		$site_key  = $input['site'];
 		$post_type = $input['post_type'] ?? null;
+		$slug      = isset( $input['slug'] ) ? sanitize_title( (string) $input['slug'] ) : '';
 
 		$blog_id = function_exists( 'ec_get_blog_id' ) ? ec_get_blog_id( $site_key ) : null;
 		if ( ! $blog_id ) {
@@ -119,10 +124,98 @@ class TaxonomyCountAbilities {
 
 		switch_to_blog( $blog_id );
 		try {
+			if ( '' !== $slug ) {
+				return $this->computeSingleCount( $taxonomy, $site_key, $post_type, $slug );
+			}
+
 			return $this->computeCounts( $taxonomy, $site_key, $post_type );
 		} finally {
 			restore_current_blog();
 		}
+	}
+
+	/**
+	 * Compute the published-post count for a single taxonomy term by slug.
+	 *
+	 * Mirrors computeCounts() but scopes to one term so cross-site link
+	 * resolution can answer "does this exact term have content here?" without
+	 * pulling the full bulk listing or making an HTTP loopback call. Must be
+	 * called in the correct blog context (after switch_to_blog).
+	 *
+	 * @param string      $taxonomy  Taxonomy slug.
+	 * @param string      $site_key  Site key for the response.
+	 * @param string|null $post_type Optional explicit post type.
+	 * @param string      $slug      Term slug to count.
+	 * @return array Structured result (same shape as computeCounts).
+	 */
+	private function computeSingleCount( string $taxonomy, string $site_key, ?string $post_type, string $slug ): array {
+		if ( ! taxonomy_exists( $taxonomy ) ) {
+			return new \WP_Error(
+				'taxonomy_not_found',
+				/* translators: %s: taxonomy slug */
+				sprintf( __( 'Taxonomy "%s" does not exist on this site.', 'extrachill-multisite' ), $taxonomy ),
+				array( 'status' => 400 )
+			);
+		}
+
+		$empty = array(
+			'site'     => $site_key,
+			'taxonomy' => $taxonomy,
+			'terms'    => array(),
+			'total'    => 0,
+		);
+
+		$term = get_term_by( 'slug', $slug, $taxonomy );
+		if ( ! $term || is_wp_error( $term ) ) {
+			return $empty;
+		}
+
+		if ( $post_type ) {
+			$post_types = array( $post_type );
+		} else {
+			$post_types = get_taxonomy( $taxonomy )->object_type;
+		}
+
+		$query = new \WP_Query(
+			array(
+				'post_type'      => $post_types,
+				'post_status'    => 'publish',
+				'posts_per_page' => 1,
+				'fields'         => 'ids',
+				'no_found_rows'  => false,
+				'tax_query'      => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query
+					array(
+						'taxonomy' => $taxonomy,
+						'field'    => 'term_id',
+						'terms'    => $term->term_id,
+					),
+				),
+			)
+		);
+
+		if ( $query->found_posts < 1 ) {
+			return $empty;
+		}
+
+		$url = get_term_link( $term );
+		if ( is_wp_error( $url ) ) {
+			return $empty;
+		}
+
+		return array(
+			'site'     => $site_key,
+			'taxonomy' => $taxonomy,
+			'terms'    => array(
+				array(
+					'term_id' => (int) $term->term_id,
+					'name'    => $term->name,
+					'slug'    => $term->slug,
+					'count'   => (int) $query->found_posts,
+					'url'     => $url,
+				),
+			),
+			'total'    => 1,
+		);
 	}
 
 	/**
