@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.18.0] - 2026-06-16
+
+### Added
+- feat(cross-site): instrument bridge click + impression events in shared engine
+
 ## [1.17.1] - 2026-06-15
 
 ### Fixed
