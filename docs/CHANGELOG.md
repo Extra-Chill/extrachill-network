@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.18.1] - 2026-06-17
+
+### Changed
+- move bridge beacon receiver to canonical extrachill-api routes
+
 ## [1.18.0] - 2026-06-16
 
 ### Added

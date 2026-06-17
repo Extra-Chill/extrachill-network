@@ -3,7 +3,7 @@
  * Plugin Name: Extra Chill Multisite
  * Plugin URI: https://extrachill.com
  * Description: Network administration foundation for the ExtraChill Platform. Provides network-wide Cloudflare Turnstile integration and consolidated network admin menu.
- * Version: 1.18.0
+ * Version: 1.18.1
  * Author: Chris Huber
  * Author URI: https://chubes.net
  * Network: true
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'EXTRACHILL_MULTISITE_VERSION', '1.18.0' );
+define( 'EXTRACHILL_MULTISITE_VERSION', '1.18.1' );
 define( 'EXTRACHILL_MULTISITE_PLUGIN_FILE', __FILE__ );
 define( 'EXTRACHILL_MULTISITE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'EXTRACHILL_MULTISITE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
