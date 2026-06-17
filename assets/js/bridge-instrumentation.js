@@ -7,10 +7,12 @@
  *   - click:      when a human clicks a cross-site link button.
  *
  * Both ship via navigator.sendBeacon (no AJAX, fire-and-forget, survives the
- * navigation a click triggers). Because this code only runs in a real,
- * JS-executing browser, prefetch/prerender/crawler hits — the source of the
- * bridge channel's bot inflation — never fire either event. That is the
- * built-in bot filter: clicks and impressions are humans-with-JS by
+ * navigation a click triggers) to the canonical extrachill-api analytics
+ * routes — clicks to /analytics/click (click_type=bridge), impressions to
+ * /analytics/impression (impression_type=bridge). Because this code only runs
+ * in a real, JS-executing browser, prefetch/prerender/crawler hits — the
+ * source of the bridge channel's bot inflation — never fire either event. That
+ * is the built-in bot filter: clicks and impressions are humans-with-JS by
  * construction.
  *
  * Destination context (dest_site, term) is read from the link's existing UTM
@@ -19,25 +21,31 @@
  */
 ( function () {
 	var config = window.ecBridgeInstrumentation;
-	if ( ! config || ! config.endpoint || ! config.linkClass ) {
+	if (
+		! config ||
+		! config.clickEndpoint ||
+		! config.impressionEndpoint ||
+		! config.linkClass
+	) {
 		return;
 	}
 
 	/**
 	 * Send an event via sendBeacon, falling back to keepalive fetch.
 	 *
-	 * @param {Object} payload Event payload.
+	 * @param {string} endpoint Target REST endpoint.
+	 * @param {Object} payload  Event payload.
 	 */
-	function send( payload ) {
+	function send( endpoint, payload ) {
 		var data = JSON.stringify( payload );
 
 		if ( navigator.sendBeacon ) {
 			navigator.sendBeacon(
-				config.endpoint,
+				endpoint,
 				new Blob( [ data ], { type: 'application/json' } )
 			);
 		} else {
-			fetch( config.endpoint, {
+			fetch( endpoint, {
 				method: 'POST',
 				body: data,
 				headers: { 'Content-Type': 'application/json' },
@@ -61,30 +69,22 @@
 		}
 	}
 
-	/**
-	 * Base payload shared by both event kinds.
-	 *
-	 * @param {string} kind Event kind ('click' | 'impression').
-	 * @return {Object} Payload.
-	 */
-	function base( kind ) {
-		return {
-			kind: kind,
-			source_post: config.sourcePost || 0,
-			source_site: config.sourceSite || '',
-			source_url: window.location.href,
-		};
-	}
-
 	var links = document.getElementsByClassName( config.linkClass );
 
 	// --- Impression: one per pageview when the bridge actually rendered cards.
+	// Posts to the canonical extrachill-api impression route (impression_type=bridge).
 	if ( links && links.length > 0 ) {
-		send( base( 'impression' ) );
+		send( config.impressionEndpoint, {
+			impression_type: 'bridge',
+			source_url: window.location.href,
+			source_post: config.sourcePost || 0,
+			source_site: config.sourceSite || '',
+		} );
 	}
 
 	// --- Click: delegated so it covers links added after load, and so a single
-	// listener instruments every bridge consumer.
+	// listener instruments every bridge consumer. Posts to the canonical
+	// extrachill-api click route (click_type=bridge).
 	document.addEventListener(
 		'click',
 		function ( event ) {
@@ -99,13 +99,16 @@
 			}
 
 			var href = link.getAttribute( 'href' ) || '';
-			var payload = base( 'click' );
 
-			// Destination context is carried by the link's existing UTM params.
-			payload.dest_site = param( href, 'utm_campaign' );
-			payload.term = link.textContent ? link.textContent.trim() : '';
-
-			send( payload );
+			send( config.clickEndpoint, {
+				click_type: 'bridge',
+				source_url: window.location.href,
+				source_post: config.sourcePost || 0,
+				source_site: config.sourceSite || '',
+				// Destination context is carried by the link's existing UTM params.
+				dest_site: param( href, 'utm_campaign' ),
+				term: link.textContent ? link.textContent.trim() : '',
+			} );
 		},
 		true
 	);
