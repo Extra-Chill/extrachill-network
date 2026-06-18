@@ -20,6 +20,7 @@ require_once __DIR__ . '/entity-links.php';
 require_once __DIR__ . '/renderers.php';
 require_once __DIR__ . '/canonical-authority.php';
 require_once __DIR__ . '/bridge-instrumentation.php';
+require_once __DIR__ . '/internal-linking-candidates.php';
 
 /**
  * Get taxonomy-to-site mapping
