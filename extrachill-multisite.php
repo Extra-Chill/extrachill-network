@@ -78,6 +78,14 @@ function extrachill_multisite_init() {
 	require_once EXTRACHILL_MULTISITE_PLUGIN_DIR . 'inc/community-activity/sidebar-widget.php';
 	require_once EXTRACHILL_MULTISITE_PLUGIN_DIR . 'inc/assets.php';
 
+	// NetworkStats — composable cross-site metric-provider registry. The
+	// engine, interface, core providers, and the `extrachill_network_stat_providers`
+	// filter load here; the get-network-stats ability registers itself on
+	// `wp_abilities_api_init` (guarded inside bootstrap). The thin
+	// ec_get_network_stats() helper loads unconditionally for template callers.
+	require_once EXTRACHILL_MULTISITE_PLUGIN_DIR . 'inc/NetworkStats/bootstrap.php';
+	require_once EXTRACHILL_MULTISITE_PLUGIN_DIR . 'inc/NetworkStats/helpers.php';
+
 	// Abilities API.
 	if ( function_exists( 'wp_register_ability' ) ) {
 		// Single owner for the `extrachill-multisite` ability category — load
