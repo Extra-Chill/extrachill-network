@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.19.0] - 2026-06-19
+
+### Added
+- add composable NetworkStats metric-provider registry + get-network-stats ability
+- route internal links toward forward surfaces via cross-site candidates
+
+### Changed
+- own the online-users query in OnlineUsersProvider + add metric cache invalidation
+
 ## [1.18.1] - 2026-06-17
 
 ### Changed
