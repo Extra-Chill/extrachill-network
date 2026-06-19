@@ -167,6 +167,29 @@ class NetworkStats {
 	}
 
 	/**
+	 * Invalidate the cached value for a single metric.
+	 *
+	 * Deletes ONLY the per-metric transient for the given key, forcing the next
+	 * read to recompute via the provider. Use this when an event makes one
+	 * metric stale (e.g. a user becoming active invalidates "online_users")
+	 * without disturbing every other cached metric.
+	 *
+	 * The key is the provider's machine key; it does not need to be registered
+	 * for the delete to run (the transient name is derived purely from the key),
+	 * so callers in other plugins can invalidate without resolving the registry.
+	 *
+	 * @param string $key Metric machine key (e.g. "online_users").
+	 * @return bool True if a cached value was deleted, false otherwise.
+	 */
+	public static function forget( string $key ): bool {
+		if ( '' === $key ) {
+			return false;
+		}
+
+		return delete_transient( self::CACHE_PREFIX . $key );
+	}
+
+	/**
 	 * Flush all cached network-stat metrics.
 	 *
 	 * Deletes the per-metric transient for every registered provider. Useful

@@ -26,3 +26,20 @@ if ( ! function_exists( 'ec_get_network_stats' ) ) {
 		return \ExtraChillMultisite\NetworkStats\NetworkStats::get( $keys );
 	}
 }
+
+if ( ! function_exists( 'ec_network_stats_forget' ) ) {
+	/**
+	 * Invalidate the cached value for a single network-stat metric.
+	 *
+	 * Thin procedural wrapper around NetworkStats::forget() for callers (e.g.
+	 * an activity recorder in another plugin) that need to bust ONE metric's
+	 * per-metric cache without flushing the rest. The next read recomputes via
+	 * the provider.
+	 *
+	 * @param string $key Metric machine key (e.g. "online_users").
+	 * @return bool True if a cached value was deleted, false otherwise.
+	 */
+	function ec_network_stats_forget( string $key ): bool {
+		return \ExtraChillMultisite\NetworkStats\NetworkStats::forget( $key );
+	}
+}
