@@ -150,6 +150,72 @@ abstract class AbstractMetricProvider implements MetricProvider {
 	}
 
 	/**
+	 * Count UPCOMING published events on another site.
+	 *
+	 * Reads the data-machine-events `datamachine_event_dates` table directly
+	 * (it carries its own `post_status` and `start_datetime` columns), counting
+	 * distinct events whose start is today or later — matching the calendar's
+	 * own "upcoming" boundary (`current_time('Y-m-d') . ' 00:00:00'`, see
+	 * data-machine-events CalendarAbilities). This is the count a calendar
+	 * landing page actually wants — "how many shows are coming up" — not the
+	 * all-time published total, which includes every past event ever scraped.
+	 *
+	 * Plugin-independent: the events post type / plugin is not loaded in this
+	 * process, but the rows live in the shared DB and are queryable after
+	 * switch_to_blog(). Returns null when the site cannot be resolved or the
+	 * table is absent, so the engine reports "not available" rather than a
+	 * fabricated zero. A genuine zero (no upcoming events) returns 0.
+	 *
+	 * @param string $site_key Logical site key (e.g. 'events').
+	 * @return int|null Upcoming published event count, or null if unavailable.
+	 */
+	protected function count_upcoming_events( string $site_key ): ?int {
+		$blog_id = $this->resolve_blog_id( $site_key );
+		if ( null === $blog_id ) {
+			return null;
+		}
+
+		$switched = false;
+		if ( (int) get_current_blog_id() !== $blog_id && function_exists( 'switch_to_blog' ) ) {
+			switch_to_blog( $blog_id );
+			$switched = true;
+		}
+
+		try {
+			global $wpdb;
+
+			$table = $wpdb->prefix . 'datamachine_event_dates';
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
+			if ( $exists !== $table ) {
+				// Table not present (events site unavailable / schema absent).
+				return null;
+			}
+
+			// Match the calendar's "upcoming" boundary: start of today in the
+			// site's local timezone (data-machine-events CalendarAbilities uses
+			// current_time('Y-m-d') . ' 00:00:00').
+			$today_start = current_time( 'Y-m-d' ) . ' 00:00:00';
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$count = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(DISTINCT post_id) FROM {$table} WHERE post_status = %s AND start_datetime >= %s",
+					'publish',
+					$today_start
+				)
+			);
+
+			return (int) $count;
+		} finally {
+			if ( $switched ) {
+				restore_current_blog();
+			}
+		}
+	}
+
+	/**
 	 * Count non-empty terms of a taxonomy on another site.
 	 *
 	 * "Non-empty" means count > 0, matching how a landing page would describe
