@@ -362,7 +362,7 @@ Cross-domain auth relies on:
 
 - WordPress multisite cookies for `.extrachill.com` subdomains
 - Domain mapping via `.github/sunrise.php` for `extrachill.link`
-- A small cookie header patch in `extrachill-api/inc/auth/extrachill-link-auth.php` that appends `SameSite=None; Secure` to WordPress auth cookies so cross-domain REST requests from `extrachill.link` can remain authenticated
+- For `extrachill.link` (a different registrable domain than `.extrachill.com`, so the auth cookie can never reach it), authenticated REST calls use a **wp-native bearer token** minted by `extrachill-api/inc/auth/extrachill-link-token-handoff.php` on the artist site and handed to the link page in a URL fragment. This replaced the former `SameSite=None; Secure` cookie patch, which modern browser privacy (Safari ITP, Chrome third-party-cookie phase-out) increasingly blocked.
 
 Cookie domain configuration still lives in WordPress configuration (and the hosting/proxy layer).
 
