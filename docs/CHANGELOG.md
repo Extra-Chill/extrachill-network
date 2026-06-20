@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.19.1] - 2026-06-20
+
+### Fixed
+- events_count counts UPCOMING events, not all-time published total
+- silence deprecated print_emoji_styles notice network-wide
+
 ## [1.19.0] - 2026-06-19
 
 ### Added
