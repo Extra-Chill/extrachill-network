@@ -13,9 +13,9 @@
  *    warmer running on blog 7), prefer the richer "upcoming" count via
  *    data_machine_events_query_events() — the number a calendar landing page
  *    actually wants.
- *  - Otherwise fall back to a plugin-independent published-post count read
- *    directly from blog 7's database (matches the issue's spec: "published
- *    data_machine_events on blog 7").
+ *  - Otherwise fall back to a plugin-independent UPCOMING count read directly
+ *    from blog 7's `datamachine_event_dates` table (start today or later) —
+ *    the count a calendar landing page wants, not the all-time published total.
  *
  * Returns null only when the events site itself is unavailable.
  *
@@ -58,7 +58,8 @@ class EventsCountProvider extends AbstractMetricProvider {
 			}
 		}
 
-		// Plugin-independent fallback: published count from blog 7's DB.
-		return $this->count_published_posts( 'events', 'data_machine_events' );
+		// Plugin-independent fallback: UPCOMING count from blog 7's event-dates
+		// table (the calendar's own boundary), not the all-time published total.
+		return $this->count_upcoming_events( 'events' );
 	}
 }
