@@ -3,7 +3,8 @@
  *
  * Fires two sibling analytics events for the shared cross-site link engine:
  *
- *   - impression: once per pageview, when >=1 bridge link is present in the DOM.
+ *   - impression: one per rendered bridge card present in the DOM, each
+ *                 carrying that card's dest_site, deduped per pageview.
  *   - click:      when a human clicks a cross-site link button.
  *
  * Both ship via navigator.sendBeacon (no AJAX, fire-and-forget, survives the
@@ -17,7 +18,10 @@
  *
  * Destination context (dest_site, term) is read from the link's existing UTM
  * params, so no new markup contract is introduced — the bridge consumers
- * already UTM-tag every outbound URL.
+ * already UTM-tag every outbound URL. Emitting one impression PER CARD (rather
+ * than one page-level impression) gives impressions the same per-destination
+ * grain the click beacon already has, so CTR = clicks / impressions becomes
+ * computable per destination. See extrachill-analytics#75.
  */
 ( function () {
 	var config = window.ecBridgeInstrumentation;
@@ -71,15 +75,42 @@
 
 	var links = document.getElementsByClassName( config.linkClass );
 
-	// --- Impression: one per pageview when the bridge actually rendered cards.
-	// Posts to the canonical extrachill-api impression route (impression_type=bridge).
+	// --- Impression: one per rendered bridge card, each carrying that card's
+	// dest_site (read from the link's existing utm_campaign, exactly like the
+	// click beacon below). Posts to the canonical extrachill-api impression
+	// route (impression_type=bridge).
+	//
+	// Deduped per pageview by dest_site: if a page renders the same destination
+	// more than once, only the first card emits an impression for that dest.
+	// This keeps the impression denominator at one-per-destination-per-pageview,
+	// the simplest grain that pairs cleanly with the per-destination click
+	// numerator for CTR. See extrachill-analytics#75.
 	if ( links && links.length > 0 ) {
-		send( config.impressionEndpoint, {
-			impression_type: 'bridge',
-			source_url: window.location.href,
-			source_post: config.sourcePost || 0,
-			source_site: config.sourceSite || '',
-		} );
+		var seenDests = {};
+		for ( var i = 0; i < links.length; i++ ) {
+			var card = links[ i ];
+			var cardHref = card.getAttribute( 'href' ) || '';
+			var destSite = param( cardHref, 'utm_campaign' );
+
+			// Dedupe on dest_site within this pageview. An empty dest_site can
+			// only be counted once so an untagged card can't inflate the
+			// denominator.
+			if ( Object.prototype.hasOwnProperty.call( seenDests, destSite ) ) {
+				continue;
+			}
+			seenDests[ destSite ] = true;
+
+			send( config.impressionEndpoint, {
+				impression_type: 'bridge',
+				source_url: window.location.href,
+				source_post: config.sourcePost || 0,
+				source_site: config.sourceSite || '',
+				// Destination context is carried by the card link's existing UTM
+				// params, mirroring the click beacon below.
+				dest_site: destSite,
+				term: card.textContent ? card.textContent.trim() : '',
+			} );
+		}
 	}
 
 	// --- Click: delegated so it covers links added after load, and so a single
