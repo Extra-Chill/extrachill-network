@@ -95,7 +95,7 @@ function extrachill_internal_linking_taxonomy_tiers() {
  */
 function extrachill_internal_linking_is_geography_taxonomy( $taxonomy ) {
 	$tiers = extrachill_internal_linking_taxonomy_tiers();
-	return in_array( $taxonomy, isset( $tiers['geography'] ) ? (array) $tiers['geography'] : array(), true );
+	return in_array( $taxonomy, (array) $tiers['geography'], true );
 }
 
 /**
@@ -179,7 +179,7 @@ function extrachill_add_cross_site_linking_candidates( $candidates, $post_id, $s
 		return $candidates;
 	}
 
-	$candidates = is_array( $candidates ) ? $candidates : array();
+	$candidates = (array) $candidates;
 
 	// Highest existing same-site score — forward-surface candidates are
 	// boosted just above it so they rank first without erasing the catalog.
@@ -222,10 +222,7 @@ function extrachill_add_cross_site_linking_candidates( $candidates, $post_id, $s
 		$is_geography = extrachill_internal_linking_is_geography_taxonomy( $taxonomy );
 
 		foreach ( $terms as $term ) {
-			$links = extrachill_get_cross_site_term_links( $term, $taxonomy );
-			if ( ! is_array( $links ) ) {
-				$links = array();
-			}
+			$links = (array) extrachill_get_cross_site_term_links( $term, $taxonomy );
 
 			// Past-OK: an artist/festival events archive with only PAST shows
 			// is still a relevant destination for a band article, but the
