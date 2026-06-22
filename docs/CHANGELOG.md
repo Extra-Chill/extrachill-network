@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.19.2] - 2026-06-22
+
+### Fixed
+- emit one impression per rendered card with dest_site so CTR can pair impressions to destinations
+
 ## [1.19.1] - 2026-06-20
 
 ### Fixed
