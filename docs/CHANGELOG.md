@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.20.0] - 2026-06-22
+
+### Fixed
+- clear phpstan always-true findings via direct array access and casts
+- prefer entity matches over geography, link past-show artist archives, and skip thin stubs
+
 ## [1.19.2] - 2026-06-22
 
 ### Fixed
