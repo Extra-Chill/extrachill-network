@@ -65,6 +65,7 @@ function extrachill_multisite_init() {
 	require_once EXTRACHILL_MULTISITE_PLUGIN_DIR . 'inc/core/legacy-path-redirects.php';
 	require_once EXTRACHILL_MULTISITE_PLUGIN_DIR . 'inc/core/new-site-setup.php';
 	require_once EXTRACHILL_MULTISITE_PLUGIN_DIR . 'inc/cross-site-links/cross-site-links.php';
+	require_once EXTRACHILL_MULTISITE_PLUGIN_DIR . 'inc/cross-site-links/network-bridge.php';
 	require_once EXTRACHILL_MULTISITE_PLUGIN_DIR . 'inc/theme/footer-main-menu.php';
 	require_once EXTRACHILL_MULTISITE_PLUGIN_DIR . 'inc/theme/network-dropdown.php';
 	require_once EXTRACHILL_MULTISITE_PLUGIN_DIR . 'inc/theme/site-title.php';
