@@ -15,19 +15,22 @@
  *     loaded in the PHP process of any other site, and switch_to_blog() does
  *     NOT load it. The only transport that reaches it from another site is an
  *     HTTP loopback that bootstraps the community site's full plugin stack.
- *     We dispatch to the core Abilities REST run endpoint via
- *     ec_cross_site_rest_request('community', ...).
+ *     We dispatch to the canonical extrachill/v1 platform route
+ *     `GET /extrachill/v1/community/stats` (a thin extrachill-api wrapper that
+ *     delegates to the extrachill/community-get-stats ability) via
+ *     ec_cross_site_rest_request('community', ...). Route-affinity maps
+ *     `/extrachill/v1/community/` to the community blog.
  *
  * Honesty: if neither path resolves (loopback fails, ability returns an error),
  * value() returns null — the engine marks the metric "not available" rather
  * than fabricating a zero.
  *
- * NOTE (companion follow-up): the cross-site loopback path requires
- * `extrachill/community-get-stats` to be exposed over REST
- * (`show_in_rest => true`); it is currently `false`, so the core run route
- * 404s until that one-line change lands in extrachill-community. Until then the
- * local fast path still works on the community blog, and off-blog callers get
- * an honest null. Tracked separately; not in this PR's repo.
+ * NOTE: the cross-site loopback path reaches the community-get-stats ability
+ * through the canonical extrachill/v1/community/stats route in extrachill-api,
+ * NOT the generic core Abilities /run endpoint. The ability itself stays off
+ * the core REST surface (`show_in_rest => false`); the thin api route is the
+ * only HTTP door. Until extrachill-api ships that route, off-blog callers get
+ * an honest null while the local fast path still works on the community blog.
  *
  * The community stats payload is fetched once and shared between the two
  * community providers within a request via a static cache, so requesting both
@@ -102,10 +105,15 @@ abstract class CommunityStatsProvider extends AbstractMetricProvider {
 		}
 
 		// Path 2: cross-site HTTP loopback to the community site, which
-		// bootstraps extrachill-community and registers the ability + run route.
-		// Force the loopback transport: the ability callback is only defined
-		// inside the community site's process, so the default in-process
-		// switch_to_blog dispatch cannot satisfy it.
+		// bootstraps extrachill-community (registering the ability) and
+		// extrachill-api (registering the canonical thin route). We hit the
+		// canonical extrachill/v1 route — a namespace-relative path that
+		// ec_cross_site_rest_resolve_route() auto-prefixes to
+		// /extrachill/v1/community/stats — NOT the generic core Abilities /run
+		// endpoint. It is a READABLE GET (no body). Force the loopback
+		// transport: the ability callback is only defined inside the community
+		// site's process, so the default in-process switch_to_blog dispatch
+		// cannot satisfy it.
 		if ( function_exists( 'ec_cross_site_rest_request' ) ) {
 			$force_http = static function ( $use_http, $site_key ) {
 				return 'community' === $site_key ? true : $use_http;
@@ -115,11 +123,8 @@ abstract class CommunityStatsProvider extends AbstractMetricProvider {
 			try {
 				$response = ec_cross_site_rest_request(
 					'community',
-					'POST',
-					'/wp-abilities/v1/abilities/extrachill/community-get-stats/run',
-					array(
-						'body' => array( 'input' => array() ),
-					)
+					'GET',
+					'/community/stats'
 				);
 			} finally {
 				remove_filter( 'ec_cross_site_use_http_loopback', $force_http, 10 );
