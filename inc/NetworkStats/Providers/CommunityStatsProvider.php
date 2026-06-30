@@ -93,7 +93,19 @@ abstract class CommunityStatsProvider extends AbstractMetricProvider {
 		}
 
 		// Path 1: local ability (community-blog origin / warmer).
-		if ( function_exists( 'wp_get_ability' ) ) {
+		//
+		// The `extrachill/community-get-stats` ability is registered ONLY in the
+		// community site's PHP process (extrachill-community is a per-site
+		// plugin). Off-blog it is never loaded — not even under
+		// switch_to_blog() — so an unconditional wp_get_ability() lookup misses
+		// and trips WP_Abilities_Registry::get_registered()'s _doing_it_wrong
+		// notice (~1 per off-blog call) before Path 2 resolves the value
+		// correctly. Guard the fast path to the community blog so off-blog
+		// callers skip straight to the HTTP loopback (Path 2) without the
+		// log-noise. Uses the canonical ec_get_blog_id('community') idiom
+		// established elsewhere in this plugin.
+		$community_blog_id = function_exists( 'ec_get_blog_id' ) ? ec_get_blog_id( 'community' ) : null;
+		if ( $community_blog_id && (int) $community_blog_id === (int) get_current_blog_id() && function_exists( 'wp_get_ability' ) ) {
 			$ability = wp_get_ability( 'extrachill/community-get-stats' );
 			if ( $ability ) {
 				$result = $ability->execute( array() );
