@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.20.2] - 2026-06-30
+
+### Fixed
+- skip in-process community-stats fast-path off-blog to stop _doing_it_wrong notice #82
+
 ## [1.20.1] - 2026-06-30
 
 ### Changed
