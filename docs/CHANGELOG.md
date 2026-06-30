@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.20.1] - 2026-06-30
+
+### Changed
+- extract single-post network bridge into shared multisite primitive
+
+### Fixed
+- route community-stats loopback through canonical extrachill/v1
+
 ## [1.20.0] - 2026-06-22
 
 ### Fixed
