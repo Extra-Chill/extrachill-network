@@ -65,6 +65,7 @@ function extrachill_multisite_init() {
 	require_once EXTRACHILL_MULTISITE_PLUGIN_DIR . 'inc/core/blog-ids.php';
 	require_once EXTRACHILL_MULTISITE_PLUGIN_DIR . 'inc/core/mail.php';
 	require_once EXTRACHILL_MULTISITE_PLUGIN_DIR . 'inc/core/cross-site-rest.php';
+	require_once EXTRACHILL_MULTISITE_PLUGIN_DIR . 'inc/core/cross-site-content-migration.php';
 	require_once EXTRACHILL_MULTISITE_PLUGIN_DIR . 'inc/core/extrachill-turnstile.php';
 	require_once EXTRACHILL_MULTISITE_PLUGIN_DIR . 'inc/core/oauth-helpers.php';
 	require_once EXTRACHILL_MULTISITE_PLUGIN_DIR . 'inc/core/object-cache-config.php';
@@ -109,6 +110,9 @@ function extrachill_multisite_init() {
 
 		require_once EXTRACHILL_MULTISITE_PLUGIN_DIR . 'inc/Abilities/MailAbilities.php';
 		new \ExtraChillMultisite\Abilities\MailAbilities();
+
+		require_once EXTRACHILL_MULTISITE_PLUGIN_DIR . 'inc/Abilities/CrossSiteContentMigrationAbilities.php';
+		new \ExtraChillMultisite\Abilities\CrossSiteContentMigrationAbilities();
 
 		// Shared editor utilities — load-envelope shape, permissions block,
 		// blog_id resolution. Consumed by every editor ability across the
