@@ -159,11 +159,19 @@ function ec_migrate_post( int $source_blog_id, int $post_id, int $dest_blog_id, 
 
 	// ---------------------------------------------------------------------
 	// 3. Rewrite content with the ID/URL maps and create the dest post.
+	// Resolve the source + dest upload baseurls (under their own blog context)
+	// so the rewrite can do a prefix swap that catches sized variants and the
+	// multisite `sites/<n>/` prefix an exact-URL map would miss.
 	// ---------------------------------------------------------------------
+	$source_baseurl = ec_migrate_get_upload_baseurl( $source_blog_id );
+	$dest_baseurl   = ec_migrate_get_upload_baseurl( $dest_blog_id );
+
 	$new_content = ec_migrate_rewrite_post_content(
 		(string) $source_post['post_content'],
 		$attachment_map,
-		$url_map
+		$url_map,
+		$source_baseurl,
+		$dest_baseurl
 	);
 
 	$featured_dest_id = 0;
@@ -559,31 +567,75 @@ function ec_migrate_copy_attachments( array $attachments, int $dest_blog_id ) {
 }
 
 /**
+ * Resolve a blog's upload baseurl (host + path prefix, no trailing slash).
+ *
+ * Switches into the target blog so wp_get_upload_dir() returns that blog's
+ * `baseurl` — e.g. `https://studio.extrachill.com/wp-content/uploads/sites/12`
+ * on a subsite, or `https://extrachill.com/wp-content/uploads` on the main
+ * (non-subdir) site. Returns '' if the baseurl can't be resolved.
+ *
+ * @param int $blog_id Blog ID.
+ * @return string Upload baseurl with no trailing slash, or '' on failure.
+ */
+function ec_migrate_get_upload_baseurl( int $blog_id ): string {
+	switch_to_blog( $blog_id );
+	try {
+		$uploads = wp_get_upload_dir();
+		$baseurl = isset( $uploads['baseurl'] ) ? (string) $uploads['baseurl'] : '';
+		return untrailingslashit( $baseurl );
+	} finally {
+		restore_current_blog();
+	}
+}
+
+/**
  * Rewrite post content so old attachment IDs and URLs point at dest equivalents.
  *
  * Pure string function (no WP calls) — the load-bearing correctness surface,
  * unit-tested directly. Handles:
+ *   - source upload baseurl PREFIX => dest upload baseurl prefix. This is the
+ *     load-bearing URL fix: it rewrites full, sized (`-1024x683.jpg`), and
+ *     dedupe-suffixed (`-1.jpg`) variants uniformly in one pass, and bridges
+ *     the multisite `.../uploads/sites/<n>/...` prefix that an exact-URL map
+ *     can never match. Because migration copies files into the dest preserving
+ *     the year/month subpath, swapping only the baseurl prefix resolves every
+ *     variant to a real file on dest.
  *   - `"id":OLD`          => `"id":NEW`   (image/media block attrs).
  *   - `"ids":[a,OLD,b]`   => remapped array (gallery block ids).
  *   - `wp-image-OLD`      => `wp-image-NEW` (inline <img> classes).
  *   - `data-id="OLD"`     => `data-id="NEW"`.
- *   - raw old URL         => new URL (covers `.../uploads/sites/<src>/...`).
+ *   - raw old URL         => new URL (belt-and-suspenders exact-URL map).
  *
- * URL replacement runs first (longest URLs first to avoid partial overlap),
- * then ID token replacement using word-boundary-safe patterns so `123` never
- * clobbers `1234`.
+ * Prefix swap runs first, then the exact-URL map (longest URLs first to avoid
+ * partial overlap), then ID token replacement using word-boundary-safe patterns
+ * so `123` never clobbers `1234`. The URL passes operate on upload paths/hosts;
+ * the ID pass operates on `"id":N` / `wp-image-N` tokens — the two are
+ * orthogonal and do not interfere.
  *
  * @param string $content        Original post content.
  * @param array  $attachment_map old_id => new_id.
  * @param array  $url_map        old_url => new_url.
+ * @param string $source_baseurl Source blog upload baseurl (e.g.
+ *                               `https://studio.extrachill.com/wp-content/uploads/sites/12`).
+ *                               Empty string disables the prefix swap.
+ * @param string $dest_baseurl   Dest blog upload baseurl (e.g.
+ *                               `https://extrachill.com/wp-content/uploads`).
  * @return string Rewritten content.
  */
-function ec_migrate_rewrite_post_content( string $content, array $attachment_map, array $url_map ): string {
+function ec_migrate_rewrite_post_content( string $content, array $attachment_map, array $url_map, string $source_baseurl = '', string $dest_baseurl = '' ): string {
 	if ( '' === $content ) {
 		return $content;
 	}
 
-	// 1. Raw URL replacement first. Sort by descending length so a longer URL
+	// 0. Prefix swap: replace the source upload baseurl prefix with the dest
+	// upload baseurl prefix. This is the primary URL fix — it rewrites full,
+	// sized, and thumbnail variants uniformly and handles the `sites/<n>/`
+	// multisite prefix that the exact-URL map below can never match.
+	if ( '' !== $source_baseurl && '' !== $dest_baseurl && $source_baseurl !== $dest_baseurl ) {
+		$content = str_replace( $source_baseurl, $dest_baseurl, $content );
+	}
+
+	// 1. Raw URL replacement. Sort by descending length so a longer URL
 	// (e.g. a sized variant) is replaced before a shorter prefix of it.
 	if ( ! empty( $url_map ) ) {
 		$urls = array_keys( $url_map );
