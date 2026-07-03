@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.21.0] - 2026-07-03
+
+### Added
+- add generic cross-site post migration primitive + ability
+
+### Fixed
+- harden Breeze role cookie to prevent auth users served cached anon pages
+
 ## [1.20.2] - 2026-06-30
 
 ### Fixed
