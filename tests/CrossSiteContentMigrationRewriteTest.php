@@ -134,6 +134,88 @@ class CrossSiteContentMigrationRewriteTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The prefix swap rewrites sized/dedupe variants AND the multisite
+	 * `sites/<n>/` prefix that an exact-URL map can never match.
+	 *
+	 * This is the regression case for issue #86: the ID tokens were remapped
+	 * correctly but every `<img src>` still pointed at the source blog because
+	 * the exact-URL map was keyed on the base full-size URL and never matched
+	 * `-1024x683.jpg` / `-1.jpg` variants or the `sites/12/` prefix.
+	 */
+	public function test_rewrite_prefix_swap_sized_variants_and_sites_prefix(): void {
+		$source_baseurl = 'https://studio.extrachill.com/wp-content/uploads/sites/12';
+		$dest_baseurl   = 'https://extrachill.com/wp-content/uploads';
+
+		// Mixed real-world markup: full-size, a -1024x683 sized variant, and a
+		// -1.jpg dedupe-suffixed file — none of which an exact-URL map keyed on
+		// the base full URL would have caught.
+		$content = ''
+			. '<!-- wp:image {"id":840,"sizeSlug":"large"} -->'
+			. '<figure class="wp-block-image size-large">'
+			. '<img src="https://studio.extrachill.com/wp-content/uploads/sites/12/2026/07/0L8A8809-1.jpg" class="wp-image-840"/>'
+			. '</figure><!-- /wp:image -->'
+			. '<img src="https://studio.extrachill.com/wp-content/uploads/sites/12/2026/07/0L8A8809-1-1024x683.jpg" />'
+			. '<img srcset="https://studio.extrachill.com/wp-content/uploads/sites/12/2026/07/0L8A8809-1-768x512.jpg 768w" />';
+
+		$out = ec_migrate_rewrite_post_content(
+			$content,
+			array( 840 => 110840 ),
+			array(),
+			$source_baseurl,
+			$dest_baseurl
+		);
+
+		// Zero references to the source blog upload path/host remain.
+		$this->assertStringNotContainsString( $source_baseurl, $out );
+		$this->assertStringNotContainsString( 'studio.extrachill.com', $out );
+		$this->assertStringNotContainsString( '/sites/12/', $out );
+
+		// Every variant now points at the dest baseurl, preserving the subpath.
+		$this->assertStringContainsString( $dest_baseurl . '/2026/07/0L8A8809-1.jpg', $out );
+		$this->assertStringContainsString( $dest_baseurl . '/2026/07/0L8A8809-1-1024x683.jpg', $out );
+		$this->assertStringContainsString( $dest_baseurl . '/2026/07/0L8A8809-1-768x512.jpg', $out );
+
+		// The ID token was still remapped (orthogonal to the URL swap).
+		$this->assertStringContainsString( '"id":110840', $out );
+		$this->assertStringContainsString( 'wp-image-110840', $out );
+		$this->assertStringNotContainsString( 'wp-image-840"', $out );
+	}
+
+	/**
+	 * The prefix swap also covers the single-site (non-subdir) case where the
+	 * source baseurl has NO `sites/<n>/` segment.
+	 */
+	public function test_rewrite_prefix_swap_single_site_non_subdir(): void {
+		$source_baseurl = 'https://blog.extrachill.com/wp-content/uploads';
+		$dest_baseurl   = 'https://extrachill.com/wp-content/uploads';
+
+		$content = '<img src="https://blog.extrachill.com/wp-content/uploads/2025/12/pic-300x200.jpg" class="wp-image-9" />';
+
+		$out = ec_migrate_rewrite_post_content(
+			$content,
+			array( 9 => 42 ),
+			array(),
+			$source_baseurl,
+			$dest_baseurl
+		);
+
+		$this->assertStringContainsString( 'https://extrachill.com/wp-content/uploads/2025/12/pic-300x200.jpg', $out );
+		$this->assertStringNotContainsString( 'blog.extrachill.com', $out );
+		$this->assertStringContainsString( 'wp-image-42', $out );
+	}
+
+	/**
+	 * An empty source baseurl disables the prefix swap (no accidental
+	 * whole-content mangling when a baseurl can't be resolved).
+	 */
+	public function test_rewrite_prefix_swap_disabled_when_baseurl_empty(): void {
+		$content = '<img src="https://studio.extrachill.com/wp-content/uploads/sites/12/2026/07/x.jpg" />';
+		$out     = ec_migrate_rewrite_post_content( $content, array(), array(), '', '' );
+
+		$this->assertSame( $content, $out );
+	}
+
+	/**
 	 * A short id must NOT clobber a longer id that contains it (12 vs 123).
 	 */
 	public function test_rewrite_id_boundaries_no_substring_clobber(): void {
