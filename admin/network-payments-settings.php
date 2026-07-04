@@ -3,25 +3,24 @@
  * ExtraChill Network Commerce Credentials
  *
  * Network admin page for configuring all platform commerce/provider credentials.
- * This is the single WRITE surface for network-wide commerce secrets:
+ * This is the single WRITE surface for network-wide commerce secrets.
  *
- *   Stripe (artist marketplace + Connect payouts):
- *     - extrachill_stripe_secret_key
- *     - extrachill_stripe_publishable_key
- *     - extrachill_stripe_connect_client_id
- *     - extrachill_stripe_webhook_secret
+ * Writes flow through the Extra Chill Shop encrypted auth providers (built on
+ * Data Machine's BaseAuthProvider AES-256-GCM envelope):
  *
- *   Shipping (Shippo label generation):
- *     - extrachill_shippo_api_key
+ *   Stripe (artist marketplace + Connect payouts) — \ExtraChill\Shop\Auth\StripeAuthProvider:
+ *     - secret_key, connect_client_id, webhook_secret  (encrypted at rest)
+ *     - publishable_key                                (plaintext by Stripe design)
  *
- * The shop (extrachill-shop) owns the runtime READ contract for each option:
+ *   Shipping (Shippo label generation) — \ExtraChill\Shop\Auth\ShippoAuthProvider:
+ *     - api_key                                        (encrypted at rest)
  *
- *     apply_filters( 'extrachill_stripe_<key>', get_site_option( 'extrachill_stripe_<key>' ) )
- *     get_site_option( 'extrachill_shippo_api_key' )
- *
- * This layer only writes the site_options under those exact option names, so the
- * shop read paths (and its `extrachill-dev` filter overrides) keep working
- * unchanged. Network-admin (super admin) only — these are platform-level secrets.
+ * The shop owns the provider classes and the runtime READ contract
+ * (apply_filters( 'extrachill_stripe_<key>' ) / extrachill_shippo_api_key).
+ * This layer only hands submitted values to the provider save() methods, so
+ * secrets are encrypted before they ever touch the options table, and the shop
+ * read paths keep working unchanged. Network-admin (super admin) only — these
+ * are platform-level secrets.
  *
  * @package ExtraChill\Multisite
  */
@@ -49,9 +48,11 @@ add_action( 'network_admin_edit_extrachill_payments', 'ec_handle_network_payment
 /**
  * Commerce credential field specification.
  *
- * Single source of truth for the POST field name, the site_option name the shop
- * reads, and the field UI metadata. Option names MUST match the shop's read
- * contract exactly. Grouped by `section` for rendering.
+ * Single source of truth for the POST field name (ec_commerce_<key>) and the
+ * field UI metadata. The `key` matches the Stripe provider field names
+ * directly; the shipping field's `key` is the legacy POST name, mapped to the
+ * provider `api_key` field on save (see ec_handle_network_payments_save()).
+ * Grouped by `section` for rendering.
  *
  * @return array<int, array<string,string>>
  */
@@ -61,7 +62,6 @@ function ec_network_commerce_fields() {
 		array(
 			'section'     => 'stripe',
 			'key'         => 'secret_key',
-			'option'      => 'extrachill_stripe_secret_key',
 			'label'       => __( 'Secret Key', 'extrachill-multisite' ),
 			'placeholder' => 'sk_live_...',
 			'description' => __( 'Your Stripe secret API key. Keep this confidential.', 'extrachill-multisite' ),
@@ -69,7 +69,6 @@ function ec_network_commerce_fields() {
 		array(
 			'section'     => 'stripe',
 			'key'         => 'publishable_key',
-			'option'      => 'extrachill_stripe_publishable_key',
 			'label'       => __( 'Publishable Key', 'extrachill-multisite' ),
 			'placeholder' => 'pk_live_...',
 			'description' => __( 'Stripe publishable API key, used for frontend integration.', 'extrachill-multisite' ),
@@ -77,7 +76,6 @@ function ec_network_commerce_fields() {
 		array(
 			'section'     => 'stripe',
 			'key'         => 'connect_client_id',
-			'option'      => 'extrachill_stripe_connect_client_id',
 			'label'       => __( 'Connect Client ID', 'extrachill-multisite' ),
 			'placeholder' => 'ca_...',
 			'description' => __( 'Stripe Connect platform client ID. Enables artist Connect Express onboarding and payouts.', 'extrachill-multisite' ),
@@ -85,7 +83,6 @@ function ec_network_commerce_fields() {
 		array(
 			'section'     => 'stripe',
 			'key'         => 'webhook_secret',
-			'option'      => 'extrachill_stripe_webhook_secret',
 			'label'       => __( 'Webhook Secret', 'extrachill-multisite' ),
 			'placeholder' => 'whsec_...',
 			'description' => __( 'Webhook signing secret used to verify Stripe webhook events.', 'extrachill-multisite' ),
@@ -94,7 +91,6 @@ function ec_network_commerce_fields() {
 		array(
 			'section'     => 'shipping',
 			'key'         => 'shippo_api_key',
-			'option'      => 'extrachill_shippo_api_key',
 			'label'       => __( 'Shippo API Key', 'extrachill-multisite' ),
 			'placeholder' => 'shippo_live_...',
 			'description' => __( 'Shippo API token used to generate USPS shipping labels. Keep this confidential.', 'extrachill-multisite' ),
@@ -105,9 +101,17 @@ function ec_network_commerce_fields() {
 /**
  * Handle commerce credentials form submission.
  *
- * No-wipe-on-blank: a key is only written when a NEW non-empty value is
- * submitted. Saving the form with a blank field preserves any already-set key,
- * so an accidental empty save cannot erase configured credentials.
+ * Writes flow through the encrypted Extra Chill Shop auth providers
+ * (StripeAuthProvider / ShippoAuthProvider), which store secrets in Data
+ * Machine's AES-256-GCM auth envelope. No-wipe-on-blank: each provider save()
+ * is a full-config overwrite, so non-blank submitted fields are merged over the
+ * current decrypted config before saving — a blank submission leaves every
+ * already-set field untouched.
+ *
+ * Graceful degradation: if the shop plugin (and therefore the provider classes)
+ * is not active, the submission is skipped rather than falling back to a
+ * plaintext write. Commerce credentials are the shop's responsibility; without
+ * it there is nothing to configure here.
  */
 function ec_handle_network_payments_save() {
 	if ( ! current_user_can( 'manage_network_options' ) ) {
@@ -116,6 +120,12 @@ function ec_handle_network_payments_save() {
 
 	check_admin_referer( 'ec_payments_settings', 'ec_payments_nonce' );
 
+	// Partition non-blank submissions by provider. Each provider save() is a
+	// full-config overwrite, so a provider is written at most once per save
+	// with only its changed fields merged into the current config.
+	$stripe_changes = array();
+	$shippo_changes = array();
+
 	foreach ( ec_network_commerce_fields() as $field ) {
 		$post_key = 'ec_commerce_' . $field['key'];
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above via check_admin_referer().
@@ -123,15 +133,31 @@ function ec_handle_network_payments_save() {
 			? sanitize_text_field( wp_unslash( $_POST[ $post_key ] ) )
 			: '';
 
-		// Only update when a new non-empty value was submitted.
-		if ( '' !== $submitted ) {
-			// TODO: encrypt these secrets at rest once a shared EC secret-encryption
-			// helper exists. No reusable EC-owned crypto helper is available today
-			// (only third-party, plugin-local schemes such as Easy WP SMTP's own
-			// Crypto class). Do not invent a bespoke scheme here; revisit when a
-			// shared helper lands.
-			update_site_option( $field['option'], $submitted );
+		if ( '' === $submitted ) {
+			continue;
 		}
+
+		if ( 'shipping' === $field['section'] ) {
+			// The Shippo provider field is `api_key`; the form POST key keeps
+			// the legacy `shippo_api_key` name for form stability.
+			$shippo_changes['api_key'] = $submitted;
+		} else {
+			$stripe_changes[ $field['key'] ] = $submitted;
+		}
+	}
+
+	if ( ! empty( $stripe_changes ) && class_exists( '\ExtraChill\Shop\Auth\StripeAuthProvider' ) ) {
+		$stripe_provider = new \ExtraChill\Shop\Auth\StripeAuthProvider();
+		\ExtraChill\Shop\Auth\StripeAuthProvider::save(
+			array_merge( $stripe_provider->get_config(), $stripe_changes )
+		);
+	}
+
+	if ( ! empty( $shippo_changes ) && class_exists( '\ExtraChill\Shop\Auth\ShippoAuthProvider' ) ) {
+		$shippo_provider = new \ExtraChill\Shop\Auth\ShippoAuthProvider();
+		\ExtraChill\Shop\Auth\ShippoAuthProvider::save(
+			array_merge( $shippo_provider->get_config(), $shippo_changes )
+		);
 	}
 
 	$redirect_url = add_query_arg(
@@ -147,6 +173,43 @@ function ec_handle_network_payments_save() {
 }
 
 /**
+ * Whether a commerce credential is currently set in the encrypted auth store.
+ *
+ * Reads from the Extra Chill Shop providers so the Set / Not set indicator
+ * reflects the same encrypted store the write path targets. Returns false when
+ * the provider classes are unavailable (shop inactive) — there is no plaintext
+ * fallback, by design.
+ *
+ * @param array<string,string> $field Field spec from ec_network_commerce_fields().
+ * @return bool
+ */
+function ec_network_commerce_field_is_set( array $field ): bool {
+	if ( 'shipping' === $field['section'] ) {
+		return class_exists( '\ExtraChill\Shop\Auth\ShippoAuthProvider' )
+			&& '' !== ( new \ExtraChill\Shop\Auth\ShippoAuthProvider() )->get_api_key();
+	}
+
+	if ( ! class_exists( '\ExtraChill\Shop\Auth\StripeAuthProvider' ) ) {
+		return false;
+	}
+
+	$stripe  = new \ExtraChill\Shop\Auth\StripeAuthProvider();
+	$getters = array(
+		'secret_key'        => 'get_secret_key',
+		'publishable_key'   => 'get_publishable_key',
+		'connect_client_id' => 'get_connect_client_id',
+		'webhook_secret'    => 'get_webhook_secret',
+	);
+
+	if ( ! isset( $getters[ $field['key'] ] ) ) {
+		return false;
+	}
+
+	$getter = $getters[ $field['key'] ];
+	return '' !== $stripe->$getter();
+}
+
+/**
  * Render network commerce credentials page.
  *
  * Stored credential values are NEVER echoed back into the form. Each field shows
@@ -158,7 +221,7 @@ function ec_render_network_payments_page() {
 	$statuses = array();
 
 	foreach ( $fields as $field ) {
-		$statuses[ $field['key'] ] = ! empty( get_site_option( $field['option'], '' ) );
+		$statuses[ $field['key'] ] = ec_network_commerce_field_is_set( $field );
 	}
 
 	$is_configured   = ! empty( $statuses['secret_key'] ) && ! empty( $statuses['publishable_key'] );
