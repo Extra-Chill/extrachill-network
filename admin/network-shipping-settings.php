@@ -35,7 +35,8 @@ function ec_add_network_shipping_menu() {
  * Render network shipping settings page (read-only policy reference).
  */
 function ec_render_network_shipping_page() {
-	$shipping_ready = ! empty( get_site_option( 'extrachill_shippo_api_key', '' ) );
+	$shipping_ready = class_exists( '\ExtraChill\Shop\Auth\ShippoAuthProvider' )
+		&& '' !== ( new \ExtraChill\Shop\Auth\ShippoAuthProvider() )->get_api_key();
 	$payments_url   = add_query_arg(
 		array( 'page' => 'extrachill-payments' ),
 		network_admin_url( 'admin.php' )
