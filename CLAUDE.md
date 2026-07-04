@@ -19,7 +19,7 @@
 
 **Extra Chill Multisite** is the network foundation plugin for the Extra Chill Platform, providing centralized infrastructure for all 10 active WordPress multisite sites. It manages network-wide configuration, authentication, security, site discovery, and cross-site linking patterns while remaining lightweight and performant across the entire network.
 
-**Core Purpose**: Single source of truth for blog ID management, Cloudflare Turnstile integration, network admin menu structure, and cross-site coordination patterns (including `ec_get_artist_profile_by_slug` and `ec_render_cross_site_artist_profile_links`).
+**Core Purpose**: Single source of truth for blog ID management, Cloudflare Turnstile integration, network admin menu structure, and cross-site coordination patterns (including `ec_get_artist_profile_by_slug`).
 
 ## Current Status
 
@@ -406,7 +406,6 @@ add_action( 'wp_enqueue_scripts', function() {
 - `ec_get_artist_profile_by_slug( $slug )`  Resolves published `artist_profile` CPT by slug on the artist site.
 - `ec_render_cross_site_taxonomy_links()` (hook: `extrachill_archive_below_description`)  renders taxonomy link buttons on `is_tax()`.
 - `ec_render_cross_site_user_links( $user_id )` (hook: `extrachill_after_author_bio`)  renders user link buttons on author pages.
-- `ec_render_cross_site_artist_profile_links( $artist_slug )`  renders links on artist profile surfaces.
 
 **Canonical Authority Functions** (`inc/cross-site-links/canonical-authority.php`):
 - `ec_get_canonical_authority_url( $term, $taxonomy )`  Returns canonical URL for taxonomy archive across sites.
