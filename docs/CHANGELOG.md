@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.22.0] - 2026-07-04
+
+### Added
+- consolidate + harden network commerce credentials (Stripe + Shippo)
+
+### Changed
+- write network commerce credentials via encrypted auth providers
+- retire artist-profile Coverage button-row section
+
+### Fixed
+- rewrite inline image src URLs via prefix swap during cross-site migration
+
 ## [1.21.0] - 2026-07-03
 
 ### Added
