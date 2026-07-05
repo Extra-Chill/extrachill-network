@@ -134,6 +134,12 @@ function extrachill_multisite_init() {
 		require_once EXTRACHILL_MULTISITE_PLUGIN_DIR . 'inc/og-cards/og-cards.php';
 	}
 
+	// Commerce auth providers (Stripe + Shippo). These MUST live at the network
+	// layer so their classes load in network-admin (where the Network Admin >
+	// Payments save handler runs) as well as on blog 3 (where the shop reads
+	// them). The bootstrap self-guards on Data Machine's BaseAuthProvider. See #92.
+	require_once EXTRACHILL_MULTISITE_PLUGIN_DIR . 'inc/commerce/auth/bootstrap.php';
+
 	if ( is_admin() && is_network_admin() ) {
 		require_once EXTRACHILL_MULTISITE_PLUGIN_DIR . 'admin/network-menu.php';
 		require_once EXTRACHILL_MULTISITE_PLUGIN_DIR . 'admin/network-security-settings.php';

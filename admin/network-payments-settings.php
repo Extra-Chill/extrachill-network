@@ -5,22 +5,21 @@
  * Network admin page for configuring all platform commerce/provider credentials.
  * This is the single WRITE surface for network-wide commerce secrets.
  *
- * Writes flow through the Extra Chill Shop encrypted auth providers (built on
+ * Writes flow through the network-layer encrypted auth providers (built on
  * Data Machine's BaseAuthProvider AES-256-GCM envelope):
  *
- *   Stripe (artist marketplace + Connect payouts) — \ExtraChill\Shop\Auth\StripeAuthProvider:
+ *   Stripe (artist marketplace + Connect payouts) — \ExtraChillMultisite\Commerce\Auth\StripeAuthProvider:
  *     - secret_key, connect_client_id, webhook_secret  (encrypted at rest)
  *     - publishable_key                                (plaintext by Stripe design)
  *
- *   Shipping (Shippo label generation) — \ExtraChill\Shop\Auth\ShippoAuthProvider:
+ *   Shipping (Shippo label generation) — \ExtraChillMultisite\Commerce\Auth\ShippoAuthProvider:
  *     - api_key                                        (encrypted at rest)
  *
- * The shop owns the provider classes and the runtime READ contract
- * (apply_filters( 'extrachill_stripe_<key>' ) / extrachill_shippo_api_key).
- * This layer only hands submitted values to the provider save() methods, so
- * secrets are encrypted before they ever touch the options table, and the shop
- * read paths keep working unchanged. Network-admin (super admin) only — these
- * are platform-level secrets.
+ * These providers live in this (network-active) plugin, so the class_exists()
+ * guards below are TRUE in network-admin and the save actually persists. The
+ * shop consumes the read-filter contract (`extrachill_stripe_<key>` /
+ * `extrachill_shippo_api_key`) registered by inc/commerce/auth/bootstrap.php.
+ * Network-admin (super admin) only — these are platform-level secrets.
  *
  * @package ExtraChill\Multisite
  */
@@ -101,17 +100,18 @@ function ec_network_commerce_fields() {
 /**
  * Handle commerce credentials form submission.
  *
- * Writes flow through the encrypted Extra Chill Shop auth providers
- * (StripeAuthProvider / ShippoAuthProvider), which store secrets in Data
- * Machine's AES-256-GCM auth envelope. No-wipe-on-blank: each provider save()
- * is a full-config overwrite, so non-blank submitted fields are merged over the
- * current decrypted config before saving — a blank submission leaves every
- * already-set field untouched.
+ * Writes flow through the encrypted network-layer auth providers
+ * (StripeAuthProvider / ShippoAuthProvider in ExtraChillMultisite\Commerce\Auth),
+ * which store secrets in Data Machine's AES-256-GCM auth envelope. Because the
+ * providers live in this network-active plugin, their classes load in
+ * network-admin and the class_exists() guards below are TRUE — the save
+ * persists. No-wipe-on-blank: each provider save() is a full-config overwrite,
+ * so non-blank submitted fields are merged over the current decrypted config
+ * before saving — a blank submission leaves every already-set field untouched.
  *
- * Graceful degradation: if the shop plugin (and therefore the provider classes)
+ * Graceful degradation: if Data Machine (and therefore the provider classes)
  * is not active, the submission is skipped rather than falling back to a
- * plaintext write. Commerce credentials are the shop's responsibility; without
- * it there is nothing to configure here.
+ * plaintext write.
  */
 function ec_handle_network_payments_save() {
 	if ( ! current_user_can( 'manage_network_options' ) ) {
@@ -146,16 +146,16 @@ function ec_handle_network_payments_save() {
 		}
 	}
 
-	if ( ! empty( $stripe_changes ) && class_exists( '\ExtraChill\Shop\Auth\StripeAuthProvider' ) ) {
-		$stripe_provider = new \ExtraChill\Shop\Auth\StripeAuthProvider();
-		\ExtraChill\Shop\Auth\StripeAuthProvider::save(
+	if ( ! empty( $stripe_changes ) && class_exists( '\ExtraChillMultisite\Commerce\Auth\StripeAuthProvider' ) ) {
+		$stripe_provider = new \ExtraChillMultisite\Commerce\Auth\StripeAuthProvider();
+		\ExtraChillMultisite\Commerce\Auth\StripeAuthProvider::save(
 			array_merge( $stripe_provider->get_config(), $stripe_changes )
 		);
 	}
 
-	if ( ! empty( $shippo_changes ) && class_exists( '\ExtraChill\Shop\Auth\ShippoAuthProvider' ) ) {
-		$shippo_provider = new \ExtraChill\Shop\Auth\ShippoAuthProvider();
-		\ExtraChill\Shop\Auth\ShippoAuthProvider::save(
+	if ( ! empty( $shippo_changes ) && class_exists( '\ExtraChillMultisite\Commerce\Auth\ShippoAuthProvider' ) ) {
+		$shippo_provider = new \ExtraChillMultisite\Commerce\Auth\ShippoAuthProvider();
+		\ExtraChillMultisite\Commerce\Auth\ShippoAuthProvider::save(
 			array_merge( $shippo_provider->get_config(), $shippo_changes )
 		);
 	}
@@ -175,25 +175,25 @@ function ec_handle_network_payments_save() {
 /**
  * Whether a commerce credential is currently set in the encrypted auth store.
  *
- * Reads from the Extra Chill Shop providers so the Set / Not set indicator
+ * Reads from the network-layer providers so the Set / Not set indicator
  * reflects the same encrypted store the write path targets. Returns false when
- * the provider classes are unavailable (shop inactive) — there is no plaintext
- * fallback, by design.
+ * the provider classes are unavailable (Data Machine inactive) — there is no
+ * plaintext fallback, by design.
  *
  * @param array<string,string> $field Field spec from ec_network_commerce_fields().
  * @return bool
  */
 function ec_network_commerce_field_is_set( array $field ): bool {
 	if ( 'shipping' === $field['section'] ) {
-		return class_exists( '\ExtraChill\Shop\Auth\ShippoAuthProvider' )
-			&& '' !== ( new \ExtraChill\Shop\Auth\ShippoAuthProvider() )->get_api_key();
+		return class_exists( '\ExtraChillMultisite\Commerce\Auth\ShippoAuthProvider' )
+			&& '' !== ( new \ExtraChillMultisite\Commerce\Auth\ShippoAuthProvider() )->get_api_key();
 	}
 
-	if ( ! class_exists( '\ExtraChill\Shop\Auth\StripeAuthProvider' ) ) {
+	if ( ! class_exists( '\ExtraChillMultisite\Commerce\Auth\StripeAuthProvider' ) ) {
 		return false;
 	}
 
-	$stripe  = new \ExtraChill\Shop\Auth\StripeAuthProvider();
+	$stripe  = new \ExtraChillMultisite\Commerce\Auth\StripeAuthProvider();
 	$getters = array(
 		'secret_key'        => 'get_secret_key',
 		'publishable_key'   => 'get_publishable_key',
