@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.22.1] - 2026-07-05
+
+### Fixed
+- move commerce auth providers to network layer so save works in network-admin
+
 ## [1.22.0] - 2026-07-04
 
 ### Added
