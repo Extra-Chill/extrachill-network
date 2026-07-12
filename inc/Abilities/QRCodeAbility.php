@@ -28,7 +28,7 @@ class QRCodeAbility {
 	 * Register the ability unless the retiring owner already provided it.
 	 */
 	public function register(): void {
-		if ( wp_get_ability( 'extrachill/generate-qr-code' ) ) {
+		if ( wp_has_ability( 'extrachill/generate-qr-code' ) ) {
 			return;
 		}
 
