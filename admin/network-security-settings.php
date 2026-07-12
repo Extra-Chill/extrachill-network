@@ -24,7 +24,7 @@ function ec_add_network_security_menu() {
 		'Security Settings',
 		'Security',
 		'manage_network_options',
-		EXTRACHILL_NETWORK_MENU_SLUG,
+		'extrachill-security',
 		'ec_render_network_security_page'
 	);
 }
@@ -55,7 +55,7 @@ function ec_handle_network_security_save() {
 	// Redirect back with success message
 	$redirect_url = add_query_arg(
 		array(
-			'page'    => EXTRACHILL_NETWORK_MENU_SLUG,
+			'page'    => 'extrachill-security',
 			'updated' => 'true',
 		),
 		network_admin_url( 'admin.php' )

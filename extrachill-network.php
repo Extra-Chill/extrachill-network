@@ -146,5 +146,6 @@ function extrachill_network_init() {
 		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'admin/network-payments-settings.php';
 		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'admin/network-oauth-settings.php';
 		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'admin/network-shipping-settings.php';
+		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'admin/network-integrations-settings.php';
 	}
 }
