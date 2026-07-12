@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.0.0] - 2026-07-12
+
+### Changed
+- rename plugin extrachill-multisite → extrachill-network
+
 ## [1.22.1] - 2026-07-05
 
 ### Fixed
