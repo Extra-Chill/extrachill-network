@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.1.2] - 2026-07-12
+
+### Fixed
+- cover QR ability registration lifecycle (#110)
+
 ## [2.1.1] - 2026-07-12
 
 ### Fixed
