@@ -14,15 +14,6 @@ if ( ! defined( 'EXTRACHILL_NETWORK_MENU_SLUG' ) ) {
 	define( 'EXTRACHILL_NETWORK_MENU_SLUG', 'extrachill-network' );
 }
 
-// Back-compat: consumer plugins (extrachill-seo, extrachill-users) register
-// their submenu pages against the pre-rename constant. Keep it defined and
-// pointing at the SAME slug so their `if ( ! defined( ... ) ) return;` guards
-// keep passing and their pages keep landing under this menu. Remove once all
-// consumers reference EXTRACHILL_NETWORK_MENU_SLUG.
-if ( ! defined( 'EXTRACHILL_MULTISITE_MENU_SLUG' ) ) {
-	define( 'EXTRACHILL_MULTISITE_MENU_SLUG', EXTRACHILL_NETWORK_MENU_SLUG );
-}
-
 add_action( 'network_admin_menu', 'ec_add_network_menu', 5 );
 
 function ec_add_network_menu() {
