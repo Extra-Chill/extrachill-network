@@ -312,9 +312,8 @@ function extrachill_network_bridge_build_cards( $terms_by_taxonomy, $allowed_sit
  * "from around the network" destination, and the engine already excludes it.
  *
  * The `artist` destination is special-cased: instead of the per-term artist
- * profile deep link the engine resolves, this substitutes a fixed platform
- * conversion card (see extrachill_network_bridge_artist_platform_card()).
- * See "Why artist destinations are special-cased" below.
+ * profile deep link the engine resolves, this substitutes a contextual
+ * community-search card (see extrachill_network_bridge_artist_community_card()).
  *
  * @since 1.21.0
  *
@@ -343,32 +342,14 @@ function extrachill_network_bridge_collect( &$by_site, $term, $taxonomy, $allowe
 			continue;
 		}
 
-		/*
-		 * Why artist destinations are special-cased:
-		 *
-		 * The engine resolved a real artist_profile match — that's still the
-		 * correct GATE ("does this term have a live artist-platform
-		 * destination at all"), so we keep using $links exactly as before to
-		 * decide whether an artist card renders. What changes is the CARD
-		 * ITSELF: rather than deep-linking the one term-matched profile, this
-		 * destination pitches the platform to artists.
-		 *
-		 * Measured reason (extrachill-network#98): 30-day first-party data
-		 * showed 2,410 artist-destination bridge impressions against 1 click
-		 * ALL-TIME (0.04% CTR), vs. 1.76% for the events destination on the
-		 * identical UI. 98.8% of those impressions were the "Grateful Dead
-		 * Artist Profile" card served to legacy song-meaning SEO traffic that
-		 * has no use for one band's link page. The surface's job for this
-		 * destination is to convert READERS INTO ARTISTS ("free link page,
-		 * subscribers, analytics — no catch"), not to deep-link a
-		 * term-matched profile nobody asked for. Only one artist card is ever
-		 * possible per post anyway (by_site is keyed by site_key), so every
-		 * matching artist term collapses onto the same platform CTA.
-		 */
-		if ( 'artist' === $site_key ) {
-			$platform_card = extrachill_network_bridge_artist_platform_card();
-			if ( $platform_card ) {
-				$by_site['artist'] = $platform_card;
+		// Artist-profile cards measured at 0.04% CTR because fan-oriented
+		// editorial traffic landed on link pages. Route that intent into a
+		// contextual community search instead; artist-platform conversion stays
+		// on artist-facing surfaces such as extrachill.link. See #88 and #98.
+		if ( 'artist' === $site_key && in_array( 'community', $allowed_site_keys, true ) ) {
+			$community_card = extrachill_network_bridge_artist_community_card( $term );
+			if ( $community_card && empty( $by_site['community'] ) ) {
+				$by_site['community'] = $community_card;
 			}
 			continue;
 		}
@@ -389,39 +370,36 @@ function extrachill_network_bridge_collect( &$by_site, $term, $taxonomy, $allowe
 }
 
 /**
- * Build the fixed artist-destination platform conversion card.
+ * Build a contextual community card for an artist term.
  *
- * Replaces the per-term artist_profile deep link with a card that sells the
- * Extra Chill Artist Platform itself — a free link page, subscribers, and
- * analytics — and points at the `/power/#artists` section of the network
- * manifesto page (extrachill-blog's power-page.php) rather than any single
- * artist's profile. See extrachill-network#98 for the measured rationale.
- *
- * `term_name` is deliberately empty: extrachill_cross_site_link_button()
- * prefixes the label with term_name when present, and this card's label is
- * a complete, term-agnostic pitch — prefixing it with the post's artist term
- * name would reintroduce the exact "why is this about ONE band" framing this
- * change removes.
+ * Replaces the low-performing artist-profile deep link with a search for that
+ * artist on the community site. This serves the fan intent of editorial
+ * traffic and follows the community-first bridge strategy in #88.
  *
  * @since 1.23.0
  *
+ * @param WP_Term $term Artist taxonomy term.
  * @return array|null Link array consumable by extrachill_cross_site_link_button(),
- *                     or null if the main site URL can't be resolved.
+ *                     or null if the community URL can't be resolved.
  */
-function extrachill_network_bridge_artist_platform_card() {
+function extrachill_network_bridge_artist_community_card( $term ) {
 	if ( ! function_exists( 'ec_get_site_url' ) ) {
 		return null;
 	}
 
-	$main_url = ec_get_site_url( 'main' );
-	if ( ! $main_url ) {
+	$community_url = ec_get_site_url( 'community' );
+	if ( ! $community_url || empty( $term->name ) ) {
 		return null;
 	}
 
 	return array(
-		'site_key'  => 'artist',
-		'url'       => $main_url . '/power/#artists',
-		'label'     => __( 'Are You an Artist? Free Link Page, Subscribers & Analytics', 'extrachill-network' ),
+		'site_key'  => 'community',
+		'url'       => add_query_arg( 's', $term->name, trailingslashit( $community_url ) ),
+		'label'     => sprintf(
+			/* translators: %s: artist name. */
+			__( 'Discuss %s in the Community', 'extrachill-network' ),
+			$term->name
+		),
 		'term_name' => '',
 		'count'     => 0,
 	);
