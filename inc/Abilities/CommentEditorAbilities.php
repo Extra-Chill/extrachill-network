@@ -9,16 +9,16 @@
  * rather than any per-site plugin.
  *
  * Block content is stored as serialized markup in comment_content, mirroring
- * the topic/reply storage decision documented in extrachill-multisite#33.
+ * the topic/reply storage decision documented in extrachill-network#33.
  *
- * @package ExtraChillMultisite\Abilities
+ * @package ExtraChillNetwork\Abilities
  */
 
-namespace ExtraChillMultisite\Abilities;
+namespace ExtraChillNetwork\Abilities;
 
-use ExtraChillMultisite\Editor\BlogResolver;
-use ExtraChillMultisite\Editor\LoadEnvelope;
-use ExtraChillMultisite\Editor\Permissions;
+use ExtraChillNetwork\Editor\BlogResolver;
+use ExtraChillNetwork\Editor\LoadEnvelope;
+use ExtraChillNetwork\Editor\Permissions;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -39,9 +39,9 @@ class CommentEditorAbilities {
 		wp_register_ability(
 			'extrachill/comment-get-for-editor',
 			array(
-				'label'               => __( 'Get Comment For Editor', 'extrachill-multisite' ),
-				'description'         => __( 'Load a comment for editing: returns serialized comment_content (block markup as-stored) and permissions envelope.', 'extrachill-multisite' ),
-				'category'            => 'extrachill-multisite',
+				'label'               => __( 'Get Comment For Editor', 'extrachill-network' ),
+				'description'         => __( 'Load a comment for editing: returns serialized comment_content (block markup as-stored) and permissions envelope.', 'extrachill-network' ),
+				'category'            => 'extrachill-network',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(
@@ -109,9 +109,9 @@ class CommentEditorAbilities {
 		wp_register_ability(
 			'extrachill/comment-update',
 			array(
-				'label'               => __( 'Update Comment', 'extrachill-multisite' ),
-				'description'         => __( 'Update an existing comment\'s content. Sanitises via wp_kses_post(), calls wp_update_comment(), fires edit_comment so cache and notification hooks trigger.', 'extrachill-multisite' ),
-				'category'            => 'extrachill-multisite',
+				'label'               => __( 'Update Comment', 'extrachill-network' ),
+				'description'         => __( 'Update an existing comment\'s content. Sanitises via wp_kses_post(), calls wp_update_comment(), fires edit_comment so cache and notification hooks trigger.', 'extrachill-network' ),
+				'category'            => 'extrachill-network',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(

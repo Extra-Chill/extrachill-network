@@ -6,7 +6,7 @@
  * Provides taxonomy archive linking, user profile linking, and artist profile linking
  * between sites with content existence verification.
  *
- * @package ExtraChillMultisite
+ * @package ExtraChillNetwork
  * @since 1.4.0
  */
 
@@ -53,15 +53,15 @@ function extrachill_get_site_labels() {
 	return apply_filters(
 		'extrachill_site_labels',
 		array(
-			'main'       => __( 'Blog', 'extrachill-multisite' ),
-			'community'  => __( 'Community', 'extrachill-multisite' ),
-			'shop'       => __( 'Shop', 'extrachill-multisite' ),
-			'artist'     => __( 'Artist Platform', 'extrachill-multisite' ),
-			'events'     => __( 'Events', 'extrachill-multisite' ),
-			'newsletter' => __( 'Newsletter', 'extrachill-multisite' ),
-			'docs'       => __( 'Docs', 'extrachill-multisite' ),
-			'wire'       => __( 'News Wire', 'extrachill-multisite' ),
-			'studio'     => __( 'Studio', 'extrachill-multisite' ),
+			'main'       => __( 'Blog', 'extrachill-network' ),
+			'community'  => __( 'Community', 'extrachill-network' ),
+			'shop'       => __( 'Shop', 'extrachill-network' ),
+			'artist'     => __( 'Artist Platform', 'extrachill-network' ),
+			'events'     => __( 'Events', 'extrachill-network' ),
+			'newsletter' => __( 'Newsletter', 'extrachill-network' ),
+			'docs'       => __( 'Docs', 'extrachill-network' ),
+			'wire'       => __( 'News Wire', 'extrachill-network' ),
+			'studio'     => __( 'Studio', 'extrachill-network' ),
 		)
 	);
 }
@@ -78,12 +78,12 @@ function extrachill_get_site_content_type_labels() {
 	return apply_filters(
 		'extrachill_site_content_type_labels',
 		array(
-			'main'      => __( 'Blog Posts', 'extrachill-multisite' ),
-			'events'    => __( 'Events', 'extrachill-multisite' ),
-			'shop'      => __( 'Shop', 'extrachill-multisite' ),
-			'wire'      => __( 'Festival Wire', 'extrachill-multisite' ),
-			'artist'    => __( 'Artist Profile', 'extrachill-multisite' ),
-			'community' => __( 'Forum Discussions', 'extrachill-multisite' ),
+			'main'      => __( 'Blog Posts', 'extrachill-network' ),
+			'events'    => __( 'Events', 'extrachill-network' ),
+			'shop'      => __( 'Shop', 'extrachill-network' ),
+			'wire'      => __( 'Festival Wire', 'extrachill-network' ),
+			'artist'    => __( 'Artist Profile', 'extrachill-network' ),
+			'community' => __( 'Forum Discussions', 'extrachill-network' ),
 		)
 	);
 }

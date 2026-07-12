@@ -11,7 +11,7 @@ All rules apply to the `extrachill.com` zone (which covers every subsite via the
 
 ## Status
 
-These rules were drafted in agent Session 22 (2026-04-28) and Session 25 (2026-05-18) and are tracked for deployment in [Extra-Chill/extrachill-multisite#23](https://github.com/Extra-Chill/extrachill-multisite/issues/23). The acceptance criteria there govern which rules are required (1–3, 6, 7) vs. optional (4, 5).
+These rules were drafted in agent Session 22 (2026-04-28) and Session 25 (2026-05-18) and are tracked for deployment in [Extra-Chill/extrachill-network#23](https://github.com/Extra-Chill/extrachill-network/issues/23). The acceptance criteria there govern which rules are required (1–3, 6, 7) vs. optional (4, 5).
 
 ---
 
@@ -164,6 +164,6 @@ When Cloudflare drift is detected (a rule in the dashboard doesn't match this fi
 
 ## See also
 
-- [Extra-Chill/extrachill-multisite#23](https://github.com/Extra-Chill/extrachill-multisite/issues/23) — the issue tracking deployment of these rules.
-- [Extra-Chill/extrachill-multisite#12](https://github.com/Extra-Chill/extrachill-multisite/issues/12) — closed predecessor that established the `docs/nginx/` pattern.
+- [Extra-Chill/extrachill-network#23](https://github.com/Extra-Chill/extrachill-network/issues/23) — the issue tracking deployment of these rules.
+- [Extra-Chill/extrachill-network#12](https://github.com/Extra-Chill/extrachill-network/issues/12) — closed predecessor that established the `docs/nginx/` pattern.
 - `bot-blocking.conf` and `server-snippet.conf` in this directory — the nginx origin layer that runs alongside these Cloudflare rules.

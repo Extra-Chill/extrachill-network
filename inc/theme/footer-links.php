@@ -5,7 +5,7 @@
  * Provides EC-specific footer bottom menu links via filter.
  * Theme provides empty default; this plugin adds EC links.
  *
- * @package ExtraChill\Multisite
+ * @package ExtraChill\Network
  * @since 1.4.0
  */
 
@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @param array $items Existing footer items.
  * @return array Modified items.
  */
-function extrachill_multisite_footer_bottom_links( $items ) {
+function extrachill_network_footer_bottom_links( $items ) {
 	$main_site_url = function_exists( 'ec_get_site_url' ) ? ec_get_site_url( 'main' ) : home_url();
 
 	$items[] = array(
@@ -37,4 +37,4 @@ function extrachill_multisite_footer_bottom_links( $items ) {
 
 	return $items;
 }
-add_filter( 'extrachill_footer_bottom_menu_items', 'extrachill_multisite_footer_bottom_links' );
+add_filter( 'extrachill_footer_bottom_menu_items', 'extrachill_network_footer_bottom_links' );

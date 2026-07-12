@@ -24,7 +24,7 @@
  * or taxonomy slugs. The consuming plugin owns the `is_singular()` / site
  * guard and decides WHEN to call this; the primitive just renders given args.
  *
- * @package ExtraChillMultisite
+ * @package ExtraChillNetwork
  * @since 1.21.0
  */
 
@@ -39,20 +39,20 @@ if ( ! defined( 'ABSPATH' ) ) {
  * bridge actually has cards to show, so no CSS loads on posts without
  * cross-site matches. Depends on `extrachill-root` for the design tokens.
  *
- * Centralized in extrachill-multisite so the three consuming plugins no longer
+ * Centralized in extrachill-network so the three consuming plugins no longer
  * each ship an identical copy of network-bridge.css.
  *
  * @since 1.21.0
  */
 function extrachill_network_bridge_register_style() {
-	$css_path = EXTRACHILL_MULTISITE_PLUGIN_DIR . 'assets/css/network-bridge.css';
+	$css_path = EXTRACHILL_NETWORK_PLUGIN_DIR . 'assets/css/network-bridge.css';
 	if ( ! file_exists( $css_path ) ) {
 		return;
 	}
 
 	wp_register_style(
 		'extrachill-network-bridge',
-		EXTRACHILL_MULTISITE_PLUGIN_URL . 'assets/css/network-bridge.css',
+		EXTRACHILL_NETWORK_PLUGIN_URL . 'assets/css/network-bridge.css',
 		array( 'extrachill-root' ),
 		(string) filemtime( $css_path )
 	);
@@ -110,7 +110,7 @@ function extrachill_render_network_bridge( array $args ) {
 		: 'network-bridge-header';
 	$heading_text      = isset( $args['heading_text'] ) && '' !== $args['heading_text']
 		? (string) $args['heading_text']
-		: __( 'From Around the Extra Chill Network', 'extrachill-multisite' );
+		: __( 'From Around the Extra Chill Network', 'extrachill-network' );
 
 	if ( empty( $taxonomies ) || empty( $allowed_site_keys ) || empty( $slot_order ) ) {
 		return;

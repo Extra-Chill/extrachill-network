@@ -4,17 +4,17 @@
  *
  * Resolves the data payload that each post type's OG template should
  * receive. Generic and filterable so any plugin can register a data
- * collector for its own post type without coupling to extrachill-multisite.
+ * collector for its own post type without coupling to extrachill-network.
  *
  * The post-type → template mapping is filterable too so plugins can claim
  * their own post types ("use template X for post type Y") without us
  * touching this file.
  *
- * @package ExtraChillMultisite\OgCards
+ * @package ExtraChillNetwork\OgCards
  * @since 1.11.0
  */
 
-namespace ExtraChillMultisite\OgCards;
+namespace ExtraChillNetwork\OgCards;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;

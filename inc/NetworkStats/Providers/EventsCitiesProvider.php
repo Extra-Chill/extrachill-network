@@ -13,13 +13,13 @@
  *
  * Returns null only when the events site itself is unavailable.
  *
- * @package ExtraChillMultisite\NetworkStats\Providers
+ * @package ExtraChillNetwork\NetworkStats\Providers
  * @since   1.19.0
  */
 
-namespace ExtraChillMultisite\NetworkStats\Providers;
+namespace ExtraChillNetwork\NetworkStats\Providers;
 
-use ExtraChillMultisite\NetworkStats\AbstractMetricProvider;
+use ExtraChillNetwork\NetworkStats\AbstractMetricProvider;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -32,7 +32,7 @@ class EventsCitiesProvider extends AbstractMetricProvider {
 	 * Construct the events-cities provider.
 	 */
 	public function __construct() {
-		parent::__construct( 'events_cities', __( 'Cities', 'extrachill-multisite' ), HOUR_IN_SECONDS );
+		parent::__construct( 'events_cities', __( 'Cities', 'extrachill-network' ), HOUR_IN_SECONDS );
 	}
 
 	/**

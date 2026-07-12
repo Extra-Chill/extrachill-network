@@ -8,13 +8,13 @@
  * whole-network member total. This provider reuses the SAME transient the
  * footer widget warms, so the two numbers never diverge.
  *
- * @package ExtraChillMultisite\NetworkStats\Providers
+ * @package ExtraChillNetwork\NetworkStats\Providers
  * @since   1.19.0
  */
 
-namespace ExtraChillMultisite\NetworkStats\Providers;
+namespace ExtraChillNetwork\NetworkStats\Providers;
 
-use ExtraChillMultisite\NetworkStats\AbstractMetricProvider;
+use ExtraChillNetwork\NetworkStats\AbstractMetricProvider;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -27,7 +27,7 @@ class TotalMembersProvider extends AbstractMetricProvider {
 	 * Construct the total-members provider.
 	 */
 	public function __construct() {
-		parent::__construct( 'total_members', __( 'Total Members', 'extrachill-multisite' ), DAY_IN_SECONDS );
+		parent::__construct( 'total_members', __( 'Total Members', 'extrachill-network' ), DAY_IN_SECONDS );
 	}
 
 	/**

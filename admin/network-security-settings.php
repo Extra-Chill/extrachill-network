@@ -5,7 +5,7 @@
  * Network admin page for configuring security settings across the multisite network,
  * including Cloudflare Turnstile configuration.
  *
- * @package ExtraChill\Multisite
+ * @package ExtraChill\Network
  * @since 1.0.0
  */
 
@@ -20,11 +20,11 @@ add_action( 'network_admin_menu', 'ec_add_network_security_menu' );
  */
 function ec_add_network_security_menu() {
 	add_submenu_page(
-		EXTRACHILL_MULTISITE_MENU_SLUG,
+		EXTRACHILL_NETWORK_MENU_SLUG,
 		'Security Settings',
 		'Security',
 		'manage_network_options',
-		EXTRACHILL_MULTISITE_MENU_SLUG,
+		EXTRACHILL_NETWORK_MENU_SLUG,
 		'ec_render_network_security_page'
 	);
 }
@@ -38,11 +38,11 @@ add_action( 'network_admin_edit_extrachill_security', 'ec_handle_network_securit
  */
 function ec_handle_network_security_save() {
 	if ( ! current_user_can( 'manage_network_options' ) ) {
-		wp_die( esc_html__( 'You do not have permission to access this page.', 'extrachill-multisite' ) );
+		wp_die( esc_html__( 'You do not have permission to access this page.', 'extrachill-network' ) );
 	}
 
 	if ( ! wp_verify_nonce( $_POST['ec_security_nonce'], 'ec_security_settings' ) ) {
-		wp_die( esc_html__( 'Security check failed.', 'extrachill-multisite' ) );
+		wp_die( esc_html__( 'Security check failed.', 'extrachill-network' ) );
 	}
 
 	// Save Turnstile settings
@@ -55,7 +55,7 @@ function ec_handle_network_security_save() {
 	// Redirect back with success message
 	$redirect_url = add_query_arg(
 		array(
-			'page'    => EXTRACHILL_MULTISITE_MENU_SLUG,
+			'page'    => EXTRACHILL_NETWORK_MENU_SLUG,
 			'updated' => 'true',
 		),
 		network_admin_url( 'admin.php' )
@@ -76,11 +76,11 @@ function ec_render_network_security_page() {
 	$is_configured = ec_is_turnstile_configured();
 	?>
 	<div class="wrap">
-		<h1><?php esc_html_e( 'Extra Chill Security Settings', 'extrachill-multisite' ); ?></h1>
+		<h1><?php esc_html_e( 'Extra Chill Security Settings', 'extrachill-network' ); ?></h1>
 
 		<?php if ( isset( $_GET['updated'] ) ) : ?>
 			<div class="notice notice-success is-dismissible">
-				<p><?php esc_html_e( 'Security settings updated successfully.', 'extrachill-multisite' ); ?></p>
+				<p><?php esc_html_e( 'Security settings updated successfully.', 'extrachill-network' ); ?></p>
 			</div>
 		<?php endif; ?>
 
@@ -91,20 +91,20 @@ function ec_render_network_security_page() {
 				<tbody>
 					<tr>
 						<th colspan="2">
-							<h2><?php esc_html_e( 'Cloudflare Turnstile Configuration', 'extrachill-multisite' ); ?></h2>
+							<h2><?php esc_html_e( 'Cloudflare Turnstile Configuration', 'extrachill-network' ); ?></h2>
 							<p class="description">
-								<?php esc_html_e( 'Configure Cloudflare Turnstile for spam protection across all sites in the network.', 'extrachill-multisite' ); ?>
+								<?php esc_html_e( 'Configure Cloudflare Turnstile for spam protection across all sites in the network.', 'extrachill-network' ); ?>
 								<?php if ( $is_configured ) : ?>
-									<span style="color: #46b450; font-weight: bold;">✓ <?php esc_html_e( 'Currently configured', 'extrachill-multisite' ); ?></span>
+									<span style="color: #46b450; font-weight: bold;">✓ <?php esc_html_e( 'Currently configured', 'extrachill-network' ); ?></span>
 								<?php else : ?>
-									<span style="color: #dc3232; font-weight: bold;">⚠ <?php esc_html_e( 'Not configured', 'extrachill-multisite' ); ?></span>
+									<span style="color: #dc3232; font-weight: bold;">⚠ <?php esc_html_e( 'Not configured', 'extrachill-network' ); ?></span>
 								<?php endif; ?>
 							</p>
 						</th>
 					</tr>
 					<tr>
 						<th scope="row">
-							<label for="ec_turnstile_site_key"><?php esc_html_e( 'Site Key', 'extrachill-multisite' ); ?></label>
+							<label for="ec_turnstile_site_key"><?php esc_html_e( 'Site Key', 'extrachill-network' ); ?></label>
 						</th>
 						<td>
 							<input type="text"
@@ -114,13 +114,13 @@ function ec_render_network_security_page() {
 									class="regular-text"
 									placeholder="0x4AAAAAAAPvQsUv5Z6QBB5n" />
 							<p class="description">
-								<?php esc_html_e( 'The site key from your Cloudflare Turnstile dashboard. This will be used in forms across all sites.', 'extrachill-multisite' ); ?>
+								<?php esc_html_e( 'The site key from your Cloudflare Turnstile dashboard. This will be used in forms across all sites.', 'extrachill-network' ); ?>
 							</p>
 						</td>
 					</tr>
 					<tr>
 						<th scope="row">
-							<label for="ec_turnstile_secret_key"><?php esc_html_e( 'Secret Key', 'extrachill-multisite' ); ?></label>
+							<label for="ec_turnstile_secret_key"><?php esc_html_e( 'Secret Key', 'extrachill-network' ); ?></label>
 						</th>
 						<td>
 							<input type="password"
@@ -130,37 +130,37 @@ function ec_render_network_security_page() {
 									class="regular-text"
 									placeholder="0x4AAAAAAAPvQp7DbBfqJD7LW-gbrAkiAb0" />
 							<p class="description">
-								<?php esc_html_e( 'The secret key from your Cloudflare Turnstile dashboard. Used for server-side verification.', 'extrachill-multisite' ); ?>
+								<?php esc_html_e( 'The secret key from your Cloudflare Turnstile dashboard. Used for server-side verification.', 'extrachill-network' ); ?>
 							</p>
 						</td>
 					</tr>
 				</tbody>
 			</table>
 
-			<h2><?php esc_html_e( 'Affected Forms', 'extrachill-multisite' ); ?></h2>
+			<h2><?php esc_html_e( 'Affected Forms', 'extrachill-network' ); ?></h2>
 			<p class="description">
-				<?php esc_html_e( 'These forms across your multisite network will use the Turnstile configuration:', 'extrachill-multisite' ); ?>
+				<?php esc_html_e( 'These forms across your multisite network will use the Turnstile configuration:', 'extrachill-network' ); ?>
 			</p>
 			<ul style="margin-left: 20px;">
-				<li><?php esc_html_e( 'Contact forms (extrachill-contact plugin)', 'extrachill-multisite' ); ?></li>
-				<li><?php esc_html_e( 'User registration (extrachill-users plugin)', 'extrachill-multisite' ); ?></li>
-				<li><?php esc_html_e( 'Newsletter subscriptions (extrachill-newsletter plugin)', 'extrachill-multisite' ); ?></li>
-				<li><?php esc_html_e( 'Festival tip submissions (extrachill-news-wire plugin)', 'extrachill-multisite' ); ?></li>
+				<li><?php esc_html_e( 'Contact forms (extrachill-contact plugin)', 'extrachill-network' ); ?></li>
+				<li><?php esc_html_e( 'User registration (extrachill-users plugin)', 'extrachill-network' ); ?></li>
+				<li><?php esc_html_e( 'Newsletter subscriptions (extrachill-newsletter plugin)', 'extrachill-network' ); ?></li>
+				<li><?php esc_html_e( 'Festival tip submissions (extrachill-news-wire plugin)', 'extrachill-network' ); ?></li>
 			</ul>
 
-			<?php submit_button( __( 'Save Security Settings', 'extrachill-multisite' ) ); ?>
+			<?php submit_button( __( 'Save Security Settings', 'extrachill-network' ) ); ?>
 		</form>
 
 		<div class="card" style="margin-top: 20px;">
-			<h3><?php esc_html_e( 'Setup Instructions', 'extrachill-multisite' ); ?></h3>
+			<h3><?php esc_html_e( 'Setup Instructions', 'extrachill-network' ); ?></h3>
 			<ol>
-				<li><?php esc_html_e( 'Create a Cloudflare account and add your domain', 'extrachill-multisite' ); ?></li>
-				<li><?php esc_html_e( 'Navigate to Security → Turnstile in your Cloudflare dashboard', 'extrachill-multisite' ); ?></li>
-				<li><?php esc_html_e( 'Create a new widget for your domain', 'extrachill-multisite' ); ?></li>
-				<li><?php esc_html_e( 'Copy the Site Key and Secret Key from the widget settings', 'extrachill-multisite' ); ?></li>
-				<li><?php esc_html_e( 'Paste the keys in the fields above and save', 'extrachill-multisite' ); ?></li>
+				<li><?php esc_html_e( 'Create a Cloudflare account and add your domain', 'extrachill-network' ); ?></li>
+				<li><?php esc_html_e( 'Navigate to Security → Turnstile in your Cloudflare dashboard', 'extrachill-network' ); ?></li>
+				<li><?php esc_html_e( 'Create a new widget for your domain', 'extrachill-network' ); ?></li>
+				<li><?php esc_html_e( 'Copy the Site Key and Secret Key from the widget settings', 'extrachill-network' ); ?></li>
+				<li><?php esc_html_e( 'Paste the keys in the fields above and save', 'extrachill-network' ); ?></li>
 			</ol>
-			<p><strong><?php esc_html_e( 'Note:', 'extrachill-multisite' ); ?></strong> <?php esc_html_e( 'These settings apply to all sites in your multisite network.', 'extrachill-multisite' ); ?></p>
+			<p><strong><?php esc_html_e( 'Note:', 'extrachill-network' ); ?></strong> <?php esc_html_e( 'These settings apply to all sites in your multisite network.', 'extrachill-network' ); ?></p>
 		</div>
 	</div>
 

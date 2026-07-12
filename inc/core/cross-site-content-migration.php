@@ -23,7 +23,7 @@
  * media_handle_sideload()-style sideloading (wp_insert_attachment +
  * wp_generate_attachment_metadata) for attachments.
  *
- * @package ExtraChillMultisite
+ * @package ExtraChillNetwork
  * @since 1.21.0
  */
 

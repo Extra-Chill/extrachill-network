@@ -7,10 +7,10 @@
  * live at rest with the same AES-256-GCM protection used by every other Data
  * Machine handler, and so they surface in `wp datamachine auth ...`.
  *
- * These providers live at the NETWORK layer (extrachill-multisite) because they
+ * These providers live at the NETWORK layer (extrachill-network) because they
  * must be loaded in BOTH contexts that touch commerce credentials:
  *   - network-admin, where the Network Admin > Payments save handler writes
- *     them (extrachill-multisite is network-active, so its PHP loads here), and
+ *     them (extrachill-network is network-active, so its PHP loads here), and
  *   - blog 3 (the shop), where checkout / webhook / shipping reads them.
  * A blog-scoped plugin (extrachill-shop, Requires Plugins: woocommerce) cannot
  * load in network-admin, so a provider that lived there was unreachable from
@@ -37,11 +37,11 @@
  * Encryption/decryption is handled by `BaseAuthProvider::encrypt_fields()` /
  * `decrypt_fields()` using AES-256-GCM keyed from `wp_salt( 'auth' )`.
  *
- * @package ExtraChillMultisite\Commerce\Auth
+ * @package ExtraChillNetwork\Commerce\Auth
  * @since 1.23.0
  */
 
-namespace ExtraChillMultisite\Commerce\Auth;
+namespace ExtraChillNetwork\Commerce\Auth;
 
 use DataMachine\Core\OAuth\BaseAuthProvider;
 

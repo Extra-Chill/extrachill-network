@@ -14,7 +14,7 @@
  * widget belongs to. No fetch, no AJAX — pure client bootstrap for a 3rd-party
  * widget. This file is intentionally dependency-free.
  *
- * @package ExtraChill\Multisite
+ * @package ExtraChill\Network
  */
 ( function () {
 	'use strict';

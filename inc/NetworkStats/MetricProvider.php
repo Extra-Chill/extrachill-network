@@ -10,7 +10,7 @@
  *
  * Providers are registered via the `extrachill_network_stat_providers` filter,
  * so any plugin on the network can contribute a metric WITHOUT this plugin
- * knowing about it (layer purity). extrachill-multisite ships the engine, the
+ * knowing about it (layer purity). extrachill-network ships the engine, the
  * interface, and the obvious cross-site CORE providers; strict per-plugin
  * ownership of individual metrics can migrate incrementally through the same
  * filter without any engine change.
@@ -21,11 +21,11 @@
  * to callers as a genuine "not available" marker so landing pages can tell the
  * difference between "zero of a thing" and "we could not count this".
  *
- * @package ExtraChillMultisite\NetworkStats
+ * @package ExtraChillNetwork\NetworkStats
  * @since   1.19.0
  */
 
-namespace ExtraChillMultisite\NetworkStats;
+namespace ExtraChillNetwork\NetworkStats;
 
 defined( 'ABSPATH' ) || exit;
 

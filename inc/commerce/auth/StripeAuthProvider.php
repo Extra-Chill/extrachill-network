@@ -9,11 +9,11 @@
  * `publishable_key` is intentionally NOT encrypted — Stripe publishable keys
  * are non-secret by design (they are exposed in frontend checkout HTML).
  *
- * @package ExtraChillMultisite\Commerce\Auth
+ * @package ExtraChillNetwork\Commerce\Auth
  * @since 1.23.0
  */
 
-namespace ExtraChillMultisite\Commerce\Auth;
+namespace ExtraChillNetwork\Commerce\Auth;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -32,28 +32,28 @@ final class StripeAuthProvider extends CommerceAuthProvider {
 	public function get_config_fields(): array {
 		return array(
 			'secret_key'        => array(
-				'label'       => __( 'Secret Key', 'extrachill-multisite' ),
+				'label'       => __( 'Secret Key', 'extrachill-network' ),
 				'type'        => 'password',
 				'required'    => true,
-				'description' => __( 'Stripe secret API key (sk_live_... / sk_test_...). Confidential.', 'extrachill-multisite' ),
+				'description' => __( 'Stripe secret API key (sk_live_... / sk_test_...). Confidential.', 'extrachill-network' ),
 			),
 			'publishable_key'   => array(
-				'label'       => __( 'Publishable Key', 'extrachill-multisite' ),
+				'label'       => __( 'Publishable Key', 'extrachill-network' ),
 				'type'        => 'text',
 				'required'    => true,
-				'description' => __( 'Stripe publishable key (pk_live_... / pk_test_...). Non-secret by Stripe design.', 'extrachill-multisite' ),
+				'description' => __( 'Stripe publishable key (pk_live_... / pk_test_...). Non-secret by Stripe design.', 'extrachill-network' ),
 			),
 			'connect_client_id' => array(
-				'label'       => __( 'Connect Client ID', 'extrachill-multisite' ),
+				'label'       => __( 'Connect Client ID', 'extrachill-network' ),
 				'type'        => 'password',
 				'required'    => false,
-				'description' => __( 'Stripe Connect client ID (ca_...).', 'extrachill-multisite' ),
+				'description' => __( 'Stripe Connect client ID (ca_...).', 'extrachill-network' ),
 			),
 			'webhook_secret'    => array(
-				'label'       => __( 'Webhook Signing Secret', 'extrachill-multisite' ),
+				'label'       => __( 'Webhook Signing Secret', 'extrachill-network' ),
 				'type'        => 'password',
 				'required'    => false,
-				'description' => __( 'Signing secret for the Stripe webhook endpoint (whsec_...).', 'extrachill-multisite' ),
+				'description' => __( 'Signing secret for the Stripe webhook endpoint (whsec_...).', 'extrachill-network' ),
 			),
 		);
 	}

@@ -6,10 +6,10 @@
  * ability input. Used by every editor ability across the network so the
  * "which site is this on?" handshake stays uniform regardless of content type.
  *
- * @package ExtraChillMultisite\Editor
+ * @package ExtraChillNetwork\Editor
  */
 
-namespace ExtraChillMultisite\Editor;
+namespace ExtraChillNetwork\Editor;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;

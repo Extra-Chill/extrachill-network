@@ -11,10 +11,10 @@
  * populate the type identifier and any type-specific fields via the `type`
  * and `extra` parameters.
  *
- * @package ExtraChillMultisite\Editor
+ * @package ExtraChillNetwork\Editor
  */
 
-namespace ExtraChillMultisite\Editor;
+namespace ExtraChillNetwork\Editor;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;

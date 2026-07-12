@@ -12,11 +12,11 @@
  * individual metrics can migrate incrementally via the same public filter
  * without any engine change (layer purity).
  *
- * @package ExtraChillMultisite\NetworkStats
+ * @package ExtraChillNetwork\NetworkStats
  * @since   1.19.0
  */
 
-namespace ExtraChillMultisite\NetworkStats;
+namespace ExtraChillNetwork\NetworkStats;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -86,16 +86,16 @@ function register_network_stats_ability(): void {
 	wp_register_ability(
 		'extrachill/get-network-stats',
 		array(
-			'label'               => __( 'Get Network Stats', 'extrachill-multisite' ),
-			'description'         => __( 'Composable cross-site network statistics: events, cities, artist profiles, community members/topics, wire posts, online users, total members, total posts. Each metric is individually cached; unavailable sources return null (never a fake zero).', 'extrachill-multisite' ),
-			'category'            => 'extrachill-multisite',
+			'label'               => __( 'Get Network Stats', 'extrachill-network' ),
+			'description'         => __( 'Composable cross-site network statistics: events, cities, artist profiles, community members/topics, wire posts, online users, total members, total posts. Each metric is individually cached; unavailable sources return null (never a fake zero).', 'extrachill-network' ),
+			'category'            => 'extrachill-network',
 			'input_schema'        => array(
 				'type'       => 'object',
 				'properties' => array(
 					'keys' => array(
 						'type'        => 'array',
 						'items'       => array( 'type' => 'string' ),
-						'description' => __( 'Optional metric keys to resolve (e.g. ["events_count","artist_profiles"]). Omit for all registered metrics.', 'extrachill-multisite' ),
+						'description' => __( 'Optional metric keys to resolve (e.g. ["events_count","artist_profiles"]). Omit for all registered metrics.', 'extrachill-network' ),
 					),
 				),
 			),

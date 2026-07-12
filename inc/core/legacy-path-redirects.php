@@ -2,7 +2,7 @@
 /**
  * Legacy path redirects.
  *
- * @package ExtraChillMultisite
+ * @package ExtraChillNetwork
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

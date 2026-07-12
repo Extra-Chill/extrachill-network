@@ -5,11 +5,11 @@
  * Pre-computes taxonomy badge count transients so no homepage visitor ever
  * hits a cold cache. Runs every 4 hours on each site via WP-Cron.
  *
- * Since extrachill-multisite is network-activated, this cron fires on every
+ * Since extrachill-network is network-activated, this cron fires on every
  * site natively, writing transients in the correct Redis namespace. Each
  * site only warms the transients it needs.
  *
- * @package ExtraChillMultisite
+ * @package ExtraChillNetwork
  * @since 1.6.0
  */
 
@@ -27,7 +27,7 @@ add_action( 'ec_warm_badge_counts', 'ec_badge_warmer_run' );
 function ec_badge_warmer_schedule( $schedules ) {
 	$schedules['every_four_hours'] = array(
 		'interval' => 4 * HOUR_IN_SECONDS,
-		'display'  => __( 'Every 4 Hours', 'extrachill-multisite' ),
+		'display'  => __( 'Every 4 Hours', 'extrachill-network' ),
 	);
 	return $schedules;
 }

@@ -4,7 +4,7 @@
  *
  * Network-wide captcha configuration accessible from all sites.
  *
- * @package ExtraChill\Multisite
+ * @package ExtraChill\Network
  * @since 1.0.0
  */
 
@@ -163,9 +163,9 @@ function ec_enqueue_turnstile_script( $handle = 'cloudflare-turnstile' ) {
 	}
 
 	$boot_handle = 'ec-turnstile-boot';
-	$boot_src    = EXTRACHILL_MULTISITE_PLUGIN_URL . 'assets/js/turnstile-boot.js';
-	$boot_path   = EXTRACHILL_MULTISITE_PLUGIN_DIR . 'assets/js/turnstile-boot.js';
-	$boot_ver    = file_exists( $boot_path ) ? (string) filemtime( $boot_path ) : EXTRACHILL_MULTISITE_VERSION;
+	$boot_src    = EXTRACHILL_NETWORK_PLUGIN_URL . 'assets/js/turnstile-boot.js';
+	$boot_path   = EXTRACHILL_NETWORK_PLUGIN_DIR . 'assets/js/turnstile-boot.js';
+	$boot_ver    = file_exists( $boot_path ) ? (string) filemtime( $boot_path ) : EXTRACHILL_NETWORK_VERSION;
 
 	wp_enqueue_script( $boot_handle, $boot_src, array(), $boot_ver, true );
 
@@ -204,7 +204,7 @@ function ec_turnstile_check_request( $request_or_token ) {
 	if ( ! function_exists( 'ec_verify_turnstile_response' ) ) {
 		return new WP_Error(
 			'turnstile_missing',
-			__( 'Security verification unavailable.', 'extrachill-multisite' ),
+			__( 'Security verification unavailable.', 'extrachill-network' ),
 			array( 'status' => 500 )
 		);
 	}
@@ -218,7 +218,7 @@ function ec_turnstile_check_request( $request_or_token ) {
 	if ( '' === $token ) {
 		return new WP_Error(
 			'turnstile_missing_token',
-			__( 'Security verification required.', 'extrachill-multisite' ),
+			__( 'Security verification required.', 'extrachill-network' ),
 			array( 'status' => 403 )
 		);
 	}
@@ -226,7 +226,7 @@ function ec_turnstile_check_request( $request_or_token ) {
 	if ( ! ec_verify_turnstile_response( $token ) ) {
 		return new WP_Error(
 			'turnstile_failed',
-			__( 'Security verification failed. Please try again.', 'extrachill-multisite' ),
+			__( 'Security verification failed. Please try again.', 'extrachill-network' ),
 			array( 'status' => 403 )
 		);
 	}

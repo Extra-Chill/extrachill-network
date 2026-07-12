@@ -4,7 +4,7 @@ set -euo pipefail
 # Cross-widget Turnstile browser smoke (explicit per-widget render isolation).
 #
 # Boots a disposable WordPress (WP Codebox / Playground), activates
-# extrachill-multisite, seeds a page that renders TWO .cf-turnstile widgets via
+# extrachill-network, seeds a page that renders TWO .cf-turnstile widgets via
 # the plugin's own ec_render_turnstile_widget() and drives them with the
 # plugin's REAL explicit-render boot script (assets/js/turnstile-boot.js) over a
 # faithful stub of window.turnstile.render(). Then it drives a real headless

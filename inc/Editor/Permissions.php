@@ -7,10 +7,10 @@
  * primitive stays decoupled from any specific content type — every consumer
  * feeds it whatever caps gate the underlying object.
  *
- * @package ExtraChillMultisite\Editor
+ * @package ExtraChillNetwork\Editor
  */
 
-namespace ExtraChillMultisite\Editor;
+namespace ExtraChillNetwork\Editor;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -29,7 +29,7 @@ class Permissions {
 	 *     to false (e.g. an edit-lock window or other domain-specific gate).
 	 *   - optional `upload_cap` — defaults to 'upload_files'.
 	 *
-	 * Returns the array shape contracted in extrachill-multisite#33.
+	 * Returns the array shape contracted in extrachill-network#33.
 	 *
 	 * @param array $args See above.
 	 * @return array{canSave: bool, canUploadMedia: bool, canDelete: bool}

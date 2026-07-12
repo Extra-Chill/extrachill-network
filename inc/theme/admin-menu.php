@@ -5,7 +5,7 @@
  * Removes Posts menu from non-main sites and Menus submenu globally.
  * Extra Chill-specific network behavior.
  *
- * @package ExtraChill\Multisite
+ * @package ExtraChill\Network
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

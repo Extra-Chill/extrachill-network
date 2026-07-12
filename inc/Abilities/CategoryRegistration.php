@@ -1,9 +1,9 @@
 <?php
 /**
- * Single owner for the `extrachill-multisite` ability category.
+ * Single owner for the `extrachill-network` ability category.
  *
  * Every `*Abilities.php` class in this plugin uses
- * `'category' => 'extrachill-multisite'` on its `wp_register_ability()`
+ * `'category' => 'extrachill-network'` on its `wp_register_ability()`
  * calls. The category itself must be registered exactly once, otherwise
  * the second registrar trips `_doing_it_wrong`.
  *
@@ -11,35 +11,35 @@
  * which started colliding the moment a second class was added. This file
  * is the single point of truth — every class consumes the category by id.
  *
- * @package ExtraChillMultisite\Abilities
+ * @package ExtraChillNetwork\Abilities
  * @since 1.14.1
  */
 
-namespace ExtraChillMultisite\Abilities;
+namespace ExtraChillNetwork\Abilities;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Register the `extrachill-multisite` ability category.
+ * Register the `extrachill-network` ability category.
  *
  * Hooked from the plugin bootstrap.
  */
-function register_extrachill_multisite_category(): void {
+function register_extrachill_network_category(): void {
 	if ( ! function_exists( 'wp_register_ability_category' ) ) {
 		return;
 	}
 
-	if ( function_exists( 'wp_has_ability_category' ) && wp_has_ability_category( 'extrachill-multisite' ) ) {
+	if ( function_exists( 'wp_has_ability_category' ) && wp_has_ability_category( 'extrachill-network' ) ) {
 		return;
 	}
 
 	wp_register_ability_category(
-		'extrachill-multisite',
+		'extrachill-network',
 		array(
-			'label'       => __( 'Extra Chill Multisite', 'extrachill-multisite' ),
-			'description' => __( 'Network-wide cross-site operations', 'extrachill-multisite' ),
+			'label'       => __( 'Extra Chill Network', 'extrachill-network' ),
+			'description' => __( 'Network-wide cross-site operations', 'extrachill-network' ),
 		)
 	);
 }
 
-add_action( 'wp_abilities_api_categories_init', __NAMESPACE__ . '\\register_extrachill_multisite_category' );
+add_action( 'wp_abilities_api_categories_init', __NAMESPACE__ . '\\register_extrachill_network_category' );

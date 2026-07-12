@@ -8,11 +8,11 @@
  * Writes flow through the network-layer encrypted auth providers (built on
  * Data Machine's BaseAuthProvider AES-256-GCM envelope):
  *
- *   Stripe (artist marketplace + Connect payouts) — \ExtraChillMultisite\Commerce\Auth\StripeAuthProvider:
+ *   Stripe (artist marketplace + Connect payouts) — \ExtraChillNetwork\Commerce\Auth\StripeAuthProvider:
  *     - secret_key, connect_client_id, webhook_secret  (encrypted at rest)
  *     - publishable_key                                (plaintext by Stripe design)
  *
- *   Shipping (Shippo label generation) — \ExtraChillMultisite\Commerce\Auth\ShippoAuthProvider:
+ *   Shipping (Shippo label generation) — \ExtraChillNetwork\Commerce\Auth\ShippoAuthProvider:
  *     - api_key                                        (encrypted at rest)
  *
  * These providers live in this (network-active) plugin, so the class_exists()
@@ -21,7 +21,7 @@
  * `extrachill_shippo_api_key`) registered by inc/commerce/auth/bootstrap.php.
  * Network-admin (super admin) only — these are platform-level secrets.
  *
- * @package ExtraChill\Multisite
+ * @package ExtraChill\Network
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -33,7 +33,7 @@ add_action( 'network_admin_menu', 'ec_add_network_payments_menu' );
  */
 function ec_add_network_payments_menu() {
 	add_submenu_page(
-		EXTRACHILL_MULTISITE_MENU_SLUG,
+		EXTRACHILL_NETWORK_MENU_SLUG,
 		'Payments Settings',
 		'Payments',
 		'manage_network_options',
@@ -61,38 +61,38 @@ function ec_network_commerce_fields() {
 		array(
 			'section'     => 'stripe',
 			'key'         => 'secret_key',
-			'label'       => __( 'Secret Key', 'extrachill-multisite' ),
+			'label'       => __( 'Secret Key', 'extrachill-network' ),
 			'placeholder' => 'sk_live_...',
-			'description' => __( 'Your Stripe secret API key. Keep this confidential.', 'extrachill-multisite' ),
+			'description' => __( 'Your Stripe secret API key. Keep this confidential.', 'extrachill-network' ),
 		),
 		array(
 			'section'     => 'stripe',
 			'key'         => 'publishable_key',
-			'label'       => __( 'Publishable Key', 'extrachill-multisite' ),
+			'label'       => __( 'Publishable Key', 'extrachill-network' ),
 			'placeholder' => 'pk_live_...',
-			'description' => __( 'Stripe publishable API key, used for frontend integration.', 'extrachill-multisite' ),
+			'description' => __( 'Stripe publishable API key, used for frontend integration.', 'extrachill-network' ),
 		),
 		array(
 			'section'     => 'stripe',
 			'key'         => 'connect_client_id',
-			'label'       => __( 'Connect Client ID', 'extrachill-multisite' ),
+			'label'       => __( 'Connect Client ID', 'extrachill-network' ),
 			'placeholder' => 'ca_...',
-			'description' => __( 'Stripe Connect platform client ID. Enables artist Connect Express onboarding and payouts.', 'extrachill-multisite' ),
+			'description' => __( 'Stripe Connect platform client ID. Enables artist Connect Express onboarding and payouts.', 'extrachill-network' ),
 		),
 		array(
 			'section'     => 'stripe',
 			'key'         => 'webhook_secret',
-			'label'       => __( 'Webhook Secret', 'extrachill-multisite' ),
+			'label'       => __( 'Webhook Secret', 'extrachill-network' ),
 			'placeholder' => 'whsec_...',
-			'description' => __( 'Webhook signing secret used to verify Stripe webhook events.', 'extrachill-multisite' ),
+			'description' => __( 'Webhook signing secret used to verify Stripe webhook events.', 'extrachill-network' ),
 		),
 		// Shipping (Shippo label generation).
 		array(
 			'section'     => 'shipping',
 			'key'         => 'shippo_api_key',
-			'label'       => __( 'Shippo API Key', 'extrachill-multisite' ),
+			'label'       => __( 'Shippo API Key', 'extrachill-network' ),
 			'placeholder' => 'shippo_live_...',
-			'description' => __( 'Shippo API token used to generate USPS shipping labels. Keep this confidential.', 'extrachill-multisite' ),
+			'description' => __( 'Shippo API token used to generate USPS shipping labels. Keep this confidential.', 'extrachill-network' ),
 		),
 	);
 }
@@ -101,7 +101,7 @@ function ec_network_commerce_fields() {
  * Handle commerce credentials form submission.
  *
  * Writes flow through the encrypted network-layer auth providers
- * (StripeAuthProvider / ShippoAuthProvider in ExtraChillMultisite\Commerce\Auth),
+ * (StripeAuthProvider / ShippoAuthProvider in ExtraChillNetwork\Commerce\Auth),
  * which store secrets in Data Machine's AES-256-GCM auth envelope. Because the
  * providers live in this network-active plugin, their classes load in
  * network-admin and the class_exists() guards below are TRUE — the save
@@ -115,7 +115,7 @@ function ec_network_commerce_fields() {
  */
 function ec_handle_network_payments_save() {
 	if ( ! current_user_can( 'manage_network_options' ) ) {
-		wp_die( esc_html__( 'You do not have permission to access this page.', 'extrachill-multisite' ) );
+		wp_die( esc_html__( 'You do not have permission to access this page.', 'extrachill-network' ) );
 	}
 
 	check_admin_referer( 'ec_payments_settings', 'ec_payments_nonce' );
@@ -146,16 +146,16 @@ function ec_handle_network_payments_save() {
 		}
 	}
 
-	if ( ! empty( $stripe_changes ) && class_exists( '\ExtraChillMultisite\Commerce\Auth\StripeAuthProvider' ) ) {
-		$stripe_provider = new \ExtraChillMultisite\Commerce\Auth\StripeAuthProvider();
-		\ExtraChillMultisite\Commerce\Auth\StripeAuthProvider::save(
+	if ( ! empty( $stripe_changes ) && class_exists( '\ExtraChillNetwork\Commerce\Auth\StripeAuthProvider' ) ) {
+		$stripe_provider = new \ExtraChillNetwork\Commerce\Auth\StripeAuthProvider();
+		\ExtraChillNetwork\Commerce\Auth\StripeAuthProvider::save(
 			array_merge( $stripe_provider->get_config(), $stripe_changes )
 		);
 	}
 
-	if ( ! empty( $shippo_changes ) && class_exists( '\ExtraChillMultisite\Commerce\Auth\ShippoAuthProvider' ) ) {
-		$shippo_provider = new \ExtraChillMultisite\Commerce\Auth\ShippoAuthProvider();
-		\ExtraChillMultisite\Commerce\Auth\ShippoAuthProvider::save(
+	if ( ! empty( $shippo_changes ) && class_exists( '\ExtraChillNetwork\Commerce\Auth\ShippoAuthProvider' ) ) {
+		$shippo_provider = new \ExtraChillNetwork\Commerce\Auth\ShippoAuthProvider();
+		\ExtraChillNetwork\Commerce\Auth\ShippoAuthProvider::save(
 			array_merge( $shippo_provider->get_config(), $shippo_changes )
 		);
 	}
@@ -185,15 +185,15 @@ function ec_handle_network_payments_save() {
  */
 function ec_network_commerce_field_is_set( array $field ): bool {
 	if ( 'shipping' === $field['section'] ) {
-		return class_exists( '\ExtraChillMultisite\Commerce\Auth\ShippoAuthProvider' )
-			&& '' !== ( new \ExtraChillMultisite\Commerce\Auth\ShippoAuthProvider() )->get_api_key();
+		return class_exists( '\ExtraChillNetwork\Commerce\Auth\ShippoAuthProvider' )
+			&& '' !== ( new \ExtraChillNetwork\Commerce\Auth\ShippoAuthProvider() )->get_api_key();
 	}
 
-	if ( ! class_exists( '\ExtraChillMultisite\Commerce\Auth\StripeAuthProvider' ) ) {
+	if ( ! class_exists( '\ExtraChillNetwork\Commerce\Auth\StripeAuthProvider' ) ) {
 		return false;
 	}
 
-	$stripe  = new \ExtraChillMultisite\Commerce\Auth\StripeAuthProvider();
+	$stripe  = new \ExtraChillNetwork\Commerce\Auth\StripeAuthProvider();
 	$getters = array(
 		'secret_key'        => 'get_secret_key',
 		'publishable_key'   => 'get_publishable_key',
@@ -232,11 +232,11 @@ function ec_render_network_payments_page() {
 	$shipping_fields = array_filter( $fields, static fn( $f ) => 'shipping' === $f['section'] );
 	?>
 	<div class="wrap">
-		<h1><?php esc_html_e( 'Extra Chill Commerce Settings', 'extrachill-multisite' ); ?></h1>
+		<h1><?php esc_html_e( 'Extra Chill Commerce Settings', 'extrachill-network' ); ?></h1>
 
 		<?php if ( isset( $_GET['updated'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display-only success flag. ?>
 			<div class="notice notice-success is-dismissible">
-				<p><?php esc_html_e( 'Commerce settings updated successfully.', 'extrachill-multisite' ); ?></p>
+				<p><?php esc_html_e( 'Commerce settings updated successfully.', 'extrachill-network' ); ?></p>
 			</div>
 		<?php endif; ?>
 
@@ -247,18 +247,18 @@ function ec_render_network_payments_page() {
 				<tbody>
 					<tr>
 						<th colspan="2">
-							<h2><?php esc_html_e( 'Stripe Connect', 'extrachill-multisite' ); ?></h2>
+							<h2><?php esc_html_e( 'Stripe Connect', 'extrachill-network' ); ?></h2>
 							<p class="description">
-								<?php esc_html_e( 'Stripe credentials for the artist marketplace payment processing and Connect payouts.', 'extrachill-multisite' ); ?>
+								<?php esc_html_e( 'Stripe credentials for the artist marketplace payment processing and Connect payouts.', 'extrachill-network' ); ?>
 								<?php if ( $is_configured ) : ?>
-									<span style="color: #46b450; font-weight: bold;">&#10003; <?php esc_html_e( 'Processing configured', 'extrachill-multisite' ); ?></span>
+									<span style="color: #46b450; font-weight: bold;">&#10003; <?php esc_html_e( 'Processing configured', 'extrachill-network' ); ?></span>
 								<?php else : ?>
-									<span style="color: #dc3232; font-weight: bold;">&#9888; <?php esc_html_e( 'Not configured', 'extrachill-multisite' ); ?></span>
+									<span style="color: #dc3232; font-weight: bold;">&#9888; <?php esc_html_e( 'Not configured', 'extrachill-network' ); ?></span>
 								<?php endif; ?>
 								<?php if ( $connect_enabled ) : ?>
-									&nbsp;<span style="color: #46b450; font-weight: bold;">&#10003; <?php esc_html_e( 'Connect payouts enabled', 'extrachill-multisite' ); ?></span>
+									&nbsp;<span style="color: #46b450; font-weight: bold;">&#10003; <?php esc_html_e( 'Connect payouts enabled', 'extrachill-network' ); ?></span>
 								<?php else : ?>
-									&nbsp;<span style="color: #dc3232; font-weight: bold;">&#9888; <?php esc_html_e( 'Connect client ID not set (artist payouts unavailable)', 'extrachill-multisite' ); ?></span>
+									&nbsp;<span style="color: #dc3232; font-weight: bold;">&#9888; <?php esc_html_e( 'Connect client ID not set (artist payouts unavailable)', 'extrachill-network' ); ?></span>
 								<?php endif; ?>
 							</p>
 						</th>
@@ -269,13 +269,13 @@ function ec_render_network_payments_page() {
 
 					<tr>
 						<th colspan="2" style="padding-top: 30px;">
-							<h2><?php esc_html_e( 'Shipping (Shippo)', 'extrachill-multisite' ); ?></h2>
+							<h2><?php esc_html_e( 'Shipping (Shippo)', 'extrachill-network' ); ?></h2>
 							<p class="description">
-								<?php esc_html_e( 'Shippo API token for USPS shipping label generation (artist fulfillment).', 'extrachill-multisite' ); ?>
+								<?php esc_html_e( 'Shippo API token for USPS shipping label generation (artist fulfillment).', 'extrachill-network' ); ?>
 								<?php if ( $shipping_ready ) : ?>
-									<span style="color: #46b450; font-weight: bold;">&#10003; <?php esc_html_e( 'Configured', 'extrachill-multisite' ); ?></span>
+									<span style="color: #46b450; font-weight: bold;">&#10003; <?php esc_html_e( 'Configured', 'extrachill-network' ); ?></span>
 								<?php else : ?>
-									<span style="color: #dc3232; font-weight: bold;">&#9888; <?php esc_html_e( 'Not configured', 'extrachill-multisite' ); ?></span>
+									<span style="color: #dc3232; font-weight: bold;">&#9888; <?php esc_html_e( 'Not configured', 'extrachill-network' ); ?></span>
 								<?php endif; ?>
 							</p>
 						</th>
@@ -287,29 +287,29 @@ function ec_render_network_payments_page() {
 			</table>
 
 			<p class="description">
-				<?php esc_html_e( 'Stored values are never shown. Leave a field blank to keep its current value; enter a new value to replace it.', 'extrachill-multisite' ); ?>
+				<?php esc_html_e( 'Stored values are never shown. Leave a field blank to keep its current value; enter a new value to replace it.', 'extrachill-network' ); ?>
 			</p>
 
-			<?php submit_button( __( 'Save Commerce Settings', 'extrachill-multisite' ) ); ?>
+			<?php submit_button( __( 'Save Commerce Settings', 'extrachill-network' ) ); ?>
 		</form>
 
 		<div class="card" style="margin-top: 20px; max-width: 800px;">
-			<h3><?php esc_html_e( 'Setup Instructions', 'extrachill-multisite' ); ?></h3>
-			<p><strong><?php esc_html_e( 'Stripe', 'extrachill-multisite' ); ?></strong></p>
+			<h3><?php esc_html_e( 'Setup Instructions', 'extrachill-network' ); ?></h3>
+			<p><strong><?php esc_html_e( 'Stripe', 'extrachill-network' ); ?></strong></p>
 			<ol>
-				<li><?php esc_html_e( 'Create a Stripe account at stripe.com and enable Stripe Connect in your dashboard.', 'extrachill-multisite' ); ?></li>
-				<li><?php esc_html_e( 'Developers > API keys: copy your Secret Key and Publishable Key.', 'extrachill-multisite' ); ?></li>
-				<li><?php esc_html_e( 'Developers > Connect: copy your platform Connect Client ID (the "ca_..." identifier).', 'extrachill-multisite' ); ?></li>
-				<li><?php esc_html_e( 'Create a webhook endpoint pointing to your site and copy the Webhook Signing Secret.', 'extrachill-multisite' ); ?></li>
+				<li><?php esc_html_e( 'Create a Stripe account at stripe.com and enable Stripe Connect in your dashboard.', 'extrachill-network' ); ?></li>
+				<li><?php esc_html_e( 'Developers > API keys: copy your Secret Key and Publishable Key.', 'extrachill-network' ); ?></li>
+				<li><?php esc_html_e( 'Developers > Connect: copy your platform Connect Client ID (the "ca_..." identifier).', 'extrachill-network' ); ?></li>
+				<li><?php esc_html_e( 'Create a webhook endpoint pointing to your site and copy the Webhook Signing Secret.', 'extrachill-network' ); ?></li>
 			</ol>
 			<p>
-				<strong><?php esc_html_e( 'Stripe Webhook URL:', 'extrachill-multisite' ); ?></strong>
+				<strong><?php esc_html_e( 'Stripe Webhook URL:', 'extrachill-network' ); ?></strong>
 				<code><?php echo esc_url( rest_url( 'extrachill/v1/shop/stripe-webhook' ) ); ?></code>
 			</p>
-			<p><strong><?php esc_html_e( 'Shippo', 'extrachill-multisite' ); ?></strong></p>
+			<p><strong><?php esc_html_e( 'Shippo', 'extrachill-network' ); ?></strong></p>
 			<ol>
-				<li><?php esc_html_e( 'Create a Shippo account at goshippo.com.', 'extrachill-multisite' ); ?></li>
-				<li><?php esc_html_e( 'Settings > API: copy your Live API Token.', 'extrachill-multisite' ); ?></li>
+				<li><?php esc_html_e( 'Create a Shippo account at goshippo.com.', 'extrachill-network' ); ?></li>
+				<li><?php esc_html_e( 'Settings > API: copy your Live API Token.', 'extrachill-network' ); ?></li>
 			</ol>
 		</div>
 	</div>
@@ -355,9 +355,9 @@ function ec_render_commerce_field_row( $field, $is_set ) {
 					class="regular-text"
 					placeholder="<?php echo esc_attr( $field['placeholder'] ); ?>" />
 			<?php if ( $is_set ) : ?>
-				<span style="color: #46b450; font-weight: bold;">&#10003; <?php esc_html_e( 'Set', 'extrachill-multisite' ); ?></span>
+				<span style="color: #46b450; font-weight: bold;">&#10003; <?php esc_html_e( 'Set', 'extrachill-network' ); ?></span>
 			<?php else : ?>
-				<span style="color: #dc3232; font-weight: bold;">&#9888; <?php esc_html_e( 'Not set', 'extrachill-multisite' ); ?></span>
+				<span style="color: #dc3232; font-weight: bold;">&#9888; <?php esc_html_e( 'Not set', 'extrachill-network' ); ?></span>
 			<?php endif; ?>
 			<p class="description">
 				<?php echo esc_html( $field['description'] ); ?>

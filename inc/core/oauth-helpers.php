@@ -4,7 +4,7 @@
  *
  * Network-wide OAuth configuration checks accessible from all sites.
  *
- * @package ExtraChill\Multisite
+ * @package ExtraChill\Network
  */
 
 defined( 'ABSPATH' ) || exit;

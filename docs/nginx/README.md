@@ -41,9 +41,9 @@ If the live config drifts (someone hand-edits the VPS or the CF dashboard), the 
 
 ### Drift policy
 
-The convention that prevents this directory from going stale is tracked in [Extra-Chill/extrachill-multisite#29](https://github.com/Extra-Chill/extrachill-multisite/issues/29):
+The convention that prevents this directory from going stale is tracked in [Extra-Chill/extrachill-network#29](https://github.com/Extra-Chill/extrachill-network/issues/29):
 
-> Any edit to a file in `/etc/nginx/conf.d/` or `/etc/nginx/sites-enabled/` on the production VPS MUST be accompanied by a PR to `extrachill-multisite/docs/nginx/` updating the corresponding canonical reference. Same edit, same change window.
+> Any edit to a file in `/etc/nginx/conf.d/` or `/etc/nginx/sites-enabled/` on the production VPS MUST be accompanied by a PR to `extrachill-network/docs/nginx/` updating the corresponding canonical reference. Same edit, same change window.
 
 The same rule applies to Cloudflare WAF rules vs `cloudflare-waf-rules.md`. Emergency live-first edits are allowed but the docs PR must follow within 24h, linked to the incident.
 
@@ -103,6 +103,6 @@ The `/wp-login.php` + `/login/` rate limit (both nginx and Cloudflare) is the on
 
 ## See also
 
-- [Extra-Chill/extrachill-multisite#23](https://github.com/Extra-Chill/extrachill-multisite/issues/23) — the issue this revision was filed for (CF WAF + `/login/` rate limit + scanner-path extensions).
-- [Extra-Chill/extrachill-multisite#12](https://github.com/Extra-Chill/extrachill-multisite/issues/12) — closed predecessor that originally created this directory.
+- [Extra-Chill/extrachill-network#23](https://github.com/Extra-Chill/extrachill-network/issues/23) — the issue this revision was filed for (CF WAF + `/login/` rate limit + scanner-path extensions).
+- [Extra-Chill/extrachill-network#12](https://github.com/Extra-Chill/extrachill-network/issues/12) — closed predecessor that originally created this directory.
 - [Extra-Chill/data-machine-events#246](https://github.com/Extra-Chill/data-machine-events/issues/246) — calendar caching, the proper upstream fix for the original Pinterestbot DOS vector.

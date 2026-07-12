@@ -32,7 +32,7 @@ smoke covers that layer, exercising the plugin's **real** boot script.
 
 `run-cross-widget-smoke.sh` drives the WP Codebox (Playground) runtime:
 
-1. Boots a disposable WordPress and activates `extrachill-multisite`.
+1. Boots a disposable WordPress and activates `extrachill-network`.
 2. Runs `seed-two-widgets.php`, which renders **two** `.cf-turnstile` widgets via
    the plugin's own `ec_render_turnstile_widget()`. The **first** widget is
    deliberately broken — it carries a `data-callback` naming an undefined global

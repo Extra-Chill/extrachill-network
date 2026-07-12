@@ -13,11 +13,11 @@
  * registered in the `extrachill_og_card_template_map` filter and a
  * data collector responds to `extrachill_og_card_data_<post_type>`.
  *
- * @package ExtraChillMultisite\OgCards
+ * @package ExtraChillNetwork\OgCards
  * @since 1.11.0
  */
 
-namespace ExtraChillMultisite\OgCards;
+namespace ExtraChillNetwork\OgCards;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;

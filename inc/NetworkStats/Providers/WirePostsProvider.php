@@ -8,13 +8,13 @@
  *
  * Returns null only when the wire site is unavailable.
  *
- * @package ExtraChillMultisite\NetworkStats\Providers
+ * @package ExtraChillNetwork\NetworkStats\Providers
  * @since   1.19.0
  */
 
-namespace ExtraChillMultisite\NetworkStats\Providers;
+namespace ExtraChillNetwork\NetworkStats\Providers;
 
-use ExtraChillMultisite\NetworkStats\AbstractMetricProvider;
+use ExtraChillNetwork\NetworkStats\AbstractMetricProvider;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -27,7 +27,7 @@ class WirePostsProvider extends AbstractMetricProvider {
 	 * Construct the wire-posts provider.
 	 */
 	public function __construct() {
-		parent::__construct( 'wire_posts', __( 'Wire Posts', 'extrachill-multisite' ), HOUR_IN_SECONDS );
+		parent::__construct( 'wire_posts', __( 'Wire Posts', 'extrachill-network' ), HOUR_IN_SECONDS );
 	}
 
 	/**

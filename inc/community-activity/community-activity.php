@@ -5,7 +5,7 @@
  * Provides community activity data fetching and rendering for the multisite network.
  * Queries bbPress activity from community site with caching.
  *
- * @package ExtraChill\Multisite
+ * @package ExtraChill\Network
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -152,7 +152,7 @@ if ( ! function_exists( 'extrachill_render_community_activity' ) ) {
 
 				$counter   = $index + 1 + (int) $args['counter_offset'];
 				$time_text = sprintf(
-					esc_html__( '%s ago', 'extrachill-multisite' ),
+					esc_html__( '%s ago', 'extrachill-network' ),
 					human_time_diff( strtotime( $activity['date_time'] ) )
 				);
 
@@ -178,17 +178,17 @@ if ( ! function_exists( 'extrachill_render_community_activity' ) ) {
 					? sprintf(
 						'%1$s %2$s %3$s %4$s %5$s',
 						$username_html,
-						esc_html__( 'replied to', 'extrachill-multisite' ),
+						esc_html__( 'replied to', 'extrachill-network' ),
 						$topic_html,
-						esc_html__( 'in', 'extrachill-multisite' ),
+						esc_html__( 'in', 'extrachill-network' ),
 						$forum_html
 					)
 					: sprintf(
 						'%1$s %2$s %3$s %4$s %5$s',
 						$username_html,
-						esc_html__( 'posted', 'extrachill-multisite' ),
+						esc_html__( 'posted', 'extrachill-network' ),
 						$topic_html,
-						esc_html__( 'in', 'extrachill-multisite' ),
+						esc_html__( 'in', 'extrachill-network' ),
 						$forum_html
 					);
 
@@ -204,7 +204,7 @@ if ( ! function_exists( 'extrachill_render_community_activity' ) ) {
 				printf( '</%s>', esc_attr( $args['wrapper_tag'] ) );
 			}
 		} else {
-			$empty_message = esc_html__( 'No recent activity.', 'extrachill-multisite' );
+			$empty_message = esc_html__( 'No recent activity.', 'extrachill-network' );
 
 			if ( $args['render_wrapper'] ) {
 				printf( '<%1$s class="%2$s">', esc_attr( $args['wrapper_tag'] ), esc_attr( $args['wrapper_class'] ) );

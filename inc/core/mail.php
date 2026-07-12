@@ -13,7 +13,7 @@
  * registered against the DM `datamachine_email_templates` filter — see
  * {@see extrachill_register_email_templates()} below.
  *
- * @package ExtraChillMultisite\Core\Mail
+ * @package ExtraChillNetwork\Core\Mail
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -362,7 +362,7 @@ add_filter( 'datamachine_email_templates', 'extrachill_register_email_templates'
  * @return string Rendered HTML. Empty string if the partial is missing.
  */
 function extrachill_render_email_template( $template_id, array $context ) {
-	$default_path = EXTRACHILL_MULTISITE_PLUGIN_DIR . 'templates/email/' . $template_id . '.php';
+	$default_path = EXTRACHILL_NETWORK_PLUGIN_DIR . 'templates/email/' . $template_id . '.php';
 
 	/**
 	 * Filter the resolved absolute path to an EC email template partial.

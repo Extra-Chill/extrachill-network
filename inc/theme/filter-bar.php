@@ -5,7 +5,7 @@
  * Adds EC-specific filter bar items for music categories.
  * Artist dropdown appears on song-meanings and music-history categories.
  *
- * @package ExtraChill\Multisite
+ * @package ExtraChill\Network
  * @since 1.4.0
  */
 
@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @param array $items Existing filter bar items.
  * @return array Modified items.
  */
-function extrachill_multisite_filter_bar_artist_dropdown( $items ) {
+function extrachill_network_filter_bar_artist_dropdown( $items ) {
 	if ( ! is_category( 'song-meanings' ) && ! is_category( 'music-history' ) ) {
 		return $items;
 	}
@@ -35,4 +35,4 @@ function extrachill_multisite_filter_bar_artist_dropdown( $items ) {
 
 	return $items;
 }
-add_filter( 'extrachill_filter_bar_category_items', 'extrachill_multisite_filter_bar_artist_dropdown' );
+add_filter( 'extrachill_filter_bar_category_items', 'extrachill_network_filter_bar_artist_dropdown' );

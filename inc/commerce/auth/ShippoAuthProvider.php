@@ -6,11 +6,11 @@
  * `wp datamachine auth status` and managed via
  * `wp datamachine auth config ec_shippo --api_key=...`.
  *
- * @package ExtraChillMultisite\Commerce\Auth
+ * @package ExtraChillNetwork\Commerce\Auth
  * @since 1.23.0
  */
 
-namespace ExtraChillMultisite\Commerce\Auth;
+namespace ExtraChillNetwork\Commerce\Auth;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -29,10 +29,10 @@ final class ShippoAuthProvider extends CommerceAuthProvider {
 	public function get_config_fields(): array {
 		return array(
 			'api_key' => array(
-				'label'       => __( 'API Key', 'extrachill-multisite' ),
+				'label'       => __( 'API Key', 'extrachill-network' ),
 				'type'        => 'password',
 				'required'    => true,
-				'description' => __( 'Shippo live API token (shippo_live_...). Confidential.', 'extrachill-multisite' ),
+				'description' => __( 'Shippo live API token (shippo_live_...). Confidential.', 'extrachill-network' ),
 			),
 		);
 	}

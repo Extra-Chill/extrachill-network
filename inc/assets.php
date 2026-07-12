@@ -1,11 +1,11 @@
 <?php
 /**
- * Asset Management for ExtraChill Multisite
+ * Asset Management for ExtraChill Network
  *
  * Loads CSS assets with filemtime() versioning.
  * Conditionally enqueues based on page context.
  *
- * @package ExtraChill\Multisite
+ * @package ExtraChill\Network
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -15,42 +15,42 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Enqueue 404 error page styles.
  */
-function extrachill_multisite_enqueue_404_styles() {
+function extrachill_network_enqueue_404_styles() {
 	if ( ! is_404() ) {
 		return;
 	}
 
-	$css_path = EXTRACHILL_MULTISITE_PLUGIN_DIR . 'assets/css/404.css';
+	$css_path = EXTRACHILL_NETWORK_PLUGIN_DIR . 'assets/css/404.css';
 	if ( file_exists( $css_path ) ) {
 		wp_enqueue_style(
-			'extrachill-multisite-404',
-			EXTRACHILL_MULTISITE_PLUGIN_URL . 'assets/css/404.css',
+			'extrachill-network-404',
+			EXTRACHILL_NETWORK_PLUGIN_URL . 'assets/css/404.css',
 			array( 'extrachill-root' ),
 			filemtime( $css_path )
 		);
 	}
 }
-add_action( 'wp_enqueue_scripts', 'extrachill_multisite_enqueue_404_styles', 10 );
+add_action( 'wp_enqueue_scripts', 'extrachill_network_enqueue_404_styles', 10 );
 
 /**
  * Enqueue community activity styles.
  *
  * Loads when sidebar is active or community activity is displayed.
  */
-function extrachill_multisite_enqueue_community_activity_styles() {
+function extrachill_network_enqueue_community_activity_styles() {
 	// Only load on singular posts where the sidebar renders.
 	if ( ! is_singular() ) {
 		return;
 	}
 
-	$css_path = EXTRACHILL_MULTISITE_PLUGIN_DIR . 'assets/css/community-activity.css';
+	$css_path = EXTRACHILL_NETWORK_PLUGIN_DIR . 'assets/css/community-activity.css';
 	if ( file_exists( $css_path ) ) {
 		wp_enqueue_style(
-			'extrachill-multisite-community-activity',
-			EXTRACHILL_MULTISITE_PLUGIN_URL . 'assets/css/community-activity.css',
+			'extrachill-network-community-activity',
+			EXTRACHILL_NETWORK_PLUGIN_URL . 'assets/css/community-activity.css',
 			array( 'extrachill-root' ),
 			filemtime( $css_path )
 		);
 	}
 }
-add_action( 'wp_enqueue_scripts', 'extrachill_multisite_enqueue_community_activity_styles', 15 );
+add_action( 'wp_enqueue_scripts', 'extrachill_network_enqueue_community_activity_styles', 15 );

@@ -15,7 +15,7 @@
  *   - cta_label      string Optional primary CTA label.
  *   - preheader      string Hidden preview text.
  *
- * @package ExtraChillMultisite\Templates\Email
+ * @package ExtraChillNetwork\Templates\Email
  * @var array $context Template context.
  */
 

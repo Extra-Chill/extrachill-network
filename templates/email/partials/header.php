@@ -6,7 +6,7 @@
  *   - $subject_html string Pre-escaped subject for the <title> tag.
  *   - $preheader    string Hidden preview text.
  *
- * @package ExtraChillMultisite\Templates\Email
+ * @package ExtraChillNetwork\Templates\Email
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

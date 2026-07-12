@@ -6,7 +6,7 @@
  * across the Extra Chill multisite network. When a taxonomy archive exists
  * on multiple sites, this determines which site is the authoritative source.
  *
- * @package ExtraChillMultisite
+ * @package ExtraChillNetwork
  * @since 1.4.3
  */
 

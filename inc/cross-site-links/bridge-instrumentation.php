@@ -21,7 +21,7 @@
  * Together these make CTR = clicks / impressions deterministic, and both are
  * gated on the same "JS executed in a real browser" signal, so neither is
  * bot-inflated the way the raw UTM `network_bridge` channel is (see
- * extrachill-multisite#58).
+ * extrachill-network#58).
  *
  * NO AJAX (system rule). The browser ships both events with
  * `navigator.sendBeacon()` (fire-and-forget, survives navigation) to the
@@ -32,9 +32,9 @@
  *
  * This file owns ONLY the client: enqueue, localize, and the sendBeacon JS.
  * The REST receiver lives in extrachill-api (the canonical REST home for
- * ability wrappers) — see extrachill-multisite#62.
+ * ability wrappers) — see extrachill-network#62.
  *
- * @package ExtraChillMultisite
+ * @package ExtraChillNetwork
  * @since 1.18.0
  */
 
@@ -56,14 +56,14 @@ function extrachill_bridge_enqueue_instrumentation() {
 		return;
 	}
 
-	$js_path = EXTRACHILL_MULTISITE_PLUGIN_DIR . 'assets/js/bridge-instrumentation.js';
+	$js_path = EXTRACHILL_NETWORK_PLUGIN_DIR . 'assets/js/bridge-instrumentation.js';
 	if ( ! file_exists( $js_path ) ) {
 		return;
 	}
 
 	wp_enqueue_script(
 		'extrachill-bridge-instrumentation',
-		EXTRACHILL_MULTISITE_PLUGIN_URL . 'assets/js/bridge-instrumentation.js',
+		EXTRACHILL_NETWORK_PLUGIN_URL . 'assets/js/bridge-instrumentation.js',
 		array(),
 		filemtime( $js_path ),
 		array(

@@ -6,13 +6,13 @@
  *
  * Returns null only when the main site is unavailable.
  *
- * @package ExtraChillMultisite\NetworkStats\Providers
+ * @package ExtraChillNetwork\NetworkStats\Providers
  * @since   1.19.0
  */
 
-namespace ExtraChillMultisite\NetworkStats\Providers;
+namespace ExtraChillNetwork\NetworkStats\Providers;
 
-use ExtraChillMultisite\NetworkStats\AbstractMetricProvider;
+use ExtraChillNetwork\NetworkStats\AbstractMetricProvider;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -25,7 +25,7 @@ class TotalPostsProvider extends AbstractMetricProvider {
 	 * Construct the total-posts provider.
 	 */
 	public function __construct() {
-		parent::__construct( 'total_posts', __( 'Articles', 'extrachill-multisite' ), HOUR_IN_SECONDS );
+		parent::__construct( 'total_posts', __( 'Articles', 'extrachill-network' ), HOUR_IN_SECONDS );
 	}
 
 	/**

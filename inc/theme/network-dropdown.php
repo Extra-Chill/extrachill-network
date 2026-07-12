@@ -5,7 +5,7 @@
  * Renders a dropdown site-switcher for network homepage breadcrumbs.
  * Hooks into theme's extrachill_breadcrumbs_trail_output filter.
  *
- * @package ExtraChill\Multisite
+ * @package ExtraChill\Network
  * @since 1.4.4
  */
 
@@ -13,9 +13,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-add_filter( 'extrachill_breadcrumbs_trail_output', 'extrachill_multisite_breadcrumb_dropdown' );
+add_filter( 'extrachill_breadcrumbs_trail_output', 'extrachill_network_breadcrumb_dropdown' );
 
-function extrachill_multisite_breadcrumb_dropdown( $trail ) {
+function extrachill_network_breadcrumb_dropdown( $trail ) {
 	if ( preg_match( '/^<span class="network-dropdown-target">(.+)<\/span>$/', $trail, $matches ) ) {
 		return extrachill_network_dropdown( $matches[1] );
 	}

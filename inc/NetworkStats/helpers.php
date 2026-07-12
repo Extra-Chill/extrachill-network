@@ -5,7 +5,7 @@
  * Thin procedural wrapper around the NetworkStats engine for template/theme
  * callers that prefer a function to a class call.
  *
- * @package ExtraChillMultisite\NetworkStats
+ * @package ExtraChillNetwork\NetworkStats
  * @since   1.19.0
  */
 
@@ -23,7 +23,7 @@ if ( ! function_exists( 'ec_get_network_stats' ) ) {
 	 * @return array<string,array{key:string,label:string,value:int|array|null,available:bool}>
 	 */
 	function ec_get_network_stats( array $keys = array() ): array {
-		return \ExtraChillMultisite\NetworkStats\NetworkStats::get( $keys );
+		return \ExtraChillNetwork\NetworkStats\NetworkStats::get( $keys );
 	}
 }
 
@@ -40,6 +40,6 @@ if ( ! function_exists( 'ec_network_stats_forget' ) ) {
 	 * @return bool True if a cached value was deleted, false otherwise.
 	 */
 	function ec_network_stats_forget( string $key ): bool {
-		return \ExtraChillMultisite\NetworkStats\NetworkStats::forget( $key );
+		return \ExtraChillNetwork\NetworkStats\NetworkStats::forget( $key );
 	}
 }
