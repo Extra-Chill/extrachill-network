@@ -281,7 +281,7 @@ function extrachill_get_wire_taxonomy_count_via_api( $term_slug, $taxonomy ) {
  * @return array|null Array with 'count' and 'url', or null if not found.
  */
 function extrachill_get_community_taxonomy_count_via_api( $term_slug, $taxonomy ) {
-	return extrachill_get_taxonomy_count_via_ability( $term_slug, $taxonomy, 'community' );
+	return extrachill_get_taxonomy_count_via_ability( $term_slug, $taxonomy, 'community', 'topic' );
 }
 
 /**
