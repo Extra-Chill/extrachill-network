@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.1.1] - 2026-07-12
+
+### Fixed
+- check QR ability registration safely
+
 ## [2.1.0] - 2026-07-12
 
 ### Added
