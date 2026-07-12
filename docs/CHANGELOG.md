@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.2.1] - 2026-07-12
+
+### Fixed
+- count Community taxonomy topics (#116)
+
 ## [2.2.0] - 2026-07-12
 
 ### Added
