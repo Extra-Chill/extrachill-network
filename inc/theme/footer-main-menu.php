@@ -109,6 +109,9 @@ function extrachill_network_footer_main_menu() {
 					<a href="<?php echo esc_url( ec_get_site_url( 'main' ) ); ?>/about/">About</a>
 					<ul class="sub-menu">
 						<li class="menu-item">
+							<a href="<?php echo esc_url( ec_get_site_url( 'main' ) ); ?>/power/">The Power of Extra Chill</a>
+						</li>
+						<li class="menu-item">
 							<a href="<?php echo esc_url( ec_get_site_url( 'docs' ) ); ?>">Documentation</a>
 						</li>
 						<li class="menu-item">
