@@ -5,7 +5,7 @@
  * Provides EC-specific social media links via filter.
  * Theme provides empty default; this plugin adds EC links.
  *
- * @package ExtraChill\Multisite
+ * @package ExtraChill\Network
  * @since 1.4.6
  */
 
@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @param array $links Existing social links.
  * @return array Modified links.
  */
-function extrachill_multisite_social_links_data( $links ) {
+function extrachill_network_social_links_data( $links ) {
 	$links[] = array(
 		'url'   => 'https://facebook.com/extrachill',
 		'icon'  => 'facebook',
@@ -58,4 +58,4 @@ function extrachill_multisite_social_links_data( $links ) {
 
 	return $links;
 }
-add_filter( 'extrachill_social_links_data', 'extrachill_multisite_social_links_data' );
+add_filter( 'extrachill_social_links_data', 'extrachill_network_social_links_data' );

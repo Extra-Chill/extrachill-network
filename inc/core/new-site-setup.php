@@ -6,7 +6,7 @@
  * Removes default placeholder content (Hello World post, Sample Page,
  * default comment) that WordPress auto-creates on every new site.
  *
- * @package ExtraChillMultisite
+ * @package ExtraChillNetwork
  * @subpackage Core
  */
 

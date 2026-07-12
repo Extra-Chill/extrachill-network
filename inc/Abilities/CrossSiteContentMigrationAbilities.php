@@ -12,11 +12,11 @@
  * network-level capability, and delegates all work to `ec_migrate_post()`.
  * No migration logic lives here.
  *
- * @package ExtraChillMultisite\Abilities
+ * @package ExtraChillNetwork\Abilities
  * @since 1.21.0
  */
 
-namespace ExtraChillMultisite\Abilities;
+namespace ExtraChillNetwork\Abilities;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -42,12 +42,12 @@ class CrossSiteContentMigrationAbilities {
 		wp_register_ability(
 			'extrachill/migrate-post',
 			array(
-				'label'               => __( 'Migrate Post Across Sites', 'extrachill-multisite' ),
+				'label'               => __( 'Migrate Post Across Sites', 'extrachill-network' ),
 				'description'         => __(
 					'Move one post and all of its media from any blog in the network to any other blog. Non-destructive by default (the source is only deleted when delete_source is true and the migration verifies successfully). Supports dry-run.',
-					'extrachill-multisite'
+					'extrachill-network'
 				),
-				'category'            => 'extrachill-multisite',
+				'category'            => 'extrachill-network',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'source_blog_id', 'post_id', 'dest_blog_id' ),
@@ -55,31 +55,31 @@ class CrossSiteContentMigrationAbilities {
 						'source_blog_id' => array(
 							'type'        => 'integer',
 							'minimum'     => 1,
-							'description' => __( 'Blog ID the post currently lives on.', 'extrachill-multisite' ),
+							'description' => __( 'Blog ID the post currently lives on.', 'extrachill-network' ),
 						),
 						'post_id'        => array(
 							'type'        => 'integer',
 							'minimum'     => 1,
-							'description' => __( 'Post ID on the source blog.', 'extrachill-multisite' ),
+							'description' => __( 'Post ID on the source blog.', 'extrachill-network' ),
 						),
 						'dest_blog_id'   => array(
 							'type'        => 'integer',
 							'minimum'     => 1,
-							'description' => __( 'Blog ID to migrate the post into.', 'extrachill-multisite' ),
+							'description' => __( 'Blog ID to migrate the post into.', 'extrachill-network' ),
 						),
 						'status'         => array(
 							'type'        => 'string',
-							'description' => __( 'Destination post status. Default: preserve source status (pending source maps to pending).', 'extrachill-multisite' ),
+							'description' => __( 'Destination post status. Default: preserve source status (pending source maps to pending).', 'extrachill-network' ),
 						),
 						'delete_source'  => array(
 							'type'        => 'boolean',
 							'default'     => false,
-							'description' => __( 'Delete the source post + its attachments after a verified successful migration. Never fires on dry-run or partial failure.', 'extrachill-multisite' ),
+							'description' => __( 'Delete the source post + its attachments after a verified successful migration. Never fires on dry-run or partial failure.', 'extrachill-network' ),
 						),
 						'dry_run'        => array(
 							'type'        => 'boolean',
 							'default'     => false,
-							'description' => __( 'Report what would happen without writing anything on either blog.', 'extrachill-multisite' ),
+							'description' => __( 'Report what would happen without writing anything on either blog.', 'extrachill-network' ),
 						),
 					),
 				),
@@ -147,7 +147,7 @@ class CrossSiteContentMigrationAbilities {
 		if ( ! function_exists( 'ec_migrate_post' ) ) {
 			return new \WP_Error(
 				'ec_migrate_unavailable',
-				__( 'Cross-site migration primitive is not loaded.', 'extrachill-multisite' ),
+				__( 'Cross-site migration primitive is not loaded.', 'extrachill-network' ),
 				array( 'status' => 500 )
 			);
 		}

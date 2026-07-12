@@ -9,10 +9,10 @@
  *   - `extrachill/mail-site-id` — resolve the SMTP-configured blog ID to
  *     use for outgoing mail in the current context.
  *
- * @package ExtraChillMultisite\Abilities
+ * @package ExtraChillNetwork\Abilities
  */
 
-namespace ExtraChillMultisite\Abilities;
+namespace ExtraChillNetwork\Abilities;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -38,12 +38,12 @@ class MailAbilities {
 		wp_register_ability(
 			'extrachill/mail-site-id',
 			array(
-				'label'               => __( 'Resolve Mail Site ID', 'extrachill-multisite' ),
+				'label'               => __( 'Resolve Mail Site ID', 'extrachill-network' ),
 				'description'         => __(
 					'Resolve the blog ID of the closest SMTP-configured site for the current context. Used as the `mail_site_id` input to the datamachine/send-email ability so subsites without local SMTP credentials do not silently fail.',
-					'extrachill-multisite'
+					'extrachill-network'
 				),
-				'category'            => 'extrachill-multisite',
+				'category'            => 'extrachill-network',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => new \stdClass(),

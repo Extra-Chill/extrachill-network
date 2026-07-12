@@ -25,7 +25,7 @@
  * on normal page loads — only the deprecated code path (and its notice) is
  * silenced. Network-active, so this applies to all sites.
  *
- * @package ExtraChill_Multisite
+ * @package ExtraChill_Network
  * @since 1.20.0
  */
 
@@ -36,8 +36,8 @@
  * Emoji rendering is preserved via core's modern `wp_enqueue_emoji_styles()`
  * (registered on `wp_enqueue_scripts`), which remains untouched.
  */
-function extrachill_multisite_silence_emoji_deprecation() {
+function extrachill_network_silence_emoji_deprecation() {
 	remove_action( 'wp_print_styles', 'print_emoji_styles' );
 	remove_action( 'admin_print_styles', 'print_emoji_styles' );
 }
-add_action( 'init', 'extrachill_multisite_silence_emoji_deprecation' );
+add_action( 'init', 'extrachill_network_silence_emoji_deprecation' );

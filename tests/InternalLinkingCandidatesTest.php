@@ -11,7 +11,7 @@
  * controlled deterministically by priming its persistent object-cache entry, so
  * the suite performs no cross-site queries or HTTP loopbacks.
  *
- * @package ExtraChill\Multisite
+ * @package ExtraChill\Network
  */
 
 declare( strict_types=1 );

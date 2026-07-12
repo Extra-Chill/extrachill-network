@@ -18,11 +18,11 @@
  * EXISTING cached counter (online users, total members, community stats) do so
  * explicitly in their own value() and do not use these DB helpers.
  *
- * @package ExtraChillMultisite\NetworkStats
+ * @package ExtraChillNetwork\NetworkStats
  * @since   1.19.0
  */
 
-namespace ExtraChillMultisite\NetworkStats;
+namespace ExtraChillNetwork\NetworkStats;
 
 defined( 'ABSPATH' ) || exit;
 

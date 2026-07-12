@@ -7,7 +7,7 @@
  * Main, Events, Shop, and Wire sites use REST APIs for accurate counts.
  * Artist site uses slug-based matching to artist_profile CPT.
  *
- * @package ExtraChillMultisite
+ * @package ExtraChillNetwork
  * @since 1.4.0
  */
 
@@ -38,7 +38,7 @@ const EXTRACHILL_CROSS_SITE_LINKS_CACHE_GROUP = 'extrachill_cross_site_links';
  * no HTTP); the events lookup reads the events-site bulk warmer transient and
  * only falls back to an HTTP loopback when that cache is cold (see
  * extrachill_get_events_upcoming_count_via_api() and
- * Extra-Chill/extrachill-multisite#50). Without this caching layer each render
+ * Extra-Chill/extrachill-network#50). Without this caching layer each render
  * would repeat the full cross-site cost every time.
  *
  * Results are cached in the persistent object cache keyed by
@@ -201,7 +201,7 @@ function extrachill_get_cross_site_term_links_uncached( $term, $taxonomy ) {
  * The ability switches to the target blog internally and runs a plain WP_Query
  * — no REST dispatch, so the route-affinity middleware never fires and no HTTP
  * loopback to 127.0.0.1 is made. This is the path that previously tripped the
- * nginx `wpjson` rate-limit zone (see Extra-Chill/extrachill-multisite#50).
+ * nginx `wpjson` rate-limit zone (see Extra-Chill/extrachill-network#50).
  *
  * The ability's handler depends only on network-shared primitives (taxonomy
  * registration, the posts/terms tables, get_term_link), all of which resolve
@@ -308,7 +308,7 @@ function extrachill_get_blog_taxonomy_count_via_api( $term_slug, $taxonomy ) {
  * ability. Duplicating that SQL here would be a layering violation.
  *
  * To avoid the per-term HTTP loopback that tripped nginx rate-limiting
- * (Extra-Chill/extrachill-multisite#50), this resolves from the bulk
+ * (Extra-Chill/extrachill-network#50), this resolves from the bulk
  * `ec_upcoming_counts_<taxonomy>` transient that the badge-count warmer
  * populates on the events site every 4 hours (see badge-count-warmer.php).
  * The transient lives in the events blog's object-cache namespace, so we read

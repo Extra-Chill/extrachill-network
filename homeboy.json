@@ -4,16 +4,16 @@
   "extensions": {
     "wordpress": {}
   },
-  "id": "extrachill-multisite",
-  "remote_path": "wp-content/plugins/extrachill-multisite",
+  "id": "extrachill-network",
+  "remote_path": "wp-content/plugins/extrachill-network",
   "version_targets": [
     {
-      "file": "extrachill-multisite.php",
+      "file": "extrachill-network.php",
       "pattern": "Version:\\s*([0-9.]+)"
     },
     {
-      "file": "extrachill-multisite.php",
-      "pattern": "EXTRACHILL_MULTISITE_VERSION',\\s*'([0-9.]+)'"
+      "file": "extrachill-network.php",
+      "pattern": "EXTRACHILL_NETWORK_VERSION',\\s*'([0-9.]+)'"
     }
   ]
 }

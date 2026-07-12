@@ -31,7 +31,7 @@
  * Callers can opt back into HTTP loopback via the
  * `ec_cross_site_use_http_loopback` filter (default: false).
  *
- * @package ExtraChillMultisite
+ * @package ExtraChillNetwork
  * @since 1.9.0
  */
 

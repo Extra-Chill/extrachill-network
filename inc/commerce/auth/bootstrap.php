@@ -6,7 +6,7 @@
  * decrypted values through the read-filter contract, and migrates any legacy
  * plaintext site_options into the encrypted store.
  *
- * This bootstrap lives in extrachill-multisite (network-active) so the provider
+ * This bootstrap lives in extrachill-network (network-active) so the provider
  * classes load in BOTH contexts that touch commerce credentials:
  *   - network-admin, where the Network Admin > Payments save handler writes
  *     them (the class_exists() guard in the save handler is now TRUE), and
@@ -25,7 +25,7 @@
  * Data Machine is absent the commerce auth providers are simply not registered
  * and the read path degrades to "not configured".
  *
- * @package ExtraChillMultisite\Commerce\Auth
+ * @package ExtraChillNetwork\Commerce\Auth
  * @since 1.23.0
  */
 
@@ -42,9 +42,9 @@ add_action(
 		require_once __DIR__ . '/StripeAuthProvider.php';
 		require_once __DIR__ . '/ShippoAuthProvider.php';
 
-		\ExtraChillMultisite\Commerce\Auth\CommerceAuthProvider::register_with_datamachine();
-		extrachill_multisite_register_commerce_read_filters();
-		extrachill_multisite_migrate_plaintext_commerce_credentials();
+		\ExtraChillNetwork\Commerce\Auth\CommerceAuthProvider::register_with_datamachine();
+		extrachill_network_register_commerce_read_filters();
+		extrachill_network_migrate_plaintext_commerce_credentials();
 	},
 	30
 );
@@ -59,14 +59,14 @@ add_action(
  * extrachill-dev and other overrides still win). Provider slugs are stable so
  * previously-stored encrypted values keep decrypting.
  */
-function extrachill_multisite_register_commerce_read_filters(): void {
+function extrachill_network_register_commerce_read_filters(): void {
 	add_filter(
 		'extrachill_stripe_secret_key',
 		static function ( $value ) {
 			if ( '' !== $value ) {
 				return $value;
 			}
-			return ( new \ExtraChillMultisite\Commerce\Auth\StripeAuthProvider() )->get_secret_key();
+			return ( new \ExtraChillNetwork\Commerce\Auth\StripeAuthProvider() )->get_secret_key();
 		}
 	);
 
@@ -76,7 +76,7 @@ function extrachill_multisite_register_commerce_read_filters(): void {
 			if ( '' !== $value ) {
 				return $value;
 			}
-			return ( new \ExtraChillMultisite\Commerce\Auth\StripeAuthProvider() )->get_publishable_key();
+			return ( new \ExtraChillNetwork\Commerce\Auth\StripeAuthProvider() )->get_publishable_key();
 		}
 	);
 
@@ -86,7 +86,7 @@ function extrachill_multisite_register_commerce_read_filters(): void {
 			if ( '' !== $value ) {
 				return $value;
 			}
-			return ( new \ExtraChillMultisite\Commerce\Auth\StripeAuthProvider() )->get_connect_client_id();
+			return ( new \ExtraChillNetwork\Commerce\Auth\StripeAuthProvider() )->get_connect_client_id();
 		}
 	);
 
@@ -96,7 +96,7 @@ function extrachill_multisite_register_commerce_read_filters(): void {
 			if ( '' !== $value ) {
 				return $value;
 			}
-			return ( new \ExtraChillMultisite\Commerce\Auth\StripeAuthProvider() )->get_webhook_secret();
+			return ( new \ExtraChillNetwork\Commerce\Auth\StripeAuthProvider() )->get_webhook_secret();
 		}
 	);
 
@@ -106,7 +106,7 @@ function extrachill_multisite_register_commerce_read_filters(): void {
 			if ( '' !== $value ) {
 				return $value;
 			}
-			return ( new \ExtraChillMultisite\Commerce\Auth\ShippoAuthProvider() )->get_api_key();
+			return ( new \ExtraChillNetwork\Commerce\Auth\ShippoAuthProvider() )->get_api_key();
 		}
 	);
 }
@@ -121,7 +121,7 @@ function extrachill_multisite_register_commerce_read_filters(): void {
  *
  * Safe no-op when no plaintext values exist (the current production state).
  */
-function extrachill_multisite_migrate_plaintext_commerce_credentials(): void {
+function extrachill_network_migrate_plaintext_commerce_credentials(): void {
 	if ( ! function_exists( 'get_site_option' ) || ! function_exists( 'delete_site_option' ) ) {
 		return;
 	}
@@ -143,7 +143,7 @@ function extrachill_multisite_migrate_plaintext_commerce_credentials(): void {
 	}
 
 	if ( ! empty( $stripe_data ) ) {
-		\ExtraChillMultisite\Commerce\Auth\StripeAuthProvider::save( $stripe_data );
+		\ExtraChillNetwork\Commerce\Auth\StripeAuthProvider::save( $stripe_data );
 
 		foreach ( array_keys( $stripe_data ) as $field ) {
 			$option_name = array_search( $field, $stripe_legacy, true );
@@ -155,7 +155,7 @@ function extrachill_multisite_migrate_plaintext_commerce_credentials(): void {
 
 	$shippo_value = get_site_option( 'extrachill_shippo_api_key', '' );
 	if ( '' !== $shippo_value && null !== $shippo_value ) {
-		\ExtraChillMultisite\Commerce\Auth\ShippoAuthProvider::save(
+		\ExtraChillNetwork\Commerce\Auth\ShippoAuthProvider::save(
 			array( 'api_key' => (string) $shippo_value )
 		);
 		delete_site_option( 'extrachill_shippo_api_key' );

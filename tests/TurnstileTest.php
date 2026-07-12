@@ -8,7 +8,7 @@
  * intercepted with the `pre_http_request` filter so the suite is deterministic
  * and offline.
  *
- * @package ExtraChill\Multisite
+ * @package ExtraChill\Network
  */
 
 declare( strict_types=1 );

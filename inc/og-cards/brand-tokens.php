@@ -11,11 +11,11 @@
  * EC platform tells DM how to look. Any DM-rendered image (OG cards,
  * social cards, etc.) network-wide picks up EC branding from here.
  *
- * @package ExtraChillMultisite\OgCards
+ * @package ExtraChillNetwork\OgCards
  * @since 1.11.0
  */
 
-namespace ExtraChillMultisite\OgCards;
+namespace ExtraChillNetwork\OgCards;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;

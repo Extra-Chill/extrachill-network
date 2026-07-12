@@ -6,7 +6,7 @@
  * for branded transactional emails. Pulls all URLs through
  * `ec_get_site_url()` so dev/staging overrides flow through.
  *
- * @package ExtraChillMultisite\Templates\Email
+ * @package ExtraChillNetwork\Templates\Email
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

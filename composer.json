@@ -1,5 +1,5 @@
 {
-	"name": "extrachill/multisite",
+	"name": "extrachill/network",
 	"description": "Centralized multisite functionality for the ExtraChill Platform",
 	"type": "wordpress-plugin",
 	"require": {

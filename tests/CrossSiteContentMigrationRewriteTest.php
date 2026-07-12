@@ -15,7 +15,7 @@
  * Both functions are pure strings-in / strings-out, so this suite runs without
  * any DB writes, switch_to_blog(), or file I/O.
  *
- * @package ExtraChill\Multisite
+ * @package ExtraChill\Network
  */
 
 declare( strict_types=1 );

@@ -8,13 +8,13 @@
  *
  * Returns null only when the artist site is unavailable.
  *
- * @package ExtraChillMultisite\NetworkStats\Providers
+ * @package ExtraChillNetwork\NetworkStats\Providers
  * @since   1.19.0
  */
 
-namespace ExtraChillMultisite\NetworkStats\Providers;
+namespace ExtraChillNetwork\NetworkStats\Providers;
 
-use ExtraChillMultisite\NetworkStats\AbstractMetricProvider;
+use ExtraChillNetwork\NetworkStats\AbstractMetricProvider;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -27,7 +27,7 @@ class ArtistProfilesProvider extends AbstractMetricProvider {
 	 * Construct the artist-profiles provider.
 	 */
 	public function __construct() {
-		parent::__construct( 'artist_profiles', __( 'Artist Profiles', 'extrachill-multisite' ), HOUR_IN_SECONDS );
+		parent::__construct( 'artist_profiles', __( 'Artist Profiles', 'extrachill-network' ), HOUR_IN_SECONDS );
 	}
 
 	/**

@@ -5,7 +5,7 @@
  * Configures Object Cache Pro for optimal performance with the network's plugins.
  * Uses the objectcache_config filter to ensure settings persist across updates.
  *
- * @package ExtraChillMultisite
+ * @package ExtraChillNetwork
  * @since 1.4.3
  */
 

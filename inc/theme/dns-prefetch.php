@@ -4,7 +4,7 @@
  *
  * Registers Extra Chill-specific domains for DNS prefetching.
  *
- * @package ExtraChill_Multisite
+ * @package ExtraChill_Network
  * @since 1.0.0
  */
 
@@ -14,8 +14,8 @@
  * @param array $domains Existing DNS prefetch domains.
  * @return array Modified domains array.
  */
-function extrachill_multisite_dns_prefetch_domains( $domains ) {
+function extrachill_network_dns_prefetch_domains( $domains ) {
 	$domains[] = '//scripts.mediavine.com';
 	return $domains;
 }
-add_filter( 'extrachill_dns_prefetch_domains', 'extrachill_multisite_dns_prefetch_domains' );
+add_filter( 'extrachill_dns_prefetch_domains', 'extrachill_network_dns_prefetch_domains' );

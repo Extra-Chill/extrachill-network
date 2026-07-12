@@ -1,4 +1,4 @@
-# ExtraChill Multisite
+# ExtraChill Network
 
 Network-activated WordPress plugin providing the network administration foundation for the ExtraChill Platform.
 

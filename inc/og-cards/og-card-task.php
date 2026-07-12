@@ -12,11 +12,11 @@
  * the SystemTask shell exists primarily to plug into the rest of DM's
  * task tooling (CLI run, undo, audit) without reinventing it.
  *
- * @package ExtraChillMultisite\OgCards
+ * @package ExtraChillNetwork\OgCards
  * @since 1.11.0
  */
 
-namespace ExtraChillMultisite\OgCards;
+namespace ExtraChillNetwork\OgCards;
 
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
 

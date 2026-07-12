@@ -29,7 +29,7 @@
  * dropping the user straight into the trapped state.
  *
  * THIS FILE hardens the *prevention* side of that mechanism from the layer that
- * owns platform cache/network integration (extrachill-multisite). It does NOT
+ * owns platform cache/network integration (extrachill-network). It does NOT
  * touch the vendored Breeze plugin and does NOT own advanced-cache.php — the
  * cache-serve gate itself remains Breeze's. It works WITH Breeze by re-emitting
  * the exact same role cookie Breeze expects, earlier and more reliably than
@@ -48,16 +48,16 @@
  *      closing most of the headers-already-sent window that Breeze's late
  *      `init` self-heal leaves open.
  *
- * NOTE ON SCOPE (extrachill-users#161 / extrachill-multisite#80): this is the
+ * NOTE ON SCOPE (extrachill-users#161 / extrachill-network#80): this is the
  * minimal Breeze-COMPATIBLE unblock. It cannot un-trap a browser that is
  * *already* being served from cache (that serve exits before any PHP runs) — it
  * prevents the desync that traps the browser in the first place. The complete,
  * cache-agnostic fix ("a logged-in request must NEVER be served an anonymous
  * cached page, regardless of the role cookie") requires owning the cache-serve
- * gate and is tracked as extrachill-multisite#80 (owned Redis full-page cache
+ * gate and is tracked as extrachill-network#80 (owned Redis full-page cache
  * to replace Breeze). #161 stays open until #80 lands.
  *
- * @package ExtraChillMultisite
+ * @package ExtraChillNetwork
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -137,7 +137,7 @@ function extrachill_breeze_emit_role_cookie( $user_id, array $roles, $expire = n
 		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 			error_log( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- WP_DEBUG-gated observability for the #161 desync.
 				sprintf(
-					'[extrachill-multisite] Could not emit breeze_folder_name for user %d: headers already sent by %s:%d',
+					'[extrachill-network] Could not emit breeze_folder_name for user %d: headers already sent by %s:%d',
 					(int) $user_id,
 					is_string( $file ) ? $file : 'unknown',
 					(int) $line

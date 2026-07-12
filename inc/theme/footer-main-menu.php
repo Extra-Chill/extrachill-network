@@ -5,7 +5,7 @@
  * Network-centric footer navigation for Extra Chill Platform.
  * Hooks into theme's extrachill_footer_main_content action.
  *
- * @package ExtraChill\Multisite
+ * @package ExtraChill\Network
  * @since 1.4.4
  */
 
@@ -13,9 +13,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-add_action( 'extrachill_footer_main_content', 'extrachill_multisite_footer_main_menu', 10 );
+add_action( 'extrachill_footer_main_content', 'extrachill_network_footer_main_menu', 10 );
 
-function extrachill_multisite_footer_main_menu() {
+function extrachill_network_footer_main_menu() {
 	$network_items = array(
 		array(
 			'label' => 'Blog',
@@ -131,9 +131,9 @@ function extrachill_multisite_footer_main_menu() {
 	<?php
 }
 
-add_action( 'extrachill_footer_below_menu', 'extrachill_multisite_footer_newsletter', 10 );
+add_action( 'extrachill_footer_below_menu', 'extrachill_network_footer_newsletter', 10 );
 
-function extrachill_multisite_footer_newsletter() {
+function extrachill_network_footer_newsletter() {
 	?>
 	<div class="footer-newsletter-below-menu">
 		<?php do_action( 'extrachill_render_newsletter_form', 'navigation' ); ?>

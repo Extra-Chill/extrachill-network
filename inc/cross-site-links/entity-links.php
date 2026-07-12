@@ -5,7 +5,7 @@
  * Functions for linking user profiles and artist entities across sites.
  * Migrated from extrachill-users/inc/author-links.php and artist-profiles.php.
  *
- * @package ExtraChillMultisite
+ * @package ExtraChillNetwork
  * @since 1.4.0
  */
 
@@ -145,7 +145,7 @@ function extrachill_customize_comment_form_logged_in( $defaults ) {
 
 	$defaults['logged_in_as'] = sprintf(
 		/* translators: 1: user display name, 2: profile edit URL, 3: logout URL */
-		__( 'Logged in as %1$s. <a href="%2$s">Edit profile</a> | <a href="%3$s">Log out</a>', 'extrachill-multisite' ),
+		__( 'Logged in as %1$s. <a href="%2$s">Edit profile</a> | <a href="%3$s">Log out</a>', 'extrachill-network' ),
 		$user->display_name,
 		esc_url( $profile_edit_url ),
 		esc_url( $logout_url )
@@ -179,7 +179,7 @@ function extrachill_get_cross_site_user_links( $user_id ) {
 			$links[] = array(
 				'type'  => 'community_profile',
 				'url'   => $community_url,
-				'label' => __( 'View Community Profile', 'extrachill-multisite' ),
+				'label' => __( 'View Community Profile', 'extrachill-network' ),
 			);
 		}
 	}
@@ -196,7 +196,7 @@ function extrachill_get_cross_site_user_links( $user_id ) {
 					$links[]    = array(
 						'type'  => 'author_archive',
 						'url'   => $author_url,
-						'label' => __( 'View Blog Posts', 'extrachill-multisite' ),
+						'label' => __( 'View Blog Posts', 'extrachill-network' ),
 						'count' => $post_count,
 					);
 				}
@@ -369,7 +369,7 @@ function extrachill_get_cross_site_artist_links( $artist_slug ) {
 		$links[] = array(
 			'type'  => 'blog_archive',
 			'url'   => $archive['url'],
-			'label' => __( 'Blog', 'extrachill-multisite' ),
+			'label' => __( 'Blog', 'extrachill-network' ),
 			'count' => $archive['count'],
 		);
 	}
@@ -380,7 +380,7 @@ function extrachill_get_cross_site_artist_links( $artist_slug ) {
 		$links[] = array(
 			'type'  => 'events',
 			'url'   => $events['url'],
-			'label' => __( 'Events', 'extrachill-multisite' ),
+			'label' => __( 'Events', 'extrachill-network' ),
 			'count' => $events['count'],
 		);
 	}
@@ -391,7 +391,7 @@ function extrachill_get_cross_site_artist_links( $artist_slug ) {
 		$links[] = array(
 			'type'  => 'shop',
 			'url'   => $shop['url'],
-			'label' => __( 'Shop', 'extrachill-multisite' ),
+			'label' => __( 'Shop', 'extrachill-network' ),
 			'count' => $shop['count'],
 		);
 	}

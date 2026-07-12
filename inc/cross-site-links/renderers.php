@@ -5,7 +5,7 @@
  * Display components for rendering cross-site navigation buttons.
  * Uses button-3 button-small classes from theme root.css for consistent styling.
  *
- * @package ExtraChillMultisite
+ * @package ExtraChillNetwork
  * @since 1.4.0
  */
 

@@ -18,11 +18,11 @@
  *  - Honest: a provider that cannot resolve its source returns null; the engine
  *    caches and returns a structured "not available" marker, NEVER a fake 0.
  *
- * @package ExtraChillMultisite\NetworkStats
+ * @package ExtraChillNetwork\NetworkStats
  * @since   1.19.0
  */
 
-namespace ExtraChillMultisite\NetworkStats;
+namespace ExtraChillNetwork\NetworkStats;
 
 defined( 'ABSPATH' ) || exit;
 

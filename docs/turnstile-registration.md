@@ -10,13 +10,13 @@ Cloudflare Turnstile is integrated throughout the Extra Chill Platform as a netw
 
 Turnstile is configured once at the network level and accessible to all sites:
 
-**Storage Location**: Network options (managed by extrachill-multisite)
+**Storage Location**: Network options (managed by extrachill-network)
 - `ec_turnstile_site_key` - Client-side identifier
 - `ec_turnstile_secret_key` - Server-side verification token
 
 **Configuration UI**: Network Admin → Extra Chill Settings → Turnstile
 
-**Availability**: Functions defined in `extrachill-multisite` and available to all plugins
+**Availability**: Functions defined in `extrachill-network` and available to all plugins
 
 ### 2. Frontend Registration Form Flow
 
@@ -307,7 +307,7 @@ if ( ! ec_verify_turnstile_response( $token ) ) {
 ### How Plugins Implement Turnstile
 
 **Step 1: Import Functions**
-- Functions automatically available (extrachill-multisite loaded first)
+- Functions automatically available (extrachill-network loaded first)
 - No require_once needed
 
 **Step 2: Check Configuration**
@@ -390,7 +390,7 @@ echo ec_render_turnstile_widget( array(
 
 ## Related Documentation
 
-- [extrachill-multisite CLAUDE.md - Turnstile Functions](../CLAUDE.md#cloudflare-turnstile-integration)
+- [extrachill-network CLAUDE.md - Turnstile Functions](../CLAUDE.md#cloudflare-turnstile-integration)
 - [extrachill-users CLAUDE.md - Registration Form](../extrachill-users/CLAUDE.md) - Uses Turnstile
 - [Root CLAUDE.md - Security Implementation](../../CLAUDE.md#security-first)
 - [Cloudflare Turnstile Docs](https://developers.cloudflare.com/turnstile/)

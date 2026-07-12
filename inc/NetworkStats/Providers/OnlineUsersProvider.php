@@ -12,13 +12,13 @@
  * single cache for this number; the extrachill-users activity recorder busts it
  * via ec_network_stats_forget('online_users') when a user becomes active.
  *
- * @package ExtraChillMultisite\NetworkStats\Providers
+ * @package ExtraChillNetwork\NetworkStats\Providers
  * @since   1.19.0
  */
 
-namespace ExtraChillMultisite\NetworkStats\Providers;
+namespace ExtraChillNetwork\NetworkStats\Providers;
 
-use ExtraChillMultisite\NetworkStats\AbstractMetricProvider;
+use ExtraChillNetwork\NetworkStats\AbstractMetricProvider;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -36,7 +36,7 @@ class OnlineUsersProvider extends AbstractMetricProvider {
 	 * Construct the online-users provider.
 	 */
 	public function __construct() {
-		parent::__construct( 'online_users', __( 'Online Now', 'extrachill-multisite' ), 5 * MINUTE_IN_SECONDS );
+		parent::__construct( 'online_users', __( 'Online Now', 'extrachill-network' ), 5 * MINUTE_IN_SECONDS );
 	}
 
 	/**

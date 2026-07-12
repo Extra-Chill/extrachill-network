@@ -2,7 +2,7 @@
 /**
  * EC email footer partial — closes the body table and document.
  *
- * @package ExtraChillMultisite\Templates\Email
+ * @package ExtraChillNetwork\Templates\Email
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

@@ -33,7 +33,7 @@
  *
  * Run inside the wp-codebox sandbox via wordpress.run-php.
  *
- * @package ExtraChill\Multisite
+ * @package ExtraChill\Network
  */
 
 if ( ! function_exists( 'ec_render_turnstile_widget' ) ) {
@@ -53,7 +53,7 @@ update_site_option( 'ec_turnstile_secret_key', '1x000000000000000000000000000000
 
 // Locate the plugin's REAL boot script so the smoke exercises shipped code, not
 // a reimplementation. If it is missing the seed fails loudly.
-$boot_path = WP_PLUGIN_DIR . '/extrachill-multisite/assets/js/turnstile-boot.js';
+$boot_path = WP_PLUGIN_DIR . '/extrachill-network/assets/js/turnstile-boot.js';
 if ( ! file_exists( $boot_path ) ) {
 	echo wp_json_encode(
 		array(

@@ -1,12 +1,12 @@
-# ExtraChill Multisite - Agent Development Guide
+# ExtraChill Network - Agent Development Guide
 
 **Network-activated WordPress plugin providing the network administration foundation for the Extra Chill Platform multisite network.**
 
 ## Plugin Information
 
- - **Name**: Extra Chill Multisite
+ - **Name**: Extra Chill Network
  - **Version**: 1.4.5
- - **Text Domain**: `extrachill-multisite`
+ - **Text Domain**: `extrachill-network`
 - **Author**: Chris Huber
 - **Author URI**: https://chubes.net
 - **License**: GPL v2 or later
@@ -17,7 +17,7 @@
 
 ## Overview
 
-**Extra Chill Multisite** is the network foundation plugin for the Extra Chill Platform, providing centralized infrastructure for all 10 active WordPress multisite sites. It manages network-wide configuration, authentication, security, site discovery, and cross-site linking patterns while remaining lightweight and performant across the entire network.
+**Extra Chill Network** is the network foundation plugin for the Extra Chill Platform, providing centralized infrastructure for all 10 active WordPress multisite sites. It manages network-wide configuration, authentication, security, site discovery, and cross-site linking patterns while remaining lightweight and performant across the entire network.
 
 **Core Purpose**: Single source of truth for blog ID management, Cloudflare Turnstile integration, network admin menu structure, and cross-site coordination patterns (including `ec_get_artist_profile_by_slug`).
 
@@ -26,7 +26,7 @@
 **Production Status**: Active network foundation plugin  
 **Architecture**: Procedural WordPress pattern with network-wide functionality
 **Scope**: Network administration infrastructure for all 10 active sites
-**Build System**: Use `homeboy build extrachill-multisite` for production builds
+**Build System**: Use `homeboy build extrachill-network` for production builds
 
 ## Architecture
 
@@ -43,8 +43,8 @@
 ### File Organization
 
 ```
-extrachill-multisite/
-├── extrachill-multisite.php            # Main plugin file
+extrachill-network/
+├── extrachill-network.php            # Main plugin file
 ├── inc/
 │   ├── core/
 │   │   ├── blog-ids.php                # Blog ID constants and helper functions
@@ -93,9 +93,9 @@ extrachill-multisite/
 
 **Conditional Loading**:
 ```php
-add_action( 'plugins_loaded', 'extrachill_multisite_init' );
+add_action( 'plugins_loaded', 'extrachill_network_init' );
 
-function extrachill_multisite_init() {
+function extrachill_network_init() {
     // Always load blog IDs and Turnstile
     require_once 'inc/core/blog-ids.php';
     require_once 'inc/core/extrachill-turnstile.php';
@@ -481,7 +481,7 @@ try {
 
 ## File Interactions
 
-### Main Plugin File (`extrachill-multisite.php`)
+### Main Plugin File (`extrachill-network.php`)
 
 **Responsibility**: Plugin initialization and loading orchestration
 
@@ -631,14 +631,14 @@ if ( ! ec_verify_turnstile_response( $_POST['cf-turnstile-response'] ) ) {
 
 ### Production Build
 
-**Build System**: Use `homeboy build extrachill-multisite` for production builds
+**Build System**: Use `homeboy build extrachill-network` for production builds
 
-**Build Output**: `/build/extrachill-multisite.zip` file only.
+**Build Output**: `/build/extrachill-network.zip` file only.
 
 **File Exclusions**: vendor/, docs/, tests/, .git/, .buildignore, build.sh
 
 **Deployment**:
-1. Build ZIP via `./build.sh` (creates `/build/extrachill-multisite.zip`)
+1. Build ZIP via `./build.sh` (creates `/build/extrachill-network.zip`)
 2. Deploy ZIP via Homeboy (`homeboy deploy ...`) or your preferred deploy pipeline
 3. Network activate in network admin
 4. Configure Turnstile keys if using bot prevention

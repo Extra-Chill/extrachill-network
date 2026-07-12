@@ -18,11 +18,11 @@
     "mounts": [
       {
         "source": "../../",
-        "target": "/wordpress/wp-content/plugins/extrachill-multisite",
+        "target": "/wordpress/wp-content/plugins/extrachill-network",
         "mode": "readonly",
         "metadata": {
           "kind": "component",
-          "slug": "extrachill-multisite",
+          "slug": "extrachill-network",
           "editable": false
         }
       }
@@ -33,7 +33,7 @@
       {
         "command": "wordpress.wp-cli",
         "args": [
-          "command=plugin activate extrachill-multisite"
+          "command=plugin activate extrachill-network"
         ]
       },
       {

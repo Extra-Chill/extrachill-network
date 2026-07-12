@@ -21,7 +21,7 @@
  * resolve a term's cross-site URL) lives here, behind the
  * `datamachine_internal_linking_candidates` filter.
  *
- * @package ExtraChillMultisite
+ * @package ExtraChillNetwork
  * @since   1.19.0
  */
 
@@ -283,7 +283,7 @@ function extrachill_add_cross_site_linking_candidates( $candidates, $post_id, $s
 					'title'   => $title,
 					'excerpt' => sprintf(
 						/* translators: 1: term name, 2: sibling site label. */
-						__( '%1$s on %2$s', 'extrachill-multisite' ),
+						__( '%1$s on %2$s', 'extrachill-network' ),
 						$term_name,
 						$site_label
 					),
@@ -377,7 +377,7 @@ function extrachill_internal_linking_events_archive_candidate( $term, $taxonomy,
 		'blog_id'   => $events_blog_id,
 		'site_key'  => 'events',
 		'url'       => $url,
-		'label'     => isset( $content_type_labels['events'] ) ? $content_type_labels['events'] : __( 'Events', 'extrachill-multisite' ),
+		'label'     => isset( $content_type_labels['events'] ) ? $content_type_labels['events'] : __( 'Events', 'extrachill-network' ),
 		'term_name' => $term->name,
 		'count'     => $count,
 	);

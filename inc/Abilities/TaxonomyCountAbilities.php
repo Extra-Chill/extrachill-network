@@ -9,10 +9,10 @@
  * on site Y?" The ability handles switch_to_blog internally when a site key
  * is provided, so callers don't need to manage blog context.
  *
- * @package ExtraChillMultisite\Abilities
+ * @package ExtraChillNetwork\Abilities
  */
 
-namespace ExtraChillMultisite\Abilities;
+namespace ExtraChillNetwork\Abilities;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -38,28 +38,28 @@ class TaxonomyCountAbilities {
 		wp_register_ability(
 			'extrachill/taxonomy-post-counts',
 			array(
-				'label'               => __( 'Taxonomy Post Counts', 'extrachill-multisite' ),
-				'description'         => __( 'Count published posts per taxonomy term on a given site. Returns terms sorted by post count descending.', 'extrachill-multisite' ),
-				'category'            => 'extrachill-multisite',
+				'label'               => __( 'Taxonomy Post Counts', 'extrachill-network' ),
+				'description'         => __( 'Count published posts per taxonomy term on a given site. Returns terms sorted by post count descending.', 'extrachill-network' ),
+				'category'            => 'extrachill-network',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'required'   => array( 'taxonomy', 'site' ),
 					'properties' => array(
 						'taxonomy'  => array(
 							'type'        => 'string',
-							'description' => __( 'Taxonomy slug to count.', 'extrachill-multisite' ),
+							'description' => __( 'Taxonomy slug to count.', 'extrachill-network' ),
 						),
 						'site'      => array(
 							'type'        => 'string',
-							'description' => __( 'Site key (e.g. "wire", "main", "shop"). Uses ec_get_blog_id().', 'extrachill-multisite' ),
+							'description' => __( 'Site key (e.g. "wire", "main", "shop"). Uses ec_get_blog_id().', 'extrachill-network' ),
 						),
 						'post_type' => array(
 							'type'        => 'string',
-							'description' => __( 'Post type to count. If omitted, uses all post types registered for the taxonomy.', 'extrachill-multisite' ),
+							'description' => __( 'Post type to count. If omitted, uses all post types registered for the taxonomy.', 'extrachill-network' ),
 						),
 						'slug'      => array(
 							'type'        => array( 'string', 'null' ),
-							'description' => __( 'Optional term slug. When provided, the result contains only that single term (still returned under the "terms" array). Omit for the full bulk listing.', 'extrachill-multisite' ),
+							'description' => __( 'Optional term slug. When provided, the result contains only that single term (still returned under the "terms" array). Omit for the full bulk listing.', 'extrachill-network' ),
 						),
 					),
 				),
@@ -117,7 +117,7 @@ class TaxonomyCountAbilities {
 			return new \WP_Error(
 				'unknown_site',
 				/* translators: %s: site key */
-				sprintf( __( 'Unknown site key "%s".', 'extrachill-multisite' ), $site_key ),
+				sprintf( __( 'Unknown site key "%s".', 'extrachill-network' ), $site_key ),
 				array( 'status' => 400 )
 			);
 		}
@@ -153,7 +153,7 @@ class TaxonomyCountAbilities {
 			return new \WP_Error(
 				'taxonomy_not_found',
 				/* translators: %s: taxonomy slug */
-				sprintf( __( 'Taxonomy "%s" does not exist on this site.', 'extrachill-multisite' ), $taxonomy ),
+				sprintf( __( 'Taxonomy "%s" does not exist on this site.', 'extrachill-network' ), $taxonomy ),
 				array( 'status' => 400 )
 			);
 		}
@@ -233,7 +233,7 @@ class TaxonomyCountAbilities {
 			return new \WP_Error(
 				'taxonomy_not_found',
 				/* translators: %s: taxonomy slug */
-				sprintf( __( 'Taxonomy "%s" does not exist on this site.', 'extrachill-multisite' ), $taxonomy ),
+				sprintf( __( 'Taxonomy "%s" does not exist on this site.', 'extrachill-network' ), $taxonomy ),
 				array( 'status' => 400 )
 			);
 		}
