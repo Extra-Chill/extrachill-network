@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.0.2] - 2026-07-12
+
+### Fixed
+- surface network manifesto in actual footer nav
+
 ## [2.0.1] - 2026-07-12
 
 ### Changed
