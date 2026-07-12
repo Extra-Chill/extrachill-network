@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.1.0] - 2026-07-12
+
+### Added
+- move QR generation to network ownership
+- network menu landing page and DMB integrations settings page (#100, #101)
+
 ## [2.0.2] - 2026-07-12
 
 ### Fixed
