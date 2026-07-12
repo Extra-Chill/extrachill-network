@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.2.0] - 2026-07-12
+
+### Added
+- route festival archives to Community (#114)
+
 ## [2.1.2] - 2026-07-12
 
 ### Fixed
