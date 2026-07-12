@@ -3,7 +3,8 @@
 	"description": "Centralized multisite functionality for the ExtraChill Platform",
 	"type": "wordpress-plugin",
 	"require": {
-		"php": ">=7.4"
+		"php": ">=8.4",
+		"endroid/qr-code": "^6.0"
 	},
 	"require-dev": {
 		"phpunit/phpunit": "^9.0",

@@ -9,7 +9,7 @@
  * Network: true
  * Requires at least: 5.0
  * Tested up to: 6.4
- * Requires PHP: 7.4
+ * Requires PHP: 8.4
  * Text Domain: extrachill-network
  * Domain Path: /languages
  */
@@ -108,6 +108,9 @@ function extrachill_network_init() {
 		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/Abilities/NetworkMediaAbilities.php';
 		new \ExtraChillNetwork\Abilities\NetworkMediaAbilities();
 
+		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/Abilities/QRCodeAbility.php';
+		new \ExtraChillNetwork\Abilities\QRCodeAbility();
+
 		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/Abilities/MailAbilities.php';
 		new \ExtraChillNetwork\Abilities\MailAbilities();
 
@@ -142,6 +145,7 @@ function extrachill_network_init() {
 
 	if ( is_admin() && is_network_admin() ) {
 		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'admin/network-menu.php';
+		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'admin/legacy-admin-tools-redirect.php';
 		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'admin/network-security-settings.php';
 		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'admin/network-payments-settings.php';
 		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'admin/network-oauth-settings.php';
