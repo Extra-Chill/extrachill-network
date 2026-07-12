@@ -32,6 +32,17 @@ class QRCodeAbilityTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Normal plugin initialization makes the ability available to consumers.
+	 */
+	public function test_ability_resolves_after_plugin_initialization(): void {
+		$this->assertTrue( wp_has_ability( 'extrachill/generate-qr-code' ) );
+		$this->assertInstanceOf(
+			\WP_Ability::class,
+			wp_get_ability( 'extrachill/generate-qr-code' )
+		);
+	}
+
+	/**
 	 * The API and CLI consumers receive the unchanged response keys.
 	 */
 	public function test_generate_preserves_response_contract(): void {
