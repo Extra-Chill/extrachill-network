@@ -24,6 +24,20 @@ declare( strict_types=1 );
 class InternalLinkingCandidatesTest extends WP_UnitTestCase {
 
 	/**
+	 * Artist discussions are a destination, while artist profiles stay canonical.
+	 */
+	public function test_artist_map_includes_community_without_changing_canonical_authority(): void {
+		$site_map         = extrachill_get_taxonomy_site_map();
+		$canonical_config = extrachill_get_taxonomy_canonical_config();
+
+		$this->assertSame(
+			array( 'main', 'events', 'shop', 'artist', 'community' ),
+			$site_map['artist']
+		);
+		$this->assertSame( 'artist', $canonical_config['artist']['canonical'] );
+	}
+
+	/**
 	 * Prime the cross-site term-link cache for a term so the hook reads the
 	 * supplied links instead of computing them.
 	 *
