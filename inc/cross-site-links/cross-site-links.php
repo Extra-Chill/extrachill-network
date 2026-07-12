@@ -37,7 +37,7 @@ function extrachill_get_taxonomy_site_map() {
 			'venue'    => array( 'main', 'events' ),
 			'location' => array( 'main', 'events', 'wire', 'community' ),
 			'artist'   => array( 'main', 'events', 'shop', 'artist' ),
-			'festival' => array( 'main', 'events', 'wire' ),
+			'festival' => array( 'main', 'events', 'wire', 'community' ),
 		)
 	);
 }
