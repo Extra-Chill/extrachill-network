@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.3.0] - 2026-07-13
+
+### Added
+- route artist archives to Community
+
 ## [2.2.1] - 2026-07-12
 
 ### Fixed
