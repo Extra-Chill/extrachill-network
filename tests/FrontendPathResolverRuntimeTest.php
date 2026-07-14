@@ -42,4 +42,17 @@ foreach ( $sites as $site => $post_type ) {
 	}
 }
 
+$transport_probe = __DIR__ . '/FrontendPathResolverTransportProbe.php';
+$transport_command = sprintf(
+	'wp --path=%s --url=%s --allow-root eval-file %s 2>&1',
+	escapeshellarg( $wp_path ),
+	escapeshellarg( 'extrachill.com' ),
+	escapeshellarg( $transport_probe )
+);
+$output = array();
+exec( $transport_command, $output, $status );
+if ( 0 !== $status ) {
+	throw new RuntimeException( sprintf( 'Large JSON POST transport probe failed: %s', implode( "\n", $output ) ) );
+}
+
 fwrite( STDOUT, "FrontendPathResolverRuntimeTest passed.\n" );

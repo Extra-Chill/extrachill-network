@@ -7,6 +7,9 @@
   "id": "extrachill-network",
   "remote_path": "wp-content/plugins/extrachill-network",
   "self_checks": {
+    "lint": [
+      "composer lint:php"
+    ],
     "test": [
       "php tests/FrontendPathResolverTest.php",
       "php tests/FrontendPathResolverRuntimeTest.php"

@@ -29,7 +29,9 @@ if ( empty( $post_ids ) ) {
 $post_id = (int) $post_ids[0];
 $path    = ec_normalize_frontend_path( (string) wp_parse_url( get_permalink( $post_id ), PHP_URL_PATH ) );
 $request = new WP_REST_Request( 'GET', '/extrachill-network/v1/frontend-path-resolution' );
-$request->set_param( 'paths', array( $path ) );
+$request->set_method( 'POST' );
+$request->set_header( 'Content-Type', 'application/json' );
+$request->set_body( wp_json_encode( array( 'paths' => array( $path ) ) ) );
 $response = rest_do_request( $request );
 $data     = $response->get_data();
 $result   = $data['results'][ $path ] ?? array();
