@@ -43,16 +43,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Enqueue the bridge instrumentation script on singular front-end views.
+ * Enqueue the bridge instrumentation script on bridge-capable front-end views.
  *
- * Loaded broadly on `is_singular()` because every bridge consumer renders on a
- * singular view (blog/events/wire single posts, artist profile hubs). The
+ * Singular views and network homepages can both act as cross-site routers. The
  * script self-gates at runtime: it fires an impression only when at least one
  * bridge link is actually present in the DOM, and a click only on a real
  * cross-site link click. No bridge cards on the page == zero beacons.
  */
 function extrachill_bridge_enqueue_instrumentation() {
-	if ( is_admin() || ! is_singular() || is_preview() ) {
+	if ( is_admin() || ( ! is_singular() && ! is_front_page() && ! is_home() ) || is_preview() ) {
 		return;
 	}
 
