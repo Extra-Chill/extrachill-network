@@ -2,12 +2,6 @@
 /**
  * Authoritative frontend-path resolution across the Extra Chill network.
  *
- * A frontend path must be resolved by each target site's own WordPress boot:
- * switch_to_blog() changes database context but does not load that site's
- * post-type rewrite registrations. The existing HTTP loopback primitive gives
- * each candidate site its real bootstrap, then this file compares the target's
- * canonical permalink path exactly before returning any match.
- *
  * @package ExtraChillNetwork
  */
 
@@ -15,20 +9,22 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/** Maximum normalized paths accepted by one target-local probe. */
+const EC_FRONTEND_PATH_RESOLVER_MAX_PATHS = 100;
+
 /**
  * Normalize a host-relative frontend path for canonical comparisons.
  *
  * Query strings and fragments do not identify content, so they are removed.
- * Absolute and protocol-relative URLs are rejected: callers with a hostname
- * must use the site-specific URL rather than asking this path-only contract to
- * infer its owner.
+ * Absolute and protocol-relative URLs are rejected rather than used to infer
+ * network ownership.
  *
  * @param string $path Host-relative frontend path.
  * @return string|null Normalized path, or null when it is not host-relative.
  */
 function ec_normalize_frontend_path( string $path ): ?string {
 	$path = trim( $path );
-	if ( '' === $path || str_starts_with( $path, '//' ) || ! str_starts_with( $path, '/' ) ) {
+	if ( '' === $path || strlen( $path ) > 2048 || str_starts_with( $path, '//' ) || ! str_starts_with( $path, '/' ) ) {
 		return null;
 	}
 
@@ -43,77 +39,208 @@ function ec_normalize_frontend_path( string $path ): ?string {
 }
 
 /**
- * Resolve a host-relative frontend path to one exact, published network post.
+ * Resolve frontend paths against every authoritative network site in one scan.
  *
- * @param string $path Host-relative frontend path. Query strings and fragments
- *                     are ignored; absolute URLs are unresolved.
- * @return array{status:string,path:?string,candidate?:array,candidates?:array}
+ * Each target receives the whole deduplicated path set in one HTTP loopback and
+ * resolves it after its own plugins and rewrite registrations have booted. A
+ * result is never unique, unresolved, or ambiguous until every target response
+ * has passed the response contract. Failures make valid inputs incomplete.
+ *
+ * @param string[] $paths Host-relative frontend paths.
+ * @param array    $args  Optional `timeout` in seconds (1-10, default 5).
+ * @return array{scan:array,results:array}
  */
-function ec_resolve_frontend_path( string $path ): array {
-	$path = ec_normalize_frontend_path( $path );
-	if ( null === $path ) {
-		return array(
-			'status'     => 'unresolved',
-			'path'       => null,
+function ec_resolve_frontend_paths( array $paths, array $args = array() ): array {
+	$timeout = isset( $args['timeout'] ) ? (int) $args['timeout'] : 5;
+	$timeout = min( 10, max( 1, $timeout ) );
+	$results = array();
+	$unique  = array();
+
+	foreach ( $paths as $input ) {
+		$input      = is_string( $input ) ? $input : '';
+		$normalized = ec_normalize_frontend_path( $input );
+		$results[]  = array(
+			'input'      => $input,
+			'path'       => $normalized,
 			'candidates' => array(),
+			'status'     => null === $normalized ? 'unresolved' : null,
+		);
+		if ( null !== $normalized ) {
+			$unique[ $normalized ] = true;
+		}
+	}
+
+	$normalized_paths = array_keys( $unique );
+	if ( count( $normalized_paths ) > EC_FRONTEND_PATH_RESOLVER_MAX_PATHS ) {
+		return ec_frontend_path_resolver_incomplete_results(
+			$results,
+			array(
+				array(
+					'code'    => 'too_many_paths',
+					'message' => 'The path batch exceeds the resolver limit.',
+				),
+			)
 		);
 	}
 
-	$candidates = array();
+	$matches  = array_fill_keys( $normalized_paths, array() );
+	$failures = array();
+	$targets  = array();
 	foreach ( ec_get_blog_ids() as $site_key => $blog_id ) {
 		$response = ec_cross_site_rest_request_http(
 			$site_key,
 			'GET',
 			'/extrachill-network/v1/frontend-path-resolution',
 			array(
-				'query' => array( 'path' => $path ),
+				'query'   => array( 'paths' => $normalized_paths ),
+				'timeout' => $timeout,
 			)
 		);
 
-		if ( is_wp_error( $response ) || ! is_array( $response ) || 'resolved' !== ( $response['status'] ?? null ) ) {
-			continue;
-		}
-
-		$candidate = $response['candidate'] ?? null;
-		if ( ! is_array( $candidate ) || ec_normalize_frontend_path( (string) ( $candidate['canonical_path'] ?? '' ) ) !== $path ) {
-			continue;
-		}
-
-		if ( (int) ( $candidate['blog_id'] ?? 0 ) !== (int) $blog_id || empty( $candidate['post_id'] ) || empty( $candidate['post_type'] ) || empty( $candidate['canonical_url'] ) ) {
-			continue;
-		}
-
-		$candidates[ (int) $candidate['blog_id'] . ':' . (int) $candidate['post_id'] ] = $candidate;
-	}
-
-	$candidates = array_values( $candidates );
-	usort(
-		$candidates,
-		static fn( array $left, array $right ): int => array( (int) $left['blog_id'], (int) $left['post_id'] ) <=> array( (int) $right['blog_id'], (int) $right['post_id'] )
-	);
-
-	if ( 1 === count( $candidates ) ) {
-		return array(
-			'status'    => 'resolved',
-			'path'      => $path,
-			'candidate' => $candidates[0],
+		$target = array(
+			'site_key' => $site_key,
+			'blog_id'  => (int) $blog_id,
 		);
+		if ( is_wp_error( $response ) ) {
+			$failures[] = array_merge(
+				$target,
+				array(
+					'code'    => $response->get_error_code(),
+					'message' => $response->get_error_message(),
+				)
+			);
+			continue;
+		}
+
+		if ( ! is_array( $response ) || 'complete' !== ( $response['status'] ?? null ) || ! isset( $response['results'] ) || ! is_array( $response['results'] ) ) {
+			$failures[] = array_merge(
+				$target,
+				array(
+					'code'    => 'malformed_response',
+					'message' => 'Target returned an invalid resolver response.',
+				)
+			);
+			continue;
+		}
+
+		$malformed = false;
+		foreach ( $normalized_paths as $path ) {
+			$local = $response['results'][ $path ] ?? null;
+			if ( ! is_array( $local ) || ! in_array( $local['status'] ?? null, array( 'resolved', 'unresolved' ), true ) ) {
+				$malformed = true;
+				break;
+			}
+			if ( 'resolved' === $local['status'] ) {
+				$candidate = $local['candidate'] ?? null;
+				if ( ! ec_frontend_path_resolver_valid_candidate( $candidate, $path, (int) $blog_id ) ) {
+					$malformed = true;
+					break;
+				}
+				$matches[ $path ][ (int) $candidate['blog_id'] . ':' . (int) $candidate['post_id'] ] = $candidate;
+			}
+		}
+
+		if ( $malformed ) {
+			$failures[] = array_merge(
+				$target,
+				array(
+					'code'    => 'malformed_response',
+					'message' => 'Target response did not cover every requested path.',
+				)
+			);
+			continue;
+		}
+		$targets[] = $target;
 	}
+
+	if ( ! empty( $failures ) ) {
+		return ec_frontend_path_resolver_incomplete_results( $results, $failures, $targets );
+	}
+
+	foreach ( $results as &$result ) {
+		if ( null === $result['path'] ) {
+			continue;
+		}
+		$candidates = array_values( $matches[ $result['path'] ] );
+		usort( $candidates, static fn( array $left, array $right ): int => array( (int) $left['blog_id'], (int) $left['post_id'] ) <=> array( (int) $right['blog_id'], (int) $right['post_id'] ) );
+		$result['candidates'] = $candidates;
+		$result['status']     = empty( $candidates ) ? 'unresolved' : ( 1 === count( $candidates ) ? 'resolved' : 'ambiguous' );
+		if ( 'resolved' === $result['status'] ) {
+			$result['candidate'] = $candidates[0];
+		}
+	}
+	unset( $result );
 
 	return array(
-		'status'     => empty( $candidates ) ? 'unresolved' : 'ambiguous',
-		'path'       => $path,
-		'candidates' => $candidates,
+		'scan'    => array(
+			'status'   => 'complete',
+			'targets'  => $targets,
+			'failures' => array(),
+		),
+		'results' => $results,
 	);
 }
 
 /**
- * Register the target-local probe used by ec_resolve_frontend_path().
+ * Delegate single-path resolution to the batch contract.
  *
- * The response is public because it exposes only already-public, published
- * content. Network callers consume it through a localhost loopback, ensuring
- * the target site's own plugin and rewrite registrations are initialized.
+ * @param string $path Host-relative frontend path.
+ * @param array  $args Optional resolver arguments.
+ * @return array
  */
+function ec_resolve_frontend_path( string $path, array $args = array() ): array {
+	$batch          = ec_resolve_frontend_paths( array( $path ), $args );
+	$result         = $batch['results'][0];
+	$result['scan'] = $batch['scan'];
+
+	return $result;
+}
+
+/**
+ * Build incomplete results without treating partial candidate data as correct.
+ *
+ * @param array $results  Input result rows.
+ * @param array $failures Target or batch failures.
+ * @param array $targets  Successfully checked targets.
+ * @return array
+ */
+function ec_frontend_path_resolver_incomplete_results( array $results, array $failures, array $targets = array() ): array {
+	foreach ( $results as &$result ) {
+		if ( null !== $result['path'] ) {
+			$result['status'] = 'incomplete';
+		}
+		$result['failures'] = $failures;
+	}
+	unset( $result );
+
+	return array(
+		'scan'    => array(
+			'status'   => 'incomplete',
+			'targets'  => $targets,
+			'failures' => $failures,
+		),
+		'results' => $results,
+	);
+}
+
+/**
+ * Verify target evidence before it contributes to a network result.
+ *
+ * @param mixed  $candidate Target candidate.
+ * @param string $path      Requested normalized path.
+ * @param int    $blog_id   Expected target blog ID.
+ * @return bool
+ */
+function ec_frontend_path_resolver_valid_candidate( $candidate, string $path, int $blog_id ): bool {
+	return is_array( $candidate )
+		&& (int) ( $candidate['blog_id'] ?? 0 ) === $blog_id
+		&& ! empty( $candidate['post_id'] )
+		&& ! empty( $candidate['post_type'] )
+		&& ! empty( $candidate['canonical_url'] )
+		&& ec_normalize_frontend_path( (string) ( $candidate['canonical_path'] ?? '' ) ) === $path;
+}
+
+/** Register the target-local batch probe. */
 function ec_register_frontend_path_resolver_route(): void {
 	register_rest_route(
 		'extrachill-network/v1',
@@ -122,51 +249,67 @@ function ec_register_frontend_path_resolver_route(): void {
 			'methods'             => WP_REST_Server::READABLE,
 			'callback'            => 'ec_frontend_path_resolver_rest_callback',
 			'permission_callback' => '__return_true',
-			'args'                => array(
-				'path' => array(
-					'required'          => true,
-					'sanitize_callback' => 'sanitize_text_field',
-				),
-			),
 		)
 	);
 }
 add_action( 'rest_api_init', 'ec_register_frontend_path_resolver_route' );
 
 /**
- * Resolve an exact canonical path inside the currently booted site.
+ * Resolve all normalized paths inside the currently booted target site.
  *
- * @param WP_REST_Request $request Request containing a host-relative path.
+ * @param WP_REST_Request $request Request containing `paths`.
  * @return WP_REST_Response
  */
 function ec_frontend_path_resolver_rest_callback( WP_REST_Request $request ): WP_REST_Response {
-	$path = ec_normalize_frontend_path( (string) $request->get_param( 'path' ) );
-	if ( null === $path ) {
-		return new WP_REST_Response( array( 'status' => 'unresolved' ) );
+	$paths = $request->get_param( 'paths' );
+	if ( ! is_array( $paths ) || count( $paths ) > EC_FRONTEND_PATH_RESOLVER_MAX_PATHS ) {
+		return new WP_REST_Response( array( 'status' => 'invalid_request' ), 400 );
 	}
 
+	$results = array();
+	foreach ( $paths as $path ) {
+		$path = is_string( $path ) ? ec_normalize_frontend_path( $path ) : null;
+		if ( null === $path ) {
+			return new WP_REST_Response( array( 'status' => 'invalid_request' ), 400 );
+		}
+		$results[ $path ] = ec_frontend_path_resolve_local( $path );
+	}
+
+	return new WP_REST_Response(
+		array(
+			'status'  => 'complete',
+			'results' => $results,
+		)
+	);
+}
+
+/**
+ * Resolve one exact canonical path in the currently booted site.
+ *
+ * @param string $path Normalized host-relative path.
+ * @return array
+ */
+function ec_frontend_path_resolve_local( string $path ): array {
 	$post_id = url_to_postid( home_url( $path ) );
 	$post    = $post_id ? get_post( $post_id ) : null;
 	if ( ! $post instanceof WP_Post || 'publish' !== $post->post_status ) {
-		return new WP_REST_Response( array( 'status' => 'unresolved' ) );
+		return array( 'status' => 'unresolved' );
 	}
 
 	$canonical_url  = get_permalink( $post );
 	$canonical_path = $canonical_url ? ec_normalize_frontend_path( (string) wp_parse_url( $canonical_url, PHP_URL_PATH ) ) : null;
 	if ( $path !== $canonical_path ) {
-		return new WP_REST_Response( array( 'status' => 'unresolved' ) );
+		return array( 'status' => 'unresolved' );
 	}
 
-	return new WP_REST_Response(
-		array(
-			'status'    => 'resolved',
-			'candidate' => array(
-				'blog_id'        => get_current_blog_id(),
-				'post_id'        => (int) $post->ID,
-				'post_type'      => $post->post_type,
-				'canonical_url'  => $canonical_url,
-				'canonical_path' => $canonical_path,
-			),
-		)
+	return array(
+		'status'    => 'resolved',
+		'candidate' => array(
+			'blog_id'        => get_current_blog_id(),
+			'post_id'        => (int) $post->ID,
+			'post_type'      => $post->post_type,
+			'canonical_url'  => $canonical_url,
+			'canonical_path' => $canonical_path,
+		),
 	);
 }

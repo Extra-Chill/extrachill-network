@@ -17,7 +17,7 @@
 		}
 	},
 	"scripts": {
-		"test": "phpunit",
+		"test": "php tests/FrontendPathResolverTest.php && php tests/FrontendPathResolverRuntimeTest.php",
 		"lint:php": "phpcs --standard=WordPress .",
 		"lint:fix": "phpcbf --standard=WordPress ."
 	},

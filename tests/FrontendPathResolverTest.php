@@ -1,154 +1,119 @@
 <?php
 /**
- * Tests for authoritative network frontend-path resolution.
+ * Standalone contract checks for frontend-path batch resolution.
  *
- * @package ExtraChill\Network
+ * @package ExtraChillNetwork
  */
 
 declare( strict_types=1 );
 
-/**
- * Verifies exact, target-booted frontend path resolution.
- */
-class FrontendPathResolverTest extends WP_UnitTestCase {
+define( 'ABSPATH', __DIR__ . '/' );
 
-	/**
-	 * Target-local responses keyed by host.
-	 *
-	 * @var array<string,array>
-	 */
-	private array $responses = array();
+class WP_Error {
+	public function __construct( private string $code, private string $message ) {}
+	public function get_error_code(): string { return $this->code; }
+	public function get_error_message(): string { return $this->message; }
+}
 
-	/** Set up isolated loopback responses. */
-	public function set_up() {
-		parent::set_up();
-		add_filter( 'pre_http_request', array( $this, 'mock_loopback' ), 10, 3 );
-	}
+class WP_Post {
+	public function __construct( public int $ID, public string $post_status, public string $post_type, public string $url ) {}
+}
 
-	/** Remove isolated loopback responses. */
-	public function tear_down() {
-		remove_filter( 'pre_http_request', array( $this, 'mock_loopback' ), 10 );
-		parent::tear_down();
-	}
+function wp_parse_url( string $url, int $component = -1 ) {
+	return parse_url( $url, $component );
+}
+function trailingslashit( string $path ): string { return rtrim( $path, '/' ) . '/'; }
+function add_action(): void {}
+function is_wp_error( $value ): bool { return $value instanceof WP_Error; }
+function ec_get_blog_ids(): array { return array( 'main' => 1, 'events' => 7, 'wire' => 11 ); }
+function home_url( string $path ): string { return 'https://example.test' . $path; }
+function get_post( int $post_id ): ?WP_Post { return $GLOBALS['ec_test_posts'][ $post_id ] ?? null; }
+function get_permalink( WP_Post $post ): string { return $post->url; }
+function get_current_blog_id(): int { return 1; }
+function ec_cross_site_rest_request_http( string $site_key, string $method, string $path, array $args ) {
+	$GLOBALS['ec_test_calls'][] = array( 'site_key' => $site_key, 'method' => $method, 'path' => $path, 'args' => $args );
+	return $GLOBALS['ec_test_responses'][ $site_key ];
+}
 
-	/**
-	 * Return target-local probe responses without making network requests.
-	 *
-	 * @param false|array|WP_Error $preempt Preempted response.
-	 * @param array                $args    HTTP arguments.
-	 * @return array
-	 */
-	public function mock_loopback( $preempt, array $args ): array {
-		$host = $args['headers']['Host'] ?? '';
-		$body = $this->responses[ $host ] ?? array(
-			'status' => 'unresolved',
-		);
+require_once dirname( __DIR__ ) . '/inc/core/frontend-path-resolver.php';
 
-		return array(
-			'headers'  => array(),
-			'body'     => wp_json_encode( $body ),
-			'response' => array(
-				'code'    => 200,
-				'message' => 'OK',
-			),
-			'cookies'  => array(),
-			'filename' => null,
-		);
-	}
-
-	/**
-	 * Build a target-local resolved candidate response.
-	 *
-	 * @param int    $blog_id   Owning blog ID.
-	 * @param int    $post_id   Published post ID.
-	 * @param string $post_type Published post type.
-	 * @param string $url       Canonical post URL.
-	 * @return array
-	 */
-	private function candidate( int $blog_id, int $post_id, string $post_type, string $url ): array {
-		return array(
-			'status'    => 'resolved',
-			'candidate' => array(
-				'blog_id'        => $blog_id,
-				'post_id'        => $post_id,
-				'post_type'      => $post_type,
-				'canonical_url'  => $url,
-				'canonical_path' => wp_parse_url( $url, PHP_URL_PATH ),
-			),
-		);
-	}
-
-	/** Main-site content resolves after query and fragment normalization. */
-	public function test_resolves_main_site_content_and_normalizes_query_and_fragment(): void {
-		$this->responses['extrachill.com'] = $this->candidate( 1, 101, 'post', 'https://extrachill.com/ordinary-post/' );
-
-		$result = ec_resolve_frontend_path( '/ordinary-post?ref=source#section' );
-
-		$this->assertSame( 'resolved', $result['status'] );
-		$this->assertSame( '/ordinary-post/', $result['path'] );
-		$this->assertSame( 1, $result['candidate']['blog_id'] );
-	}
-
-	/** Events content resolves from its authoritative target site. */
-	public function test_resolves_events_path(): void {
-		$this->responses['events.extrachill.com'] = $this->candidate( 7, 202, 'data_machine_events', 'https://events.extrachill.com/events/sample-event/' );
-
-		$result = ec_resolve_frontend_path( '/events/sample-event/' );
-
-		$this->assertSame( 'resolved', $result['status'] );
-		$this->assertSame( 7, $result['candidate']['blog_id'] );
-		$this->assertSame( 'data_machine_events', $result['candidate']['post_type'] );
-	}
-
-	/** Festival Wire content resolves from its authoritative target site. */
-	public function test_resolves_festival_wire_path(): void {
-		$this->responses['wire.extrachill.com'] = $this->candidate( 11, 303, 'festival_wire', 'https://wire.extrachill.com/festival-wire/sample-story/' );
-
-		$result = ec_resolve_frontend_path( '/festival-wire/sample-story' );
-
-		$this->assertSame( 'resolved', $result['status'] );
-		$this->assertSame( 11, $result['candidate']['blog_id'] );
-		$this->assertSame( 'festival_wire', $result['candidate']['post_type'] );
-	}
-
-	/** Missing, absolute, and canonical-mismatched paths remain unresolved. */
-	public function test_returns_unresolved_for_missing_or_non_canonical_path(): void {
-		$this->responses['events.extrachill.com'] = $this->candidate( 7, 202, 'data_machine_events', 'https://events.extrachill.com/events/canonical/' );
-
-		$this->assertSame( 'unresolved', ec_resolve_frontend_path( '/missing/' )['status'] );
-		$this->assertSame( 'unresolved', ec_resolve_frontend_path( '/events/not-canonical/' )['status'] );
-		$this->assertSame( 'unresolved', ec_resolve_frontend_path( 'https://events.extrachill.com/events/canonical/' )['status'] );
-	}
-
-	/** Collisions return all candidates rather than choosing a first match. */
-	public function test_returns_ambiguity_instead_of_first_match(): void {
-		$this->responses['extrachill.com']      = $this->candidate( 1, 101, 'post', 'https://extrachill.com/shared/' );
-		$this->responses['wire.extrachill.com'] = $this->candidate( 11, 303, 'festival_wire', 'https://wire.extrachill.com/shared/' );
-
-		$result = ec_resolve_frontend_path( '/shared/' );
-
-		$this->assertSame( 'ambiguous', $result['status'] );
-		$this->assertCount( 2, $result['candidates'] );
-		$this->assertSame( 1, $result['candidates'][0]['blog_id'] );
-		$this->assertSame( 11, $result['candidates'][1]['blog_id'] );
-	}
-
-	/** The target probe excludes drafts and refuses non-canonical paths. */
-	public function test_target_probe_rejects_drafts_and_canonical_mismatches(): void {
-		$draft_id = self::factory()->post->create( array( 'post_status' => 'draft' ) );
-		$request  = new WP_REST_Request( 'GET', '/extrachill-network/v1/frontend-path-resolution' );
-		$request->set_param( 'path', '/draft-path/' );
-		$draft_filter = static fn(): string => home_url( '?p=' . $draft_id );
-		add_filter( 'url_to_postid', $draft_filter );
-
-		$this->assertSame( 'unresolved', ec_frontend_path_resolver_rest_callback( $request )->get_data()['status'] );
-		remove_filter( 'url_to_postid', $draft_filter );
-
-		$post_id = self::factory()->post->create( array( 'post_status' => 'publish' ) );
-		$request->set_param( 'path', '/not-the-canonical-path/' );
-		$post_filter = static fn(): string => home_url( '?p=' . $post_id );
-		add_filter( 'url_to_postid', $post_filter );
-		$this->assertSame( 'unresolved', ec_frontend_path_resolver_rest_callback( $request )->get_data()['status'] );
-		remove_filter( 'url_to_postid', $post_filter );
+/** Fail the standalone process with a useful message. */
+function ec_test_assert( bool $condition, string $message ): void {
+	if ( ! $condition ) {
+		throw new RuntimeException( $message );
 	}
 }
+
+/** Build a valid target response for the requested paths. */
+function ec_test_response( int $blog_id, array $paths, array $resolved = array() ): array {
+	$results = array();
+	foreach ( $paths as $path ) {
+		if ( isset( $resolved[ $path ] ) ) {
+			$results[ $path ] = array( 'status' => 'resolved', 'candidate' => $resolved[ $path ] );
+		} else {
+			$results[ $path ] = array( 'status' => 'unresolved' );
+		}
+	}
+
+	return array( 'status' => 'complete', 'results' => $results );
+}
+
+/** Build canonical target evidence. */
+function ec_test_candidate( int $blog_id, int $post_id, string $type, string $path ): array {
+	return array(
+		'blog_id'        => $blog_id,
+		'post_id'        => $post_id,
+		'post_type'      => $type,
+		'canonical_url'  => 'https://example.test' . $path,
+		'canonical_path' => $path,
+	);
+}
+
+$paths = array( '/main/', '/events/sample/' );
+$GLOBALS['ec_test_calls'] = array();
+$GLOBALS['ec_test_responses'] = array(
+	'main'   => ec_test_response( 1, $paths, array( '/main/' => ec_test_candidate( 1, 10, 'post', '/main/' ) ) ),
+	'events' => ec_test_response( 7, $paths, array( '/events/sample/' => ec_test_candidate( 7, 20, 'data_machine_events', '/events/sample/' ) ) ),
+	'wire'   => ec_test_response( 11, $paths ),
+);
+$batch = ec_resolve_frontend_paths( array( '/main/?ref=x#one', '/events/sample/', '/main/' ) );
+ec_test_assert( 'complete' === $batch['scan']['status'], 'Complete target scan expected.' );
+ec_test_assert( 3 === count( $GLOBALS['ec_test_calls'] ), 'One target request per site expected.' );
+ec_test_assert( array( '/main/', '/events/sample/' ) === $GLOBALS['ec_test_calls'][0]['args']['query']['paths'], 'Normalized paths must be deduplicated per target request.' );
+ec_test_assert( 'resolved' === $batch['results'][0]['status'] && 1 === $batch['results'][0]['candidate']['blog_id'], 'Main path should resolve.' );
+ec_test_assert( 'resolved' === $batch['results'][1]['status'] && 7 === $batch['results'][1]['candidate']['blog_id'], 'Events path should resolve.' );
+
+$GLOBALS['ec_test_calls'] = array();
+$single = ec_resolve_frontend_path( '/main/' );
+ec_test_assert( 'complete' === $single['scan']['status'] && 'resolved' === $single['status'], 'Single wrapper must delegate to the complete batch contract.' );
+ec_test_assert( 3 === count( $GLOBALS['ec_test_calls'] ), 'Single wrapper must use one request per site.' );
+
+$GLOBALS['ec_test_responses']['wire'] = new WP_Error( 'target_down', 'Wire unavailable.' );
+$partial = ec_resolve_frontend_paths( array( '/main/' ) );
+ec_test_assert( 'incomplete' === $partial['scan']['status'] && 'incomplete' === $partial['results'][0]['status'], 'Partial scans must never claim a unique match.' );
+ec_test_assert( 'target_down' === $partial['results'][0]['failures'][0]['code'], 'Target failure evidence is required.' );
+
+$GLOBALS['ec_test_responses']['wire'] = array( 'status' => 'complete', 'results' => array() );
+$malformed = ec_resolve_frontend_paths( array( '/main/' ) );
+ec_test_assert( 'incomplete' === $malformed['results'][0]['status'] && 'malformed_response' === $malformed['scan']['failures'][0]['code'], 'Malformed target responses must be incomplete.' );
+
+$GLOBALS['ec_test_responses']['wire'] = ec_test_response( 11, array( '/shared/' ), array( '/shared/' => ec_test_candidate( 11, 30, 'festival_wire', '/shared/' ) ) );
+$GLOBALS['ec_test_responses']['main'] = ec_test_response( 1, array( '/shared/' ), array( '/shared/' => ec_test_candidate( 1, 10, 'post', '/shared/' ) ) );
+$GLOBALS['ec_test_responses']['events'] = ec_test_response( 7, array( '/shared/' ) );
+$ambiguous = ec_resolve_frontend_paths( array( '/shared/' ) );
+ec_test_assert( 'ambiguous' === $ambiguous['results'][0]['status'] && 2 === count( $ambiguous['results'][0]['candidates'] ), 'Exact collisions must be deterministically ambiguous.' );
+ec_test_assert( 1 === $ambiguous['results'][0]['candidates'][0]['blog_id'], 'Ambiguity evidence must be ordered.' );
+
+$GLOBALS['ec_test_responses']['main'] = ec_test_response( 1, array( '/missing/' ) );
+$GLOBALS['ec_test_responses']['events'] = ec_test_response( 7, array( '/missing/' ) );
+$GLOBALS['ec_test_responses']['wire'] = ec_test_response( 11, array( '/missing/' ) );
+$unresolved = ec_resolve_frontend_paths( array( '/missing/' ) );
+ec_test_assert( 'unresolved' === $unresolved['results'][0]['status'], 'Complete scans with no candidates must be unresolved.' );
+
+$GLOBALS['ec_test_posts'] = array( 1 => new WP_Post( 1, 'draft', 'post', 'https://example.test/draft/' ) );
+function url_to_postid( string $url ): int { return 1; }
+ec_test_assert( 'unresolved' === ec_frontend_path_resolve_local( '/draft/' )['status'], 'Drafts must not resolve.' );
+$GLOBALS['ec_test_posts'][1] = new WP_Post( 1, 'publish', 'post', 'https://example.test/canonical/' );
+ec_test_assert( 'unresolved' === ec_frontend_path_resolve_local( '/wrong/' )['status'], 'Canonical mismatches must not resolve.' );
+
+fwrite( STDOUT, "FrontendPathResolverTest passed.\n" );
