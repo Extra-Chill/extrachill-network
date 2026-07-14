@@ -72,6 +72,9 @@ function extrachill_network_init() {
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/object-cache-config.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/legacy-path-redirects.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/new-site-setup.php';
+	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/ad-policy.php';
+	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/integrations/ad-delivery.php';
+	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/integrations/member-ad-benefit.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/cross-site-links/cross-site-links.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/cross-site-links/network-bridge.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/theme/footer-main-menu.php';
@@ -115,6 +118,9 @@ function extrachill_network_init() {
 		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/Abilities/MailAbilities.php';
 		new \ExtraChillNetwork\Abilities\MailAbilities();
 
+		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/Abilities/AdPolicyAbility.php';
+		new \ExtraChillNetwork\Abilities\AdPolicyAbility();
+
 		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/Abilities/CrossSiteContentMigrationAbilities.php';
 		new \ExtraChillNetwork\Abilities\CrossSiteContentMigrationAbilities();
 
@@ -152,5 +158,6 @@ function extrachill_network_init() {
 		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'admin/network-oauth-settings.php';
 		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'admin/network-shipping-settings.php';
 		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'admin/network-integrations-settings.php';
+		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'admin/network-ad-settings.php';
 	}
 }

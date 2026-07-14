@@ -12,7 +12,8 @@
     ],
     "test": [
       "php tests/FrontendPathResolverTest.php",
-      "php tests/FrontendPathResolverRuntimeTest.php"
+      "php tests/FrontendPathResolverRuntimeTest.php",
+      "php tests/AdPolicyTest.php"
     ]
   },
   "version_targets": [
