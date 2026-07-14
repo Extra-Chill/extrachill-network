@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.4.0] - 2026-07-14
+
+### Added
+- resolve canonical network frontend paths
+
 ## [2.3.0] - 2026-07-13
 
 ### Added
