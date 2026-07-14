@@ -89,6 +89,7 @@ ec_test_assert( 'complete' === $batch['scan']['status'], 'Complete target scan e
 ec_test_assert( 3 === count( $GLOBALS['ec_test_calls'] ), 'One target request per site expected.' );
 ec_test_assert( 'POST' === $GLOBALS['ec_test_calls'][0]['method'], 'Target probes must use POST.' );
 ec_test_assert( array( '/main/', '/events/sample/' ) === $GLOBALS['ec_test_calls'][0]['args']['body']['paths'], 'Normalized paths must be deduplicated in each target request body.' );
+ec_test_assert( 15 === $GLOBALS['ec_test_calls'][0]['args']['timeout'], 'Batch probes must allow the transport default needed by maximum-size scans.' );
 ec_test_assert( 'resolved' === $batch['results'][0]['status'] && 1 === $batch['results'][0]['candidate']['blog_id'], 'Main path should resolve.' );
 ec_test_assert( 'resolved' === $batch['results'][1]['status'] && 7 === $batch['results'][1]['candidate']['blog_id'], 'Events path should resolve.' );
 
@@ -99,7 +100,7 @@ ec_test_assert( 3 === count( $GLOBALS['ec_test_calls'] ), 'Single wrapper must u
 
 $GLOBALS['ec_test_calls'] = array();
 $clamped = ec_resolve_frontend_paths( array( '/main/' ), array( 'timeout' => 99 ) );
-ec_test_assert( 10 === $GLOBALS['ec_test_calls'][0]['args']['timeout'] && 'complete' === $clamped['scan']['status'], 'Timeout must clamp to the maximum.' );
+ec_test_assert( 15 === $GLOBALS['ec_test_calls'][0]['args']['timeout'] && 'complete' === $clamped['scan']['status'], 'Timeout must clamp to the maximum.' );
 $GLOBALS['ec_test_calls'] = array();
 ec_resolve_frontend_paths( array( '/main/' ), array( 'timeout' => 0 ) );
 ec_test_assert( 1 === $GLOBALS['ec_test_calls'][0]['args']['timeout'], 'Timeout must clamp to the minimum.' );

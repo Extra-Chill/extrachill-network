@@ -49,7 +49,7 @@ function ec_normalize_frontend_path( string $path ): ?string {
  * has passed the response contract. Failures make valid inputs incomplete.
  *
  * @param string[] $paths Host-relative frontend paths.
- * @param array    $args  Optional `timeout` in seconds (1-10, default 5).
+ * @param array    $args  Optional `timeout` in seconds (1-15, default 15).
  * @return array{scan:array,results:array}
  */
 function ec_resolve_frontend_paths( array $paths, array $args = array() ): array {
@@ -57,8 +57,8 @@ function ec_resolve_frontend_paths( array $paths, array $args = array() ): array
 		return ec_frontend_path_resolver_rejected_input_results( $paths, 'too_many_inputs', 'The raw input batch exceeds the resolver limit.' );
 	}
 
-	$timeout   = isset( $args['timeout'] ) ? (int) $args['timeout'] : 5;
-	$timeout   = min( 10, max( 1, $timeout ) );
+	$timeout   = isset( $args['timeout'] ) ? (int) $args['timeout'] : 15;
+	$timeout   = min( 15, max( 1, $timeout ) );
 	$results   = array();
 	$unique    = array();
 	$raw_bytes = 0;
