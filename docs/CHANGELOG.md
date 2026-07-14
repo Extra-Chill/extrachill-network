@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.5.0] - 2026-07-14
+
+### Added
+- add authoritative network ad policy
+
 ## [2.4.1] - 2026-07-14
 
 ### Fixed
