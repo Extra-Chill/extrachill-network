@@ -65,6 +65,7 @@ function extrachill_network_init() {
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/blog-ids.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/mail.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/cross-site-rest.php';
+	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/frontend-path-resolver.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/cross-site-content-migration.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/extrachill-turnstile.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/oauth-helpers.php';
