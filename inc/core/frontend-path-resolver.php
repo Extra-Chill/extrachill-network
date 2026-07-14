@@ -211,7 +211,17 @@ function ec_resolve_frontend_paths( array $paths, array $args = array() ): array
  * @return array
  */
 function ec_resolve_frontend_path( string $path, array $args = array() ): array {
-	$batch          = ec_resolve_frontend_paths( array( $path ), $args );
+	$batch = ec_resolve_frontend_paths( array( $path ), $args );
+	if ( empty( $batch['results'] ) ) {
+		return array(
+			'input'      => $path,
+			'path'       => null,
+			'candidates' => array(),
+			'status'     => 'incomplete',
+			'scan'       => $batch['scan'],
+		);
+	}
+
 	$result         = $batch['results'][0];
 	$result['scan'] = $batch['scan'];
 

@@ -147,6 +147,8 @@ $max_batch = ec_resolve_frontend_paths( $maximum );
 ec_test_assert( 'complete' === $max_batch['scan']['status'] && 100 === count( $max_batch['results'] ), 'The maximum legal raw batch must resolve.' );
 $too_long = ec_resolve_frontend_paths( array( '/' . str_repeat( 'a', EC_FRONTEND_PATH_RESOLVER_MAX_PATH_BYTES ) ) );
 ec_test_assert( 'incomplete' === $too_long['scan']['status'] && 'input_too_large' === $too_long['scan']['failures'][0]['code'], 'Overlong raw paths must be rejected.' );
+$too_long_single = ec_resolve_frontend_path( '/' . str_repeat( 'a', EC_FRONTEND_PATH_RESOLVER_MAX_PATH_BYTES ) );
+ec_test_assert( 'incomplete' === $too_long_single['status'] && null === $too_long_single['path'] && 'input_too_large' === $too_long_single['scan']['failures'][0]['code'], 'The single-path wrapper must preserve batch-level rejection evidence.' );
 $large_body = array_fill( 0, 33, '/' . str_repeat( 'a', 2046 ) );
 $too_large = ec_resolve_frontend_paths( $large_body );
 ec_test_assert( 'incomplete' === $too_large['scan']['status'] && 'input_too_large' === $too_large['scan']['failures'][0]['code'], 'Raw body bytes must be bounded.' );
