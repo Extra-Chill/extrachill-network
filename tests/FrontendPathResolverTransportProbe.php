@@ -23,8 +23,8 @@ if ( ! is_wp_error( $result ) ) {
 }
 
 $error_data = $result->get_error_data();
-if ( is_array( $error_data ) && 414 === (int) ( $error_data['status'] ?? 0 ) ) {
-	throw new RuntimeException( 'Large JSON POST transport probe received HTTP 414.' );
+if ( 'rest_cannot_create' !== $result->get_error_code() || ! is_array( $error_data ) || 401 !== (int) ( $error_data['status'] ?? 0 ) ) {
+	throw new RuntimeException( 'Large JSON POST transport probe did not reach the expected WordPress route.' );
 }
 
 fwrite( STDOUT, "FrontendPathResolverTransportProbe passed.\n" );

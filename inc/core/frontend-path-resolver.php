@@ -254,23 +254,13 @@ function ec_frontend_path_resolver_incomplete_results( array $results, array $fa
  * @return array
  */
 function ec_frontend_path_resolver_rejected_input_results( array $paths, string $code, string $message ): array {
-	$results = array();
-	foreach ( $paths as $input ) {
-		$input     = is_string( $input ) ? $input : '';
-		$results[] = array(
-			'input'      => $input,
-			'path'       => ec_normalize_frontend_path( $input ),
-			'candidates' => array(),
-			'status'     => 'incomplete',
-		);
-	}
-
 	return ec_frontend_path_resolver_incomplete_results(
-		$results,
+		array(),
 		array(
 			array(
-				'code'    => $code,
-				'message' => $message,
+				'code'        => $code,
+				'message'     => $message,
+				'input_count' => count( $paths ),
 			),
 		)
 	);

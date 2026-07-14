@@ -129,6 +129,7 @@ ec_test_assert( 'unresolved' === $unresolved['results'][0]['status'], 'Complete 
 $duplicates = array_fill( 0, 101, '/duplicate/' );
 $too_many = ec_resolve_frontend_paths( $duplicates );
 ec_test_assert( 'incomplete' === $too_many['scan']['status'] && 'too_many_inputs' === $too_many['scan']['failures'][0]['code'], 'Raw input count must be bounded before deduplication.' );
+ec_test_assert( array() === $too_many['results'] && 101 === $too_many['scan']['failures'][0]['input_count'], 'Rejected raw batches must return without allocating per-input results.' );
 $invalids = array_fill( 0, 100, 'not-a-path' );
 $GLOBALS['ec_test_calls'] = array();
 $invalid_batch = ec_resolve_frontend_paths( $invalids );
