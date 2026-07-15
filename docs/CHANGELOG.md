@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.6.0] - 2026-07-15
+
+### Added
+- measure homepage bridge destinations
+
 ## [2.5.0] - 2026-07-14
 
 ### Added
