@@ -12,6 +12,8 @@
  * Requires PHP: 8.4
  * Text Domain: extrachill-network
  * Domain Path: /languages
+ *
+ * @package ExtraChillNetwork
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -35,6 +37,11 @@ require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/cache/breeze-role-cookie.php';
 
 register_activation_hook( __FILE__, 'extrachill_network_activate' );
 
+/**
+ * Prevent activation outside WordPress multisite.
+ *
+ * @return void
+ */
 function extrachill_network_activate() {
 	if ( is_multisite() ) {
 		return;
@@ -61,6 +68,11 @@ function extrachill_network_activate() {
 
 add_action( 'plugins_loaded', 'extrachill_network_init' );
 
+/**
+ * Load network-owned runtime integrations.
+ *
+ * @return void
+ */
 function extrachill_network_init() {
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/blog-ids.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/mail.php';
@@ -75,6 +87,7 @@ function extrachill_network_init() {
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/ad-policy.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/integrations/ad-delivery.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/integrations/member-ad-benefit.php';
+	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/integrations/artist-profile-discussions.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/cross-site-links/cross-site-links.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/cross-site-links/network-bridge.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/theme/footer-main-menu.php';
