@@ -3,9 +3,9 @@
  *
  * Fires two sibling analytics events for the shared cross-site link engine:
  *
- *   - impression: one per rendered bridge card present in the DOM, each
- *                 carrying that card's dest_site, deduped per pageview.
- *   - click:      when a human clicks a cross-site link button.
+ *   - impression: one per bridge link that reaches 50% viewport visibility,
+ *                 deduped by element within the page load.
+ *   - click:      the first click on that same element within the page load.
  *
  * Both ship via navigator.sendBeacon (no AJAX, fire-and-forget, survives the
  * navigation a click triggers) to the canonical extrachill-api analytics
@@ -18,10 +18,9 @@
  *
  * Destination context (dest_site, term) is read from the link's existing UTM
  * params, so no new markup contract is introduced — the bridge consumers
- * already UTM-tag every outbound URL. Emitting one impression PER CARD (rather
- * than one page-level impression) gives impressions the same per-destination
- * grain the click beacon already has, so CTR = clicks / impressions becomes
- * computable per destination. See extrachill-analytics#75.
+ * already UTM-tag every outbound URL. Each element is one opportunity: a click
+ * forces its still-missing impression before sending the click, so aggregate
+ * and per-destination CTR remain bounded at 100%.
  */
 ( function () {
 	var config = window.ecBridgeInstrumentation;
@@ -74,48 +73,125 @@
 	}
 
 	var links = document.getElementsByClassName( config.linkClass );
+	var exposedLinks = [];
+	var clickedLinks = [];
+	var exposureThreshold = 0.5;
+	var fallbackDuration = 30000;
 
-	// --- Impression: one per rendered bridge card, each carrying that card's
-	// dest_site (read from the link's existing utm_campaign, exactly like the
-	// click beacon below). Posts to the canonical extrachill-api impression
-	// route (impression_type=bridge).
-	//
-	// Deduped per pageview by dest_site: if a page renders the same destination
-	// more than once, only the first card emits an impression for that dest.
-	// This keeps the impression denominator at one-per-destination-per-pageview,
-	// the simplest grain that pairs cleanly with the per-destination click
-	// numerator for CTR. See extrachill-analytics#75.
-	if ( links && links.length > 0 ) {
-		var seenDests = {};
-		for ( var i = 0; i < links.length; i++ ) {
-			var card = links[ i ];
-			var cardHref = card.getAttribute( 'href' ) || '';
-			var destSite = param( cardHref, 'utm_campaign' );
-
-			// Dedupe on dest_site within this pageview. An empty dest_site can
-			// only be counted once so an untagged card can't inflate the
-			// denominator.
-			if ( Object.prototype.hasOwnProperty.call( seenDests, destSite ) ) {
-				continue;
-			}
-			seenDests[ destSite ] = true;
-
-			send( config.impressionEndpoint, {
-				impression_type: 'bridge',
-				source_url: window.location.href,
-				source_post: config.sourcePost || 0,
-				source_site: config.sourceSite || '',
-				// Destination context is carried by the card link's existing UTM
-				// params, mirroring the click beacon below.
-				dest_site: destSite,
-				term: card.textContent ? card.textContent.trim() : '',
-			} );
+	/**
+	 * Record one viewport exposure for a bridge element.
+	 *
+	 * @param {Element} link Bridge link element.
+	 */
+	function expose( link ) {
+		if ( exposedLinks.indexOf( link ) !== -1 ) {
+			return;
 		}
+
+		exposedLinks.push( link );
+
+		var href = link.getAttribute( 'href' ) || '';
+		send( config.impressionEndpoint, {
+			impression_type: 'bridge',
+			source_url: window.location.href,
+			source_post: config.sourcePost || 0,
+			source_site: config.sourceSite || '',
+			dest_site: param( href, 'utm_campaign' ),
+			term: link.textContent ? link.textContent.trim() : '',
+		} );
 	}
 
+	/**
+	 * Check whether at least half of an element is inside the viewport.
+	 *
+	 * @param {Element} link Bridge link element.
+	 * @return {boolean} Whether the element meets the exposure threshold.
+	 */
+	function isVisible( link ) {
+		var rect = link.getBoundingClientRect();
+		var width = Math.max(
+			0,
+			Math.min( rect.right, window.innerWidth ) - Math.max( rect.left, 0 )
+		);
+		var height = Math.max(
+			0,
+			Math.min( rect.bottom, window.innerHeight ) - Math.max( rect.top, 0 )
+		);
+		var area = Math.max( 0, rect.width * rect.height );
+
+		return area > 0 && ( width * height ) / area >= exposureThreshold;
+	}
+
+	/**
+	 * Observe exposures without leaving permanent scroll handlers in browsers
+	 * that do not support IntersectionObserver.
+	 */
+	function observeExposures() {
+		if ( ! links || links.length === 0 ) {
+			return;
+		}
+
+		if ( 'IntersectionObserver' in window ) {
+			var observer = new window.IntersectionObserver(
+				function ( entries ) {
+					for ( var i = 0; i < entries.length; i++ ) {
+						if (
+							entries[ i ].isIntersecting &&
+							entries[ i ].intersectionRatio >= exposureThreshold
+						) {
+							expose( entries[ i ].target );
+							observer.unobserve( entries[ i ].target );
+						}
+					}
+				},
+				{ threshold: [ exposureThreshold ] }
+			);
+
+			for ( var i = 0; i < links.length; i++ ) {
+				observer.observe( links[ i ] );
+			}
+			return;
+		}
+
+		var stopped = false;
+		var timeoutId;
+		function stopFallback() {
+			if ( stopped ) {
+				return;
+			}
+			stopped = true;
+			window.removeEventListener( 'scroll', checkFallback );
+			window.removeEventListener( 'resize', checkFallback );
+			window.clearTimeout( timeoutId );
+		}
+
+		function checkFallback() {
+			for ( var i = 0; i < links.length; i++ ) {
+				if (
+					exposedLinks.indexOf( links[ i ] ) === -1 &&
+					isVisible( links[ i ] )
+				) {
+					expose( links[ i ] );
+				}
+			}
+
+			if ( exposedLinks.length >= links.length ) {
+				stopFallback();
+			}
+		}
+
+		window.addEventListener( 'scroll', checkFallback );
+		window.addEventListener( 'resize', checkFallback );
+		timeoutId = window.setTimeout( stopFallback, fallbackDuration );
+		checkFallback();
+	}
+
+	observeExposures();
+
 	// --- Click: delegated so it covers links added after load, and so a single
-	// listener instruments every bridge consumer. Posts to the canonical
-	// extrachill-api click route (click_type=bridge).
+	// listener instruments every bridge consumer. A click proves exposure, so
+	// ensure its one matching impression exists before deduping and sending the
+	// click. Navigation is never intercepted.
 	document.addEventListener(
 		'click',
 		function ( event ) {
@@ -128,8 +204,13 @@
 			if ( ! link ) {
 				return;
 			}
+			if ( clickedLinks.indexOf( link ) !== -1 ) {
+				return;
+			}
 
 			var href = link.getAttribute( 'href' ) || '';
+			expose( link );
+			clickedLinks.push( link );
 
 			send( config.clickEndpoint, {
 				click_type: 'bridge',

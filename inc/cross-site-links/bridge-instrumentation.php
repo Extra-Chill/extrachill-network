@@ -7,21 +7,23 @@
  * artist-profile cross-site renderers — inherits two sibling measurements
  * without any per-consumer code:
  *
- *   1. CLICK event   — fires when a human clicks a cross-site link button.
+ *   1. CLICK event   — fires on the first click per cross-site link element and
+ *                      page load.
  *                      Measures *intent*. Prefetch/prerender can fake a UTM
  *                      arrival at the destination but cannot fake a real
  *                      pointer click in a rendered, JS-executing browser.
  *
- *   2. IMPRESSION event — fires when a bridge section renders WITH cards on a
- *                      real human pageview (the JS only runs in a real browser,
- *                      so prefetch/crawler hits that never execute scripts are
- *                      excluded). Measures *exposure* — the awareness
- *                      denominator that was previously completely unknown.
+ *   2. IMPRESSION event — fires once per link element and page load when at
+ *                      least 50% of the element enters the viewport. Browsers
+ *                      without IntersectionObserver use a scroll/resize check
+ *                      bounded to 30 seconds. A click emits a still-missing
+ *                      impression first because the interaction proves
+ *                      exposure.
  *
- * Together these make CTR = clicks / impressions deterministic, and both are
- * gated on the same "JS executed in a real browser" signal, so neither is
- * bot-inflated the way the raw UTM `network_bridge` channel is (see
- * extrachill-network#58).
+ * Together these make CTR = unique clicked opportunities / viewport-exposed
+ * opportunities deterministic and bounded at 100%. Both are gated on the same
+ * "JS executed in a real browser" signal, so neither is bot-inflated the way
+ * the raw UTM `network_bridge` channel is (see extrachill-network#58).
  *
  * NO AJAX (system rule). The browser ships both events with
  * `navigator.sendBeacon()` (fire-and-forget, survives navigation) to the
@@ -46,9 +48,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Enqueue the bridge instrumentation script on bridge-capable front-end views.
  *
  * Singular views and network homepages can both act as cross-site routers. The
- * script self-gates at runtime: it fires an impression only when at least one
- * bridge link is actually present in the DOM, and a click only on a real
- * cross-site link click. No bridge cards on the page == zero beacons.
+ * script self-gates at runtime: it observes only bridge links present in the
+ * DOM and records at most one exposure and click per element and page load. No
+ * bridge cards on the page == zero beacons.
  */
 function extrachill_bridge_enqueue_instrumentation() {
 	if ( is_admin() || ( ! is_singular() && ! is_front_page() && ! is_home() ) || is_preview() ) {
