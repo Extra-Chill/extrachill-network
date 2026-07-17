@@ -18,9 +18,11 @@
  *
  * Destination context (dest_site, term) is read from the link's existing UTM
  * params, so no new markup contract is introduced — the bridge consumers
- * already UTM-tag every outbound URL. Each element is one opportunity: a click
- * forces its still-missing impression before sending the click, so aggregate
- * and per-destination CTR remain bounded at 100%.
+ * already UTM-tag every outbound URL. Each element is one client-side
+ * opportunity, but the two events persist through independent best-effort
+ * requests. Rows may be missing under asymmetric loss or duplicated when a
+ * retry follows an ambiguous failure, so their stored ratio is not
+ * mathematically bounded.
  */
 ( function () {
 	var config = window.ecBridgeInstrumentation;
@@ -34,27 +36,59 @@
 	}
 
 	/**
-	 * Send an event via sendBeacon, falling back to keepalive fetch.
+	 * Send an event via sendBeacon, falling back to keepalive fetch when the
+	 * browser rejects beacon queueing. A failed fetch is retried once.
 	 *
 	 * @param {string} endpoint Target REST endpoint.
 	 * @param {Object} payload  Event payload.
 	 */
 	function send( endpoint, payload ) {
 		var data = JSON.stringify( payload );
+		var blob = new Blob( [ data ], { type: 'application/json' } );
+		var beaconAccepted = false;
 
 		if ( navigator.sendBeacon ) {
-			navigator.sendBeacon(
-				endpoint,
-				new Blob( [ data ], { type: 'application/json' } )
-			);
-		} else {
-			fetch( endpoint, {
-				method: 'POST',
-				body: data,
-				headers: { 'Content-Type': 'application/json' },
-				keepalive: true,
-			} );
+			try {
+				beaconAccepted = navigator.sendBeacon( endpoint, blob );
+			} catch ( error ) {
+				beaconAccepted = false;
+			}
 		}
+
+		if ( beaconAccepted || ! window.fetch ) {
+			return;
+		}
+
+		function sendWithFetch( retriesRemaining ) {
+			var request;
+			try {
+				request = window.fetch( endpoint, {
+					method: 'POST',
+					body: data,
+					headers: { 'Content-Type': 'application/json' },
+					keepalive: true,
+				} );
+			} catch ( error ) {
+				if ( retriesRemaining > 0 ) {
+					sendWithFetch( retriesRemaining - 1 );
+				}
+				return;
+			}
+
+			request
+				.then( function ( response ) {
+					if ( ! response.ok && retriesRemaining > 0 ) {
+						sendWithFetch( retriesRemaining - 1 );
+					}
+				} )
+				.catch( function () {
+					if ( retriesRemaining > 0 ) {
+						sendWithFetch( retriesRemaining - 1 );
+					}
+				} );
+		}
+
+		sendWithFetch( 1 );
 	}
 
 	/**
@@ -72,7 +106,11 @@
 		}
 	}
 
-	var links = document.getElementsByClassName( config.linkClass );
+	var matchingLinks = document.getElementsByClassName( config.linkClass );
+	var links = [];
+	for ( var linkIndex = 0; linkIndex < matchingLinks.length; linkIndex++ ) {
+		links.push( matchingLinks[ linkIndex ] );
+	}
 	var exposedLinks = [];
 	var clickedLinks = [];
 	var exposureThreshold = 0.5;
@@ -188,10 +226,11 @@
 
 	observeExposures();
 
-	// --- Click: delegated so it covers links added after load, and so a single
-	// listener instruments every bridge consumer. A click proves exposure, so
-	// ensure its one matching impression exists before deduping and sending the
-	// click. Navigation is never intercepted.
+	// --- Click: one delegated listener instruments every bridge consumer. Only
+	// links present when this deferred script initializes are eligible; dynamic
+	// placements need a future explicit lifecycle contract. A click proves
+	// exposure, so ensure its matching impression is attempted before the click.
+	// Navigation is never intercepted, including for ineligible dynamic links.
 	document.addEventListener(
 		'click',
 		function ( event ) {
@@ -201,7 +240,7 @@
 			}
 
 			var link = target.closest( '.' + config.linkClass );
-			if ( ! link ) {
+			if ( ! link || links.indexOf( link ) === -1 ) {
 				return;
 			}
 			if ( clickedLinks.indexOf( link ) !== -1 ) {

@@ -36,12 +36,16 @@ function makeLink( destination, label, rect ) {
 	};
 }
 
-function createHarness( links, supportsObserver ) {
+function createHarness( links, supportsObserver, transport = {} ) {
 	const events = [];
+	const beaconAttempts = [];
+	const fetchAttempts = [];
 	const listeners = {};
 	const removedListeners = [];
 	const timers = [];
 	const observers = [];
+	const beaconResults = [ ...( transport.beaconResults || [] ) ];
+	const fetchResults = [ ...( transport.fetchResults || [] ) ];
 	let clickHandler;
 
 	class FakeBlob {
@@ -78,6 +82,29 @@ function createHarness( links, supportsObserver ) {
 			return timers.length;
 		},
 		clearTimeout() {},
+		fetch( endpoint, options ) {
+			const result = fetchResults.length > 0 ? fetchResults.shift() : { ok: true };
+			const attempt = {
+				endpoint,
+				payload: JSON.parse( options.body ),
+				keepalive: options.keepalive,
+			};
+			fetchAttempts.push( attempt );
+
+			if ( result === 'throw' ) {
+				throw new Error( 'Synchronous fetch failure' );
+			}
+			if ( result instanceof Error ) {
+				return Promise.reject( result );
+			}
+
+			return Promise.resolve( result ).then( ( response ) => {
+				if ( response.ok ) {
+					events.push( { ...attempt, transport: 'fetch' } );
+				}
+				return response;
+			} );
+		},
 	};
 
 	if ( supportsObserver ) {
@@ -112,11 +139,19 @@ function createHarness( links, supportsObserver ) {
 		},
 		navigator: {
 			sendBeacon( endpoint, blob ) {
-				events.push( {
+				const result = beaconResults.length > 0 ? beaconResults.shift() : true;
+				const attempt = {
 					endpoint,
 					payload: JSON.parse( blob.parts.join( '' ) ),
-				} );
-				return true;
+				};
+				beaconAttempts.push( attempt );
+				if ( result === 'throw' ) {
+					throw new Error( 'Beacon failure' );
+				}
+				if ( result ) {
+					events.push( { ...attempt, transport: 'beacon' } );
+				}
+				return result;
 			},
 		},
 		Blob: FakeBlob,
@@ -128,6 +163,8 @@ function createHarness( links, supportsObserver ) {
 
 	return {
 		events,
+		beaconAttempts,
+		fetchAttempts,
 		listeners,
 		removedListeners,
 		timers,
@@ -143,6 +180,10 @@ function createHarness( links, supportsObserver ) {
 			return prevented;
 		},
 	};
+}
+
+function flushPromises() {
+	return new Promise( ( resolve ) => setImmediate( resolve ) );
 }
 
 const visibleRect = {
@@ -205,7 +246,7 @@ check(
 		.join( ',' ) === '/impression,/click'
 );
 check(
-	'click and exposure totals remain bounded',
+	'successful client submissions share one opportunity',
 	observerHarness.events.filter( ( event ) => event.endpoint === '/click' ).length ===
 		observerHarness.events.filter( ( event ) => event.endpoint === '/impression' ).length
 );
@@ -262,8 +303,67 @@ check(
 	timedOutHarness.events.length === 2
 );
 
-if ( failures > 0 ) {
-	process.exit( 1 );
+async function runDeliveryTests() {
+	const fallbackLink = makeLink( 'community', 'Community', visibleRect );
+	const beaconFallbackHarness = createHarness( [ fallbackLink ], true, {
+		beaconResults: [ false ],
+		fetchResults: [ { ok: true } ],
+	} );
+	beaconFallbackHarness.observers[ 0 ].callback( [
+		{ target: fallbackLink, isIntersecting: true, intersectionRatio: 1 },
+	] );
+	await flushPromises();
+	check(
+		'sendBeacon false falls back to keepalive fetch',
+		beaconFallbackHarness.beaconAttempts.length === 1 &&
+			beaconFallbackHarness.fetchAttempts.length === 1 &&
+			beaconFallbackHarness.fetchAttempts[ 0 ].keepalive === true &&
+			beaconFallbackHarness.events[ 0 ].transport === 'fetch'
+	);
+
+	const retryLink = makeLink( 'artist', 'Artist', visibleRect );
+	const retryHarness = createHarness( [ retryLink ], true, {
+		beaconResults: [ false ],
+		fetchResults: [ new Error( 'Network failure' ), { ok: true } ],
+	} );
+	retryHarness.observers[ 0 ].callback( [
+		{ target: retryLink, isIntersecting: true, intersectionRatio: 1 },
+	] );
+	await flushPromises();
+	check(
+		'failed fallback fetch retries once',
+		retryHarness.fetchAttempts.length === 2 && retryHarness.events.length === 1
+	);
+
+	const lossyLink = makeLink( 'shop', 'Shop', visibleRect );
+	const lossyHarness = createHarness( [ lossyLink ], true, {
+		beaconResults: [ false, true ],
+		fetchResults: [ new Error( 'Network failure' ), new Error( 'Retry failure' ) ],
+	} );
+	lossyHarness.observers[ 0 ].callback( [
+		{ target: lossyLink, isIntersecting: true, intersectionRatio: 1 },
+	] );
+	await flushPromises();
+	check( 'failed exposure delivery exhausts one retry', lossyHarness.fetchAttempts.length === 2 );
+	check( 'delivery failure does not prevent navigation', lossyHarness.click( lossyLink ) === false );
+	check(
+		'independent delivery can store a click without its exposure',
+		lossyHarness.events.length === 1 && lossyHarness.events[ 0 ].endpoint === '/click'
+	);
+
+	const initialLink = makeLink( 'events', 'Events', visibleRect );
+	const dynamicLinks = [ initialLink ];
+	const dynamicHarness = createHarness( dynamicLinks, true );
+	const dynamicLink = makeLink( 'wire', 'Wire', visibleRect );
+	dynamicLinks.push( dynamicLink );
+	check( 'dynamic links remain navigable', dynamicHarness.click( dynamicLink ) === false );
+	check( 'dynamic links are explicitly outside instrumentation', dynamicHarness.events.length === 0 );
 }
 
-console.log( 'All bridge instrumentation JS tests passed.' );
+runDeliveryTests().then( () => {
+	if ( failures > 0 ) {
+		process.exit( 1 );
+	}
+
+	console.log( 'All bridge instrumentation JS tests passed.' );
+} );

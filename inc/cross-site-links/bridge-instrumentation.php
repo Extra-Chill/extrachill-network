@@ -20,10 +20,13 @@
  *                      impression first because the interaction proves
  *                      exposure.
  *
- * Together these make CTR = unique clicked opportunities / viewport-exposed
- * opportunities deterministic and bounded at 100%. Both are gated on the same
- * "JS executed in a real browser" signal, so neither is bot-inflated the way
- * the raw UTM `network_bridge` channel is (see extrachill-network#58).
+ * Client-side dedupe targets one click attempt per viewport-exposed opportunity,
+ * but the sibling events use independent best-effort requests. Stored rows can
+ * be missing under asymmetric loss or duplicated by a retry after an ambiguous
+ * failure, so their quotient is a stored click-to-exposure ratio, not a
+ * mathematically bounded CTR. Both are gated on the same "JS executed in a real
+ * browser" signal, so neither is bot-inflated the way the raw UTM
+ * `network_bridge` channel is (see extrachill-network#58).
  *
  * NO AJAX (system rule). The browser ships both events with
  * `navigator.sendBeacon()` (fire-and-forget, survives navigation) to the
@@ -48,9 +51,11 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Enqueue the bridge instrumentation script on bridge-capable front-end views.
  *
  * Singular views and network homepages can both act as cross-site routers. The
- * script self-gates at runtime: it observes only bridge links present in the
- * DOM and records at most one exposure and click per element and page load. No
- * bridge cards on the page == zero beacons.
+ * script self-gates at runtime: it observes only bridge links present when the
+ * deferred script initializes and attempts at most one exposure and click per
+ * element and page load. Dynamically inserted links remain navigable but are
+ * intentionally outside this measurement contract. No initial bridge cards on
+ * the page == zero beacons.
  */
 function extrachill_bridge_enqueue_instrumentation() {
 	if ( is_admin() || ( ! is_singular() && ! is_front_page() && ! is_home() ) || is_preview() ) {
