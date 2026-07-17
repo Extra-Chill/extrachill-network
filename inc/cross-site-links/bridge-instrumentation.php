@@ -9,9 +9,8 @@
  *
  *   1. CLICK event   — fires on the first click per cross-site link element and
  *                      page load.
- *                      Measures *intent*. Prefetch/prerender can fake a UTM
- *                      arrival at the destination but cannot fake a real
- *                      pointer click in a rendered, JS-executing browser.
+ *                      Measures a click event. A prefetch request can create a
+ *                      UTM arrival but does not execute this page handler.
  *
  *   2. IMPRESSION event — fires once per link element and page load when at
  *                      least 50% of the element enters the viewport. Browsers
@@ -24,9 +23,9 @@
  * but the sibling events use independent best-effort requests. Stored rows can
  * be missing under asymmetric loss or duplicated by a retry after an ambiguous
  * failure, so their quotient is a stored click-to-exposure ratio, not a
- * mathematically bounded CTR. Both are gated on the same "JS executed in a real
- * browser" signal, so neither is bot-inflated the way the raw UTM
- * `network_bridge` channel is (see extrachill-network#58).
+ * mathematically bounded CTR. Both require page JavaScript execution, which
+ * filters non-JS crawlers and prefetch requests. It does not establish human
+ * identity or exclude JS-capable automation (see extrachill-network#58).
  *
  * NO AJAX (system rule). The browser ships both events with
  * `navigator.sendBeacon()` (fire-and-forget, survives navigation) to the

@@ -10,11 +10,9 @@
  * Both ship via navigator.sendBeacon (no AJAX, fire-and-forget, survives the
  * navigation a click triggers) to the canonical extrachill-api analytics
  * routes — clicks to /analytics/click (click_type=bridge), impressions to
- * /analytics/impression (impression_type=bridge). Because this code only runs
- * in a real, JS-executing browser, prefetch/prerender/crawler hits — the
- * source of the bridge channel's bot inflation — never fire either event. That
- * is the built-in bot filter: clicks and impressions are humans-with-JS by
- * construction.
+ * /analytics/impression (impression_type=bridge). Requiring page JavaScript to
+ * execute filters non-JS crawlers and prefetch requests that do not execute the
+ * page. It does not establish human identity or exclude JS-capable automation.
  *
  * Destination context (dest_site, term) is read from the link's existing UTM
  * params, so no new markup contract is introduced — the bridge consumers
