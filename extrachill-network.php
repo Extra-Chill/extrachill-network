@@ -85,6 +85,7 @@ function extrachill_network_init() {
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/legacy-path-redirects.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/new-site-setup.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/ad-policy.php';
+	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/experiments.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/integrations/ad-delivery.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/integrations/member-ad-benefit.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/integrations/artist-profile-discussions.php';
@@ -133,6 +134,9 @@ function extrachill_network_init() {
 
 		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/Abilities/AdPolicyAbility.php';
 		new \ExtraChillNetwork\Abilities\AdPolicyAbility();
+
+		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/Abilities/ExperimentAssignmentAbility.php';
+		new \ExtraChillNetwork\Abilities\ExperimentAssignmentAbility();
 
 		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/Abilities/CrossSiteContentMigrationAbilities.php';
 		new \ExtraChillNetwork\Abilities\CrossSiteContentMigrationAbilities();
