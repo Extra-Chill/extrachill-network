@@ -47,6 +47,7 @@ $GLOBALS['ec_test_route']   = true;
 $GLOBALS['ec_test_topics']  = array(
 	new WP_Post( 91, 'topic', 'publish', 'first-topic', 'First &amp; Topic' ),
 	new WP_Post( 82, 'topic', 'closed', 'closed-topic', 'Closed Topic' ),
+	new WP_Post( 74, 'topic', 'publish', '%e3%83%86%e3%82%b9%e3%83%88', 'Japanese Test' ),
 	new WP_Post( 73, 'topic', 'private', 'private-topic', 'Private Topic' ),
 );
 
@@ -151,9 +152,10 @@ ec_test_assert( 'discussions' === $sections[0]['id'] && 50 === $sections[0]['pri
 
 $data = extrachill_network_get_artist_discussions( 700, 55 );
 ec_test_assert( 'https://community.example/artist/kid-lake/?source="profile' === $data['archive_url'], 'The Community term link must remain the canonical archive.' );
-ec_test_assert( 2 === count( $data['topics'] ), 'Only public and closed topics with canonical routes should be rendered.' );
+ec_test_assert( 3 === count( $data['topics'] ), 'Only public and closed topics with canonical routes should be rendered.' );
 ec_test_assert( 'https://community.example/t/first-topic/' === $data['topics'][0]['url'], 'Topic URLs must use the persisted canonical route.' );
 ec_test_assert( 'https://community.example/t/closed-topic/' === $data['topics'][1]['url'], 'Closed topics must remain publicly visible.' );
+ec_test_assert( 'https://community.example/t/%e3%83%86%e3%82%b9%e3%83%88/' === $data['topics'][2]['url'], 'WordPress percent-encoded non-Latin slugs must not be encoded twice.' );
 ec_test_assert( 4 === $GLOBALS['ec_test_queries'][0]['posts_per_page'], 'Topic output must be bounded to four.' );
 ec_test_assert( array( 'publish', 'closed' ) === $GLOBALS['ec_test_queries'][0]['post_status'], 'The query must match Community public statuses.' );
 ec_test_assert( 155 === $GLOBALS['ec_test_queries'][0]['tax_query'][0]['terms'], 'The Community-local term ID must be used instead of the main-site ID.' );

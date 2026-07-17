@@ -133,7 +133,7 @@ function extrachill_network_get_community_topic_url( $topic, $topic_base ) {
 	}
 
 	return user_trailingslashit(
-		trailingslashit( $site_url ) . $topic_base . '/' . rawurlencode( (string) $topic->post_name )
+		trailingslashit( $site_url ) . $topic_base . '/' . $topic->post_name
 	);
 }
 
