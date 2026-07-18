@@ -1,0 +1,17 @@
+{
+  "provider_filters": {
+    "subject": "extrachill_experiment_subject_key",
+    "privacy": "extrachill_experiment_measurement_eligible",
+    "accepted_args": 4
+  },
+  "server_actions": {
+    "assignment": "extrachill_experiment_assignment",
+    "exposure": "extrachill_experiment_exposure",
+    "accepted_args": 1
+  },
+  "metadata_keys": [
+    "experiment_key",
+    "variant",
+    "surface"
+  ]
+}

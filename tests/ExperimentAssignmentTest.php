@@ -1,0 +1,450 @@
+<?php
+/**
+ * Standalone tests for deterministic experiment assignment.
+ *
+ * @package ExtraChillNetwork
+ */
+
+declare( strict_types=1 );
+
+// Standalone WordPress stubs intentionally mirror global APIs without full
+// production docblocks or output escaping.
+// phpcs:disable Squiz.Commenting.FunctionComment.Missing, Squiz.Commenting.ClassComment.Missing, Universal.Files.SeparateFunctionsFromOO.Mixed, WordPress.Security.EscapeOutput.OutputNotEscaped, WordPress.WP.AlternativeFunctions.json_encode_json_encode
+
+define( 'ABSPATH', __DIR__ . '/' );
+define( 'EXTRACHILL_NETWORK_PLUGIN_DIR', dirname( __DIR__ ) . '/' );
+define( 'EXTRACHILL_NETWORK_PLUGIN_URL', 'https://example.com/wp-content/plugins/extrachill-network/' );
+
+$GLOBALS['experiment_filters']        = array();
+$GLOBALS['experiment_user_id']        = 0;
+$GLOBALS['experiment_blog_id']        = 1;
+$GLOBALS['experiment_enqueued']       = array();
+$GLOBALS['experiment_abilities']      = array();
+$GLOBALS['experiment_actions']        = array();
+$GLOBALS['experiment_cache']          = array();
+$GLOBALS['experiment_cache_adds']     = array();
+$GLOBALS['experiment_external_cache'] = true;
+
+class WP_Error {
+	public function __construct( public string $code ) {}
+}
+
+function add_action() {}
+function wp_register_script() {}
+function wp_localize_script() {}
+function __( $value ) {
+	return $value;
+}
+function wp_register_ability( $name, $args ) {
+	$GLOBALS['experiment_abilities'][ $name ] = $args;
+}
+function wp_salt() {
+	return 'fixed-experiment-test-salt';
+}
+function do_action( $name, ...$args ) {
+	$GLOBALS['experiment_actions'][] = array( $name, $args );
+}
+function wp_using_ext_object_cache() {
+	return $GLOBALS['experiment_external_cache'];
+}
+function wp_cache_add_global_groups() {}
+function wp_cache_add( $key, $value, $group, $ttl ) {
+	$cache_key                          = $group . ':' . $key;
+	$GLOBALS['experiment_cache_adds'][] = array(
+		'key'   => $key,
+		'group' => $group,
+		'ttl'   => $ttl,
+	);
+	if ( array_key_exists( $cache_key, $GLOBALS['experiment_cache'] ) ) {
+		return false;
+	}
+
+	$GLOBALS['experiment_cache'][ $cache_key ] = $value;
+	return true;
+}
+function rest_url( $path ) {
+	return 'https://example.com/wp-json/' . $path;
+}
+function wp_json_encode( $value ) {
+	return json_encode( $value );
+}
+function esc_attr( $value ) {
+	return htmlspecialchars( (string) $value, ENT_QUOTES, 'UTF-8' );
+}
+function wp_enqueue_script( $handle ) {
+	$GLOBALS['experiment_enqueued'][] = $handle;
+}
+function get_current_user_id() {
+	return $GLOBALS['experiment_user_id'];
+}
+function get_current_blog_id() {
+	return $GLOBALS['experiment_blog_id'];
+}
+function apply_filters( $name, $value, ...$args ) {
+	if ( empty( $GLOBALS['experiment_filters'][ $name ] ) ) {
+		return $value;
+	}
+
+	foreach ( $GLOBALS['experiment_filters'][ $name ] as $callback ) {
+		$value = $callback( $value, ...$args );
+	}
+
+	return $value;
+}
+
+require dirname( __DIR__ ) . '/inc/core/experiments.php';
+require dirname( __DIR__ ) . '/inc/Abilities/ExperimentAssignmentAbility.php';
+
+// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local cross-plugin contract fixture.
+$contract_fixture = json_decode( file_get_contents( __DIR__ . '/experiment-contract.fixture.json' ), true );
+
+$failures = 0;
+function experiment_check( string $label, bool $condition ): void {
+	global $failures;
+	if ( $condition ) {
+		echo "PASS: {$label}\n";
+		return;
+	}
+
+	echo "FAIL: {$label}\n";
+	++$failures;
+}
+
+function experiment_definition( bool $eligible = true ): array {
+	return array(
+		'default_variant'      => 'control',
+		'control_variant'      => 'control',
+		'variants'             => array(
+			'control'   => 2,
+			'treatment' => 3,
+		),
+		'surfaces'             => array( 'single-post-bridge' ),
+		'eligibility_callback' => static function () use ( $eligible ): bool {
+			return $eligible;
+		},
+	);
+}
+
+$normalized = extrachill_normalize_experiment_definition( experiment_definition() );
+experiment_check( 'valid definitions normalize', is_array( $normalized ) );
+experiment_check( 'first control bucket is control', 'control' === extrachill_experiment_variant_for_bucket( $normalized, 0 ) );
+experiment_check( 'last control bucket is control', 'control' === extrachill_experiment_variant_for_bucket( $normalized, 1 ) );
+experiment_check( 'first treatment bucket is treatment', 'treatment' === extrachill_experiment_variant_for_bucket( $normalized, 2 ) );
+experiment_check( 'last treatment bucket is treatment', 'treatment' === extrachill_experiment_variant_for_bucket( $normalized, 4 ) );
+experiment_check( 'out-of-range buckets fail to control', 'control' === extrachill_experiment_variant_for_bucket( $normalized, 5 ) );
+
+$invalid                          = experiment_definition();
+$invalid['variants']['treatment'] = 0;
+experiment_check( 'zero weights invalidate configuration', null === extrachill_normalize_experiment_definition( $invalid ) );
+$invalid                          = experiment_definition();
+$invalid['variants']['treatment'] = '3';
+experiment_check( 'non-integer weights invalidate configuration', null === extrachill_normalize_experiment_definition( $invalid ) );
+$invalid                    = experiment_definition();
+$invalid['control_variant'] = 'treatment';
+experiment_check( 'default must explicitly equal control', null === extrachill_normalize_experiment_definition( $invalid ) );
+
+$maximum             = experiment_definition();
+$maximum['variants'] = array(
+	'control'   => EXTRACHILL_EXPERIMENT_MAX_VARIANT_WEIGHT,
+	'treatment' => EXTRACHILL_EXPERIMENT_MAX_VARIANT_WEIGHT,
+);
+$maximum_normalized  = extrachill_normalize_experiment_definition( $maximum );
+experiment_check( 'documented maximum variant weights are accepted', is_array( $maximum_normalized ) );
+experiment_check( 'documented maximum total is accepted', EXTRACHILL_EXPERIMENT_MAX_TOTAL_WEIGHT === $maximum_normalized['total_weight'] );
+$overflow             = experiment_definition();
+$overflow['variants'] = array(
+	'control'   => 400000,
+	'treatment' => 400000,
+	'holdout'   => 200001,
+);
+experiment_check( 'total above the maximum is rejected before addition', null === extrachill_normalize_experiment_definition( $overflow ) );
+$oversized                          = experiment_definition();
+$oversized['variants']['treatment'] = EXTRACHILL_EXPERIMENT_MAX_VARIANT_WEIGHT + 1;
+experiment_check( 'individual weight above the maximum is rejected', null === extrachill_normalize_experiment_definition( $oversized ) );
+experiment_check( '28-bit draw maximum fits signed 32-bit PHP', EXTRACHILL_EXPERIMENT_DRAW_RANGE - 1 <= 2147483647 );
+experiment_check( 'zero allocation total is rejected', null === extrachill_experiment_unbiased_bucket( 'seed', 0 ) );
+experiment_check( 'allocation total above maximum is rejected', null === extrachill_experiment_unbiased_bucket( 'seed', EXTRACHILL_EXPERIMENT_MAX_TOTAL_WEIGHT + 1 ) );
+experiment_check( 'maximum accepted 28-bit draw reaches last bucket', 999999 === extrachill_experiment_reduce_draw( 267999999, EXTRACHILL_EXPERIMENT_MAX_TOTAL_WEIGHT ) );
+experiment_check( 'first incomplete-tail draw is rejected', null === extrachill_experiment_reduce_draw( 268000000, EXTRACHILL_EXPERIMENT_MAX_TOTAL_WEIGHT ) );
+experiment_check( 'maximum 28-bit draw is rejected for million range', null === extrachill_experiment_reduce_draw( EXTRACHILL_EXPERIMENT_DRAW_RANGE - 1, EXTRACHILL_EXPERIMENT_MAX_TOTAL_WEIGHT ) );
+experiment_check( 'rejection sampling skips the incomplete 28-bit tail', 429057 === extrachill_experiment_unbiased_bucket( 'rejection-355', EXTRACHILL_EXPERIMENT_MAX_TOTAL_WEIGHT ) );
+
+$golden_vectors = array(
+	'vector-0' => array( 3, 'treatment' ),
+	'vector-1' => array( 1, 'control' ),
+	'vector-3' => array( 2, 'treatment' ),
+	'vector-5' => array( 4, 'treatment' ),
+	'vector-9' => array( 0, 'control' ),
+);
+foreach ( $golden_vectors as $subject => $expected ) {
+	experiment_check(
+		"golden 28-bit bucket vector {$subject}",
+		extrachill_experiment_unbiased_bucket( 'geo-bridge-holdout' . "\0" . $subject, 5 ) === $expected[0]
+	);
+	experiment_check(
+		"golden 28-bit variant vector {$subject}",
+		extrachill_allocate_experiment_variant( 'geo-bridge-holdout', $normalized, $subject ) === $expected[1]
+	);
+}
+
+$GLOBALS['experiment_filters']['extrachill_experiment_definitions'] = array(
+	static function (): array {
+		return array( 'geo-bridge-holdout' => experiment_definition() );
+	},
+);
+
+$missing_subject = extrachill_resolve_experiment_assignment( 'geo-bridge-holdout', 'single-post-bridge' );
+experiment_check( 'missing subject fails to control', 'control' === $missing_subject['variant'] );
+experiment_check( 'missing subject remains unmeasured', false === $missing_subject['measurement_eligible'] );
+
+$GLOBALS['experiment_filters']['extrachill_experiment_subject_key'] = array(
+	static function (): string {
+		return 'visitor-123';
+	},
+);
+$privacy_excluded = extrachill_resolve_experiment_assignment( 'geo-bridge-holdout', 'single-post-bridge' );
+experiment_check( 'privacy exclusion fails to control', 'control' === $privacy_excluded['variant'] );
+experiment_check( 'privacy exclusion remains unmeasured', false === $privacy_excluded['measurement_eligible'] );
+
+$GLOBALS['experiment_filters']['extrachill_experiment_measurement_eligible'] = array(
+	static function (): bool {
+		return true;
+	},
+);
+$GLOBALS['experiment_actions'] = array();
+$assigned                      = extrachill_resolve_experiment_assignment( 'geo-bridge-holdout', 'single-post-bridge' );
+experiment_check( 'provider-approved subject receives an assignment', true === $assigned['measurement_eligible'] );
+experiment_check( 'assignment stays within registered variants', in_array( $assigned['variant'], array( 'control', 'treatment' ), true ) );
+experiment_check( 'assignment returns a nonce-bearing opaque exposure proof', 1 === preg_match( '/^\d{10}\.[a-f0-9]{32}\.[a-f0-9]{64}$/', $assigned['exposure_token'] ) );
+experiment_check( 'trusted server assignment hook fires once', 1 === count( $GLOBALS['experiment_actions'] ) && 'extrachill_experiment_assignment' === $GLOBALS['experiment_actions'][0][0] );
+experiment_check( 'assignment hook contains only bounded metadata', 'experiment_key,variant,surface' === implode( ',', array_keys( $GLOBALS['experiment_actions'][0][1][0] ) ) );
+experiment_check( 'cross-contract fixture locks assignment hook name', $contract_fixture['server_actions']['assignment'] === $GLOBALS['experiment_actions'][0][0] );
+experiment_check( 'cross-contract fixture locks one metadata argument', 1 === $contract_fixture['server_actions']['accepted_args'] && 1 === count( $GLOBALS['experiment_actions'][0][1] ) );
+experiment_check( 'cross-contract fixture locks metadata keys', array_keys( $GLOBALS['experiment_actions'][0][1][0] ) === $contract_fixture['metadata_keys'] );
+
+$exposure = extrachill_validate_experiment_exposure(
+	'geo-bridge-holdout',
+	$assigned['variant'],
+	'single-post-bridge',
+	array(),
+	$assigned['exposure_token']
+);
+experiment_check( 'matching signed exposure validates', is_array( $exposure ) );
+experiment_check(
+	'tampered variant is rejected',
+	null === extrachill_validate_experiment_exposure(
+		'geo-bridge-holdout',
+		'control' === $assigned['variant'] ? 'treatment' : 'control',
+		'single-post-bridge',
+		array(),
+		$assigned['exposure_token']
+	)
+);
+experiment_check(
+	'tampered context is rejected',
+	null === extrachill_validate_experiment_exposure(
+		'geo-bridge-holdout',
+		$assigned['variant'],
+		'single-post-bridge',
+		array( 'post_id' => '99' ),
+		$assigned['exposure_token']
+	)
+);
+$expired_metadata = array(
+	'experiment_key' => 'geo-bridge-holdout',
+	'variant'        => $assigned['variant'],
+	'surface'        => 'single-post-bridge',
+);
+$expired_token    = extrachill_experiment_exposure_token( $expired_metadata, 'visitor-123', array(), 1700000000, str_repeat( '1', 32 ) );
+experiment_check(
+	'expired exposure proof is rejected',
+	null === extrachill_validate_experiment_exposure(
+		'geo-bridge-holdout',
+		$assigned['variant'],
+		'single-post-bridge',
+		array(),
+		$expired_token,
+		1700000000 + EXTRACHILL_EXPERIMENT_EXPOSURE_TOKEN_TTL + 1
+	)
+);
+
+$same_second_token_one = extrachill_experiment_exposure_token( $expired_metadata, 'visitor-123', array(), 1700000100 );
+$same_second_token_two = extrachill_experiment_exposure_token( $expired_metadata, 'visitor-123', array(), 1700000100 );
+experiment_check( 'concurrent same-second assignments receive unique random nonces', $same_second_token_one !== $same_second_token_two );
+experiment_check(
+	'first same-second nonce token validates',
+	is_array(
+		extrachill_validate_experiment_exposure(
+			'geo-bridge-holdout',
+			$assigned['variant'],
+			'single-post-bridge',
+			array(),
+			$same_second_token_one,
+			1700000100
+		)
+	)
+);
+experiment_check(
+	'second same-second nonce token validates independently',
+	is_array(
+		extrachill_validate_experiment_exposure(
+			'geo-bridge-holdout',
+			$assigned['variant'],
+			'single-post-bridge',
+			array(),
+			$same_second_token_two,
+			1700000100
+		)
+	)
+);
+
+$future_now                       = 1700000200;
+$future_issued                    = $future_now + EXTRACHILL_EXPERIMENT_EXPOSURE_FUTURE_SKEW;
+$future_token                     = extrachill_experiment_exposure_token( $expired_metadata, 'visitor-123', array(), $future_issued, str_repeat( '2', 32 ) );
+$GLOBALS['experiment_cache']      = array();
+$GLOBALS['experiment_cache_adds'] = array();
+experiment_check(
+	'future-skew token validates at acceptance boundary',
+	is_array(
+		extrachill_validate_experiment_exposure(
+			'geo-bridge-holdout',
+			$assigned['variant'],
+			'single-post-bridge',
+			array(),
+			$future_token,
+			$future_now
+		)
+	)
+);
+experiment_check( 'future-skew token is atomically consumed', extrachill_consume_experiment_exposure_token( $future_token, $future_now ) );
+experiment_check(
+	'future-skew marker spans complete remaining validity',
+	EXTRACHILL_EXPERIMENT_EXPOSURE_TOKEN_TTL + EXTRACHILL_EXPERIMENT_EXPOSURE_FUTURE_SKEW === $GLOBALS['experiment_cache_adds'][0]['ttl']
+);
+
+$race_issued                      = time() - 1;
+$race_token                       = extrachill_experiment_exposure_token( $expired_metadata, 'visitor-123', array(), $race_issued, str_repeat( '3', 32 ) );
+$race_first_validation            = extrachill_validate_experiment_exposure(
+	'geo-bridge-holdout',
+	$assigned['variant'],
+	'single-post-bridge',
+	array(),
+	$race_token,
+	$race_issued + 1
+);
+$race_second_validation           = extrachill_validate_experiment_exposure(
+	'geo-bridge-holdout',
+	$assigned['variant'],
+	'single-post-bridge',
+	array(),
+	$race_token,
+	$race_issued + 1
+);
+$GLOBALS['experiment_cache']      = array();
+$GLOBALS['experiment_cache_adds'] = array();
+experiment_check( 'concurrent requests can both finish stateless validation', is_array( $race_first_validation ) && is_array( $race_second_validation ) );
+experiment_check( 'first concurrent request atomically consumes token', extrachill_consume_experiment_exposure_token( $race_token, $race_issued + 1 ) );
+experiment_check( 'second concurrent request loses atomic cache race', ! extrachill_consume_experiment_exposure_token( $race_token, $race_issued + 1 ) );
+experiment_check( 'atomic claim uses the network exposure cache group', EXTRACHILL_EXPERIMENT_EXPOSURE_CACHE_GROUP === $GLOBALS['experiment_cache_adds'][0]['group'] );
+experiment_check( 'atomic claim expires within token TTL', $GLOBALS['experiment_cache_adds'][0]['ttl'] > 0 && $GLOBALS['experiment_cache_adds'][0]['ttl'] <= EXTRACHILL_EXPERIMENT_EXPOSURE_TOKEN_TTL );
+
+$first_blog_variant            = $assigned['variant'];
+$GLOBALS['experiment_blog_id'] = 9;
+$second_blog_assignment        = extrachill_resolve_experiment_assignment( 'geo-bridge-holdout', 'single-post-bridge' );
+experiment_check( 'assignment is stable across multisite blogs', $first_blog_variant === $second_blog_assignment['variant'] );
+experiment_check(
+	'explicit subject allocation is deterministic',
+	extrachill_allocate_experiment_variant( 'geo-bridge-holdout', $normalized, 'visitor-123' )
+		=== extrachill_allocate_experiment_variant( 'geo-bridge-holdout', $normalized, 'visitor-123' )
+);
+
+$GLOBALS['experiment_filters']['extrachill_experiment_definitions'] = array(
+	static function (): array {
+		return array( 'geo-bridge-holdout' => experiment_definition( false ) );
+	},
+);
+$denied = extrachill_resolve_experiment_assignment( 'geo-bridge-holdout', 'single-post-bridge' );
+experiment_check( 'consumer denial cannot be escalated by assignment', 'control' === $denied['variant'] );
+experiment_check( 'consumer denial remains unmeasured', false === $denied['measurement_eligible'] );
+
+$GLOBALS['experiment_filters']['extrachill_experiment_definitions'] = array(
+	static function (): array {
+		return array( 'geo-bridge-holdout' => experiment_definition() );
+	},
+);
+$markup = extrachill_experiment_attributes(
+	'geo-bridge-holdout',
+	'single-post-bridge',
+	array( 'post_id' => 42 )
+);
+experiment_check( 'markup contains the stable experiment key', false !== strpos( $markup, 'data-ec-experiment-key="geo-bridge-holdout"' ) );
+experiment_check( 'markup contains only the declared control', false !== strpos( $markup, 'data-ec-experiment-variant="control"' ) );
+experiment_check( 'markup contains no subject identity', false === strpos( $markup, 'visitor-123' ) );
+experiment_check( 'markup enqueues the browser assignment path', in_array( 'extrachill-experiment-assignment', $GLOBALS['experiment_enqueued'], true ) );
+
+$GLOBALS['experiment_filters']['extrachill_experiment_definitions'] = array(
+	static function () use ( $invalid ): array {
+		return array( 'broken' => $invalid );
+	},
+);
+$broken = extrachill_resolve_experiment_assignment( 'broken', 'single-post-bridge' );
+experiment_check( 'invalid configuration falls back to control', 'control' === $broken['variant'] );
+experiment_check( 'invalid configuration remains unmeasured', false === $broken['measurement_eligible'] );
+
+$ability = new \ExtraChillNetwork\Abilities\ExperimentAssignmentAbility();
+$ability->register();
+$ability_args = $GLOBALS['experiment_abilities']['extrachill/resolve-experiment-assignment'];
+experiment_check( 'assignment uses the public core Abilities API', true === $ability_args['meta']['show_in_rest'] );
+experiment_check( 'assignment ability is read-only', true === $ability_args['meta']['annotations']['readonly'] );
+experiment_check( 'ability context is bounded to ten scalar properties', 10 === $ability_args['input_schema']['properties']['context']['maxProperties'] );
+$exposure_args = $GLOBALS['experiment_abilities']['extrachill/record-experiment-exposure'];
+experiment_check( 'exposure uses the existing core Abilities route', true === $exposure_args['meta']['show_in_rest'] );
+experiment_check( 'exposure ability requires a signed token', in_array( 'exposure_token', $exposure_args['input_schema']['required'], true ) );
+$GLOBALS['experiment_filters']['extrachill_experiment_definitions'] = array(
+	static function (): array {
+		return array( 'geo-bridge-holdout' => experiment_definition() );
+	},
+);
+$GLOBALS['experiment_actions']                                      = array();
+$GLOBALS['experiment_cache']                                        = array();
+$GLOBALS['experiment_cache_adds']                                   = array();
+$exposure_result = $ability->execute_exposure(
+	array(
+		'experiment_key' => 'geo-bridge-holdout',
+		'variant'        => $assigned['variant'],
+		'surface'        => 'single-post-bridge',
+		'exposure_token' => $assigned['exposure_token'],
+	)
+);
+experiment_check( 'valid exposure ability call is accepted', true === $exposure_result['accepted'] );
+experiment_check( 'first exposure use creates one atomic digest claim', 1 === count( $GLOBALS['experiment_cache_adds'] ) && 0 === strpos( $GLOBALS['experiment_cache_adds'][0]['key'], 'exposure_' ) );
+experiment_check( 'valid exposure emits one trusted server hook', 1 === count( $GLOBALS['experiment_actions'] ) && 'extrachill_experiment_exposure' === $GLOBALS['experiment_actions'][0][0] );
+experiment_check( 'cross-contract fixture locks exposure hook name', $contract_fixture['server_actions']['exposure'] === $GLOBALS['experiment_actions'][0][0] );
+experiment_check( 'exposure hook receives one bounded metadata array', 1 === count( $GLOBALS['experiment_actions'][0][1] ) && array_keys( $GLOBALS['experiment_actions'][0][1][0] ) === $contract_fixture['metadata_keys'] );
+$replayed_exposure = $ability->execute_exposure(
+	array(
+		'experiment_key' => 'geo-bridge-holdout',
+		'variant'        => $assigned['variant'],
+		'surface'        => 'single-post-bridge',
+		'exposure_token' => $assigned['exposure_token'],
+	)
+);
+experiment_check( 'replayed valid exposure token is rejected', $replayed_exposure instanceof WP_Error && 'experiment_exposure_already_consumed' === $replayed_exposure->code );
+experiment_check( 'replayed exposure emits no duplicate hook', 1 === count( $GLOBALS['experiment_actions'] ) );
+$invalid_exposure = $ability->execute_exposure(
+	array(
+		'experiment_key' => 'geo-bridge-holdout',
+		'variant'        => $assigned['variant'],
+		'surface'        => 'single-post-bridge',
+		'exposure_token' => '1700000000.' . str_repeat( '0', 32 ) . '.' . str_repeat( '0', 64 ),
+	)
+);
+experiment_check( 'forged exposure is rejected server-side', $invalid_exposure instanceof WP_Error );
+experiment_check( 'forged exposure emits no server hook', 1 === count( $GLOBALS['experiment_actions'] ) );
+
+if ( $failures > 0 ) {
+	exit( 1 );
+}
+
+echo "All experiment assignment tests passed.\n";
+exit( 0 );
