@@ -22,7 +22,7 @@ class ExperimentAssignmentAbility {
 	}
 
 	/**
-	 * Register the public read-only assignment ability.
+	 * Register public assignment/exposure and private lifecycle abilities.
 	 */
 	public function register(): void {
 		wp_register_ability(
@@ -57,10 +57,12 @@ class ExperimentAssignmentAbility {
 				),
 				'output_schema'       => array(
 					'type'                 => 'object',
-					'required'             => array( 'experiment_key', 'variant', 'surface', 'measurement_eligible', 'exposure_token' ),
+					'required'             => array( 'experiment_key', 'definition_version', 'assignment_policy', 'variant', 'surface', 'measurement_eligible', 'exposure_token' ),
 					'additionalProperties' => false,
 					'properties'           => array(
 						'experiment_key'       => array( 'type' => 'string' ),
+						'definition_version'   => array( 'type' => 'integer' ),
+						'assignment_policy'    => array( 'type' => 'string' ),
 						'variant'              => array( 'type' => 'string' ),
 						'surface'              => array( 'type' => 'string' ),
 						'measurement_eligible' => array( 'type' => 'boolean' ),
@@ -90,14 +92,22 @@ class ExperimentAssignmentAbility {
 				'category'            => 'extrachill-network',
 				'input_schema'        => array(
 					'type'                 => 'object',
-					'required'             => array( 'experiment_key', 'variant', 'surface', 'exposure_token' ),
+					'required'             => array( 'experiment_key', 'definition_version', 'assignment_policy', 'variant', 'surface', 'exposure_token' ),
 					'additionalProperties' => false,
 					'properties'           => array(
-						'experiment_key' => $this->identifier_schema(),
-						'variant'        => $this->identifier_schema(),
-						'surface'        => $this->identifier_schema(),
-						'context'        => $this->context_schema(),
-						'exposure_token' => array(
+						'experiment_key'     => $this->identifier_schema(),
+						'definition_version' => array(
+							'type'    => 'integer',
+							'minimum' => 1,
+						),
+						'assignment_policy'  => array(
+							'type' => 'string',
+							'enum' => array( \EXTRACHILL_EXPERIMENT_ASSIGNMENT_POLICY ),
+						),
+						'variant'            => $this->identifier_schema(),
+						'surface'            => $this->identifier_schema(),
+						'context'            => $this->context_schema(),
+						'exposure_token'     => array(
 							'type'      => 'string',
 							'pattern'   => '^\\d{10}\\.[a-f0-9]{32}\\.[a-f0-9]{64}$',
 							'maxLength' => 108,
@@ -118,6 +128,73 @@ class ExperimentAssignmentAbility {
 					'show_in_rest' => true,
 					'annotations'  => array(
 						'idempotent' => false,
+					),
+				),
+			)
+		);
+
+		wp_register_ability(
+			'extrachill/list-experiments',
+			array(
+				'label'               => __( 'List Experiments', 'extrachill-network' ),
+				'description'         => __( 'List normalized code definitions and their effective network lifecycle states.', 'extrachill-network' ),
+				'category'            => 'extrachill-network',
+				'output_schema'       => array(
+					'type'  => 'array',
+					'items' => array( 'type' => 'object' ),
+				),
+				'execute_callback'    => array( $this, 'execute_list' ),
+				'permission_callback' => array( $this, 'check_admin_permission' ),
+				'meta'                => array(
+					'show_in_rest' => true,
+					'annotations'  => array(
+						'readonly'   => true,
+						'idempotent' => true,
+					),
+				),
+			)
+		);
+
+		wp_register_ability(
+			'extrachill/transition-experiment-state',
+			array(
+				'label'               => __( 'Transition Experiment State', 'extrachill-network' ),
+				'description'         => __( 'Transition one registered experiment definition version to a valid lifecycle state.', 'extrachill-network' ),
+				'category'            => 'extrachill-network',
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'required'             => array( 'experiment_key', 'definition_version', 'state' ),
+					'additionalProperties' => false,
+					'properties'           => array(
+						'experiment_key'     => $this->identifier_schema(),
+						'definition_version' => array(
+							'type'    => 'integer',
+							'minimum' => 1,
+						),
+						'state'              => array(
+							'type' => 'string',
+							'enum' => \EXTRACHILL_EXPERIMENT_STATES,
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'                 => 'object',
+					'required'             => array( 'experiment_key', 'definition_version', 'previous_state', 'state' ),
+					'additionalProperties' => false,
+					'properties'           => array(
+						'experiment_key'     => array( 'type' => 'string' ),
+						'definition_version' => array( 'type' => 'integer' ),
+						'previous_state'     => array( 'type' => 'string' ),
+						'state'              => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_transition' ),
+				'permission_callback' => array( $this, 'check_admin_permission' ),
+				'meta'                => array(
+					'show_in_rest' => true,
+					'annotations'  => array(
+						'destructive' => false,
+						'idempotent'  => true,
 					),
 				),
 			)
@@ -178,6 +255,8 @@ class ExperimentAssignmentAbility {
 		$context  = isset( $input['context'] ) && is_array( $input['context'] ) ? $input['context'] : array();
 		$metadata = extrachill_validate_experiment_exposure(
 			(string) $input['experiment_key'],
+			(int) $input['definition_version'],
+			(string) $input['assignment_policy'],
 			(string) $input['variant'],
 			(string) $input['surface'],
 			$context,
@@ -196,10 +275,43 @@ class ExperimentAssignmentAbility {
 		 * Analytics may consume this hook for persistence. Browser DOM events do
 		 * not reach this hook without a valid subject/context-bound proof.
 		 *
-		 * @param array{experiment_key: string, variant: string, surface: string} $metadata Bounded exposure metadata.
+		 * @param array{experiment_key: string, definition_version: int, assignment_policy: string, variant: string, surface: string} $metadata Bounded exposure metadata.
 		 */
 		do_action( 'extrachill_experiment_exposure', $metadata );
 
 		return array( 'accepted' => true );
+	}
+
+	/**
+	 * Require a network-options capability for lifecycle administration.
+	 *
+	 * Cookie-authenticated REST calls are nonce-validated by WordPress before
+	 * the Ability permission callback runs.
+	 */
+	public function check_admin_permission(): bool {
+		return current_user_can( 'manage_network_options' );
+	}
+
+	/**
+	 * List audit-safe definitions and effective states.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function execute_list(): array {
+		return extrachill_list_experiments();
+	}
+
+	/**
+	 * Transition one current code definition version.
+	 *
+	 * @param array<string, mixed> $input Ability input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function execute_transition( array $input ) {
+		return extrachill_transition_experiment_state(
+			(string) $input['experiment_key'],
+			(int) $input['definition_version'],
+			(string) $input['state']
+		);
 	}
 }

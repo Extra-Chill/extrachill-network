@@ -41,6 +41,15 @@ const EXTRACHILL_EXPERIMENT_EXPOSURE_FUTURE_SKEW = 60;
 /** Shared atomic-cache group for consumed exposure proofs. */
 const EXTRACHILL_EXPERIMENT_EXPOSURE_CACHE_GROUP = 'extrachill_experiment_exposures';
 
+/** Network option containing live state for registered experiment versions. */
+const EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION = 'extrachill_experiment_lifecycle';
+
+/** The only supported allocation policy. */
+const EXTRACHILL_EXPERIMENT_ASSIGNMENT_POLICY = 'weighted_random';
+
+/** Bounded lifecycle states. */
+const EXTRACHILL_EXPERIMENT_STATES = array( 'inactive', 'active', 'paused', 'completed' );
+
 /**
  * Make exposure proof consumption network-global on multisite caches.
  */
@@ -56,7 +65,11 @@ add_action( 'init', 'extrachill_register_experiment_cache_group', 0 );
  *
  * A definition has this shape:
  *
- *     array(
+ *     'stable-key' => array(
+ *         'key'                 => 'stable-key',
+ *         'definition_version'  => 1,
+ *         'assignment_policy'   => 'weighted_random',
+ *         'default_state'       => 'inactive',
  *         'default_variant'     => 'control',
  *         'control_variant'     => 'control',
  *         'variants'            => array( 'control' => 50, 'treatment' => 50 ),
@@ -78,11 +91,31 @@ function extrachill_get_experiment_definitions() {
 /**
  * Validate and normalize one code-owned experiment definition.
  *
- * @param mixed $definition Candidate definition.
+ * @param mixed  $definition     Candidate definition.
+ * @param string $registered_key Optional filter registration key.
  * @return array<string, mixed>|null Normalized definition, or null when invalid.
  */
-function extrachill_normalize_experiment_definition( $definition ) {
+function extrachill_normalize_experiment_definition( $definition, $registered_key = '' ) {
 	if ( ! is_array( $definition ) ) {
+		return null;
+	}
+
+	$registered_key = (string) $registered_key;
+	$is_legacy      = ! isset( $definition['key'] )
+		&& ! isset( $definition['definition_version'] )
+		&& ! isset( $definition['assignment_policy'] )
+		&& ! isset( $definition['default_state'] );
+	$key            = isset( $definition['key'] ) ? (string) $definition['key'] : $registered_key;
+	$version        = isset( $definition['definition_version'] ) ? $definition['definition_version'] : ( $is_legacy ? 1 : 0 );
+	$policy         = isset( $definition['assignment_policy'] ) ? (string) $definition['assignment_policy'] : ( $is_legacy ? EXTRACHILL_EXPERIMENT_ASSIGNMENT_POLICY : '' );
+	$default_state  = isset( $definition['default_state'] ) ? (string) $definition['default_state'] : ( $is_legacy ? 'active' : '' );
+	if (
+		! $is_legacy
+		&& ( ! isset( $definition['key'] )
+			|| ! isset( $definition['definition_version'] )
+			|| ! isset( $definition['assignment_policy'] )
+			|| ! isset( $definition['default_state'] ) )
+	) {
 		return null;
 	}
 
@@ -96,7 +129,13 @@ function extrachill_normalize_experiment_definition( $definition ) {
 		: array();
 
 	if (
-		'' === $default
+		( '' !== $registered_key && $key !== $registered_key )
+		|| ( '' !== $key && 1 !== preg_match( '/^[a-z0-9][a-z0-9_-]{0,63}$/', $key ) )
+		|| ! is_int( $version )
+		|| $version <= 0
+		|| EXTRACHILL_EXPERIMENT_ASSIGNMENT_POLICY !== $policy
+		|| ! in_array( $default_state, EXTRACHILL_EXPERIMENT_STATES, true )
+		|| '' === $default
 		|| $default !== $control
 		|| count( $variants ) < 2
 		|| ! isset( $variants[ $default ] )
@@ -133,6 +172,10 @@ function extrachill_normalize_experiment_definition( $definition ) {
 	}
 
 	return array(
+		'key'                  => $key,
+		'definition_version'   => $version,
+		'assignment_policy'    => $policy,
+		'default_state'        => $default_state,
 		'default_variant'      => $default,
 		'control_variant'      => $control,
 		'variants'             => $variants,
@@ -140,6 +183,221 @@ function extrachill_normalize_experiment_definition( $definition ) {
 		'eligibility_callback' => $definition['eligibility_callback'],
 		'total_weight'         => $total_weight,
 	);
+}
+
+/**
+ * Return valid code-owned definitions indexed by their declared stable key.
+ *
+ * The original keyed definition shape is migrated as version 1, weighted
+ * random, and active so the already-shipped assignment contract is preserved.
+ * New definitions must explicitly provide all lifecycle fields.
+ *
+ * @return array<string, array<string, mixed>>
+ */
+function extrachill_get_normalized_experiment_definitions() {
+	$normalized = array();
+	foreach ( extrachill_get_experiment_definitions() as $key => $definition ) {
+		if ( ! is_string( $key ) || 1 !== preg_match( '/^[a-z0-9][a-z0-9_-]{0,63}$/', $key ) ) {
+			continue;
+		}
+		$candidate = extrachill_normalize_experiment_definition( $definition, $key );
+		if ( null !== $candidate ) {
+			$normalized[ $key ] = $candidate;
+		}
+	}
+
+	return $normalized;
+}
+
+/**
+ * Read and validate the bounded live-state option.
+ *
+ * @return array{valid: bool, states: array<string, array{definition_version: int, state: string}>}
+ */
+function extrachill_get_experiment_lifecycle_option() {
+	$value = get_site_option( EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION, false );
+	if ( false === $value ) {
+		return array(
+			'valid'  => true,
+			'states' => array(),
+		);
+	}
+	if ( ! is_array( $value ) ) {
+		return array(
+			'valid'  => false,
+			'states' => array(),
+		);
+	}
+
+	$states          = array();
+	$registered_keys = array_keys( extrachill_get_normalized_experiment_definitions() );
+	foreach ( $value as $key => $record ) {
+		if (
+			! is_string( $key )
+			|| 1 !== preg_match( '/^[a-z0-9][a-z0-9_-]{0,63}$/', $key )
+			|| ! in_array( $key, $registered_keys, true )
+			|| ! is_array( $record )
+			|| array( 'definition_version', 'state' ) !== array_keys( $record )
+			|| ! is_int( $record['definition_version'] )
+			|| $record['definition_version'] <= 0
+			|| ! is_string( $record['state'] )
+			|| ! in_array( $record['state'], EXTRACHILL_EXPERIMENT_STATES, true )
+		) {
+			return array(
+				'valid'  => false,
+				'states' => array(),
+			);
+		}
+		$states[ $key ] = $record;
+	}
+
+	return array(
+		'valid'  => true,
+		'states' => $states,
+	);
+}
+
+/**
+ * Resolve live state for the current code definition version.
+ *
+ * Missing and older-version state uses the reviewed code default. Corrupt or
+ * future-version state fails closed and never broadens eligibility.
+ *
+ * @param array<string, mixed>      $definition Normalized definition.
+ * @param array<string, mixed>|null $lifecycle Optional preloaded option data.
+ * @return string Effective lifecycle state.
+ */
+function extrachill_get_experiment_state( array $definition, $lifecycle = null ) {
+	$lifecycle = is_array( $lifecycle ) ? $lifecycle : extrachill_get_experiment_lifecycle_option();
+	if ( empty( $lifecycle['valid'] ) ) {
+		return 'inactive';
+	}
+
+	$key    = $definition['key'];
+	$record = isset( $lifecycle['states'][ $key ] ) ? $lifecycle['states'][ $key ] : null;
+	if ( null === $record || $record['definition_version'] < $definition['definition_version'] ) {
+		return $definition['default_state'];
+	}
+	if ( $record['definition_version'] !== $definition['definition_version'] ) {
+		return 'inactive';
+	}
+
+	return $record['state'];
+}
+
+/**
+ * Whether a registered experiment is active for a consumer surface/context.
+ *
+ * Consumers may call this before rendering candidates or enqueueing assets.
+ * It does not replace consumer authorization; the eligibility callback must
+ * compose every applicable capability or rollout check itself.
+ *
+ * @param string               $experiment_key Stable experiment key.
+ * @param string               $surface Consumer surface, or empty for lifecycle-only checks.
+ * @param array<string, mixed> $context Consumer-owned eligibility context.
+ * @return bool Whether the current definition is active and consumer-eligible.
+ */
+function extrachill_experiment_is_active( $experiment_key, $surface = '', array $context = array() ) {
+	$definitions = extrachill_get_normalized_experiment_definitions();
+	$definition  = isset( $definitions[ $experiment_key ] ) ? $definitions[ $experiment_key ] : null;
+	if ( null === $definition || 'active' !== extrachill_get_experiment_state( $definition ) ) {
+		return false;
+	}
+	if ( '' === $surface ) {
+		return true;
+	}
+	if ( ! in_array( $surface, $definition['surfaces'], true ) ) {
+		return false;
+	}
+
+	try {
+		return (bool) call_user_func( $definition['eligibility_callback'], $context, $surface );
+	} catch ( \Throwable $error ) {
+		return false;
+	}
+}
+
+/**
+ * Return audit-safe definitions and effective live states.
+ *
+ * @return array<int, array<string, mixed>>
+ */
+function extrachill_list_experiments() {
+	$lifecycle = extrachill_get_experiment_lifecycle_option();
+	$output    = array();
+	foreach ( extrachill_get_normalized_experiment_definitions() as $definition ) {
+		$output[] = array(
+			'key'                => $definition['key'],
+			'definition_version' => $definition['definition_version'],
+			'assignment_policy'  => $definition['assignment_policy'],
+			'default_state'      => $definition['default_state'],
+			'state'              => extrachill_get_experiment_state( $definition, $lifecycle ),
+			'default_variant'    => $definition['default_variant'],
+			'control_variant'    => $definition['control_variant'],
+			'variants'           => $definition['variants'],
+			'surfaces'           => $definition['surfaces'],
+		);
+	}
+
+	return $output;
+}
+
+/**
+ * Transition one registered experiment's current code version.
+ *
+ * @param string $experiment_key Stable experiment key.
+ * @param int    $definition_version Expected current code version.
+ * @param string $new_state Requested state.
+ * @return array<string, mixed>|\WP_Error Normalized changed state.
+ */
+function extrachill_transition_experiment_state( $experiment_key, $definition_version, $new_state ) {
+	$definitions = extrachill_get_normalized_experiment_definitions();
+	$definition  = isset( $definitions[ $experiment_key ] ) ? $definitions[ $experiment_key ] : null;
+	if ( null === $definition ) {
+		return new \WP_Error( 'experiment_not_registered', __( 'Experiment is not registered.', 'extrachill-network' ), array( 'status' => 404 ) );
+	}
+	if ( $definition['definition_version'] !== $definition_version ) {
+		return new \WP_Error( 'experiment_definition_version_mismatch', __( 'Experiment definition version does not match current code.', 'extrachill-network' ), array( 'status' => 409 ) );
+	}
+	if ( ! in_array( $new_state, EXTRACHILL_EXPERIMENT_STATES, true ) ) {
+		return new \WP_Error( 'invalid_experiment_state', __( 'Experiment lifecycle state is invalid.', 'extrachill-network' ), array( 'status' => 400 ) );
+	}
+
+	$lifecycle = extrachill_get_experiment_lifecycle_option();
+	if ( empty( $lifecycle['valid'] ) ) {
+		return new \WP_Error( 'invalid_experiment_lifecycle_option', __( 'Experiment lifecycle storage is corrupt.', 'extrachill-network' ), array( 'status' => 500 ) );
+	}
+	$old_state = extrachill_get_experiment_state( $definition, $lifecycle );
+	$allowed   = array(
+		'inactive'  => array( 'active' ),
+		'active'    => array( 'paused', 'completed' ),
+		'paused'    => array( 'active', 'completed' ),
+		'completed' => array(),
+	);
+	if ( $old_state !== $new_state && ! in_array( $new_state, $allowed[ $old_state ], true ) ) {
+		return new \WP_Error( 'invalid_experiment_state_transition', __( 'Experiment lifecycle transition is invalid.', 'extrachill-network' ), array( 'status' => 409 ) );
+	}
+
+	$result = array(
+		'experiment_key'     => $definition['key'],
+		'definition_version' => $definition['definition_version'],
+		'previous_state'     => $old_state,
+		'state'              => $new_state,
+	);
+	if ( $old_state === $new_state ) {
+		return $result;
+	}
+
+	$lifecycle['states'][ $definition['key'] ] = array(
+		'definition_version' => $definition['definition_version'],
+		'state'              => $new_state,
+	);
+	if ( ! update_site_option( EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION, $lifecycle['states'] ) ) {
+		return new \WP_Error( 'experiment_state_update_failed', __( 'Experiment lifecycle state could not be saved.', 'extrachill-network' ), array( 'status' => 500 ) );
+	}
+
+	do_action( 'extrachill_experiment_state_changed', $result );
+	return $result;
 }
 
 /**
@@ -330,6 +588,8 @@ function extrachill_experiment_exposure_token( array $metadata, $subject_key, ar
 		"\0",
 		array(
 			$metadata['experiment_key'],
+			(string) $metadata['definition_version'],
+			$metadata['assignment_policy'],
 			$metadata['variant'],
 			$metadata['surface'],
 			(string) $issued_at,
@@ -347,14 +607,16 @@ function extrachill_experiment_exposure_token( array $metadata, $subject_key, ar
  * Validate an exposure proof and return trusted bounded metadata.
  *
  * @param string               $experiment_key Experiment key.
+ * @param int                  $definition_version Code definition version.
+ * @param string               $assignment_policy Allocation policy.
  * @param string               $variant        Assigned variant.
  * @param string               $surface        Registered surface.
  * @param array<string, mixed> $context        Consumer context.
  * @param string               $token          Signed assignment proof.
  * @param int|null             $now            Optional current time for tests.
- * @return array<string, string>|null Trusted metadata, or null when invalid.
+ * @return array<string, mixed>|null Trusted metadata, or null when invalid.
  */
-function extrachill_validate_experiment_exposure( $experiment_key, $variant, $surface, array $context, $token, $now = null ) {
+function extrachill_validate_experiment_exposure( $experiment_key, $definition_version, $assignment_policy, $variant, $surface, array $context, $token, $now = null ) {
 	if ( 1 !== preg_match( '/^(\d{10})\.([a-f0-9]{32})\.([a-f0-9]{64})$/', (string) $token, $matches ) ) {
 		return null;
 	}
@@ -365,12 +627,13 @@ function extrachill_validate_experiment_exposure( $experiment_key, $variant, $su
 		return null;
 	}
 
-	$definitions = extrachill_get_experiment_definitions();
-	$definition  = isset( $definitions[ $experiment_key ] )
-		? extrachill_normalize_experiment_definition( $definitions[ $experiment_key ] )
-		: null;
+	$definitions = extrachill_get_normalized_experiment_definitions();
+	$definition  = isset( $definitions[ $experiment_key ] ) ? $definitions[ $experiment_key ] : null;
 	if (
 		null === $definition
+		|| 'active' !== extrachill_get_experiment_state( $definition )
+		|| $definition['definition_version'] !== $definition_version
+		|| $definition['assignment_policy'] !== $assignment_policy
 		|| ! in_array( $surface, $definition['surfaces'], true )
 		|| ! isset( $definition['variants'][ $variant ] )
 	) {
@@ -388,9 +651,11 @@ function extrachill_validate_experiment_exposure( $experiment_key, $variant, $su
 	}
 
 	$metadata = array(
-		'experiment_key' => (string) $experiment_key,
-		'variant'        => (string) $variant,
-		'surface'        => (string) $surface,
+		'experiment_key'     => (string) $experiment_key,
+		'definition_version' => $definition['definition_version'],
+		'assignment_policy'  => $definition['assignment_policy'],
+		'variant'            => (string) $variant,
+		'surface'            => (string) $surface,
 	);
 	$expected = extrachill_experiment_exposure_token( $metadata, $subject_key, $context, $issued_at, $matches[2] );
 
@@ -455,6 +720,8 @@ function extrachill_resolve_experiment_assignment( $experiment_key, $surface, ar
 	) {
 		return array(
 			'experiment_key'       => $experiment_key,
+			'definition_version'   => 0,
+			'assignment_policy'    => '',
 			'variant'              => 'control',
 			'surface'              => $surface,
 			'measurement_eligible' => false,
@@ -462,36 +729,35 @@ function extrachill_resolve_experiment_assignment( $experiment_key, $surface, ar
 		);
 	}
 
-	$definitions    = extrachill_get_experiment_definitions();
-	$raw_definition = isset( $definitions[ $experiment_key ] ) ? $definitions[ $experiment_key ] : null;
-	$fallback       = is_array( $raw_definition )
+	$raw_definitions = extrachill_get_experiment_definitions();
+	$definitions     = extrachill_get_normalized_experiment_definitions();
+	$raw_definition  = isset( $raw_definitions[ $experiment_key ] ) ? $raw_definitions[ $experiment_key ] : null;
+	$fallback        = is_array( $raw_definition )
 		&& isset( $raw_definition['default_variant'], $raw_definition['control_variant'] )
 		&& $raw_definition['default_variant'] === $raw_definition['control_variant']
 		&& is_string( $raw_definition['default_variant'] )
 		&& 1 === preg_match( '/^[a-z0-9][a-z0-9_-]{0,63}$/', $raw_definition['default_variant'] )
 			? $raw_definition['default_variant']
 			: 'control';
-	$result         = array(
+	$result          = array(
 		'experiment_key'       => $experiment_key,
+		'definition_version'   => 0,
+		'assignment_policy'    => '',
 		'variant'              => $fallback,
 		'surface'              => $surface,
 		'measurement_eligible' => false,
 		'exposure_token'       => '',
 	);
-	$definition     = extrachill_normalize_experiment_definition( $raw_definition );
+	$definition      = isset( $definitions[ $experiment_key ] ) ? $definitions[ $experiment_key ] : null;
 
-	if ( null === $definition || ! in_array( $surface, $definition['surfaces'], true ) ) {
+	if ( null === $definition ) {
 		return $result;
 	}
 
-	$result['variant'] = $definition['default_variant'];
-	try {
-		$eligible = (bool) call_user_func( $definition['eligibility_callback'], $context, $surface );
-	} catch ( \Throwable $error ) {
-		$eligible = false;
-	}
-
-	if ( ! $eligible ) {
+	$result['definition_version'] = $definition['definition_version'];
+	$result['assignment_policy']  = $definition['assignment_policy'];
+	$result['variant']            = $definition['default_variant'];
+	if ( ! extrachill_experiment_is_active( $experiment_key, $surface, $context ) ) {
 		return $result;
 	}
 
@@ -501,9 +767,11 @@ function extrachill_resolve_experiment_assignment( $experiment_key, $surface, ar
 	}
 
 	$metadata = array(
-		'experiment_key' => $experiment_key,
-		'variant'        => extrachill_allocate_experiment_variant( $experiment_key, $definition, $subject_key ),
-		'surface'        => $surface,
+		'experiment_key'     => $experiment_key,
+		'definition_version' => $definition['definition_version'],
+		'assignment_policy'  => $definition['assignment_policy'],
+		'variant'            => extrachill_allocate_experiment_variant( $experiment_key, $definition, $subject_key ),
+		'surface'            => $surface,
 	);
 	$token    = extrachill_experiment_exposure_token( $metadata, $subject_key, $context );
 	if ( '' === $token ) {
@@ -519,7 +787,7 @@ function extrachill_resolve_experiment_assignment( $experiment_key, $surface, ar
 	 * Analytics may consume this hook for persistence. The payload deliberately
 	 * excludes subject identity and consumer context.
 	 *
-	 * @param array{experiment_key: string, variant: string, surface: string} $metadata Bounded assignment metadata.
+	 * @param array{experiment_key: string, definition_version: int, assignment_policy: string, variant: string, surface: string} $metadata Bounded assignment metadata.
 	 */
 	do_action( 'extrachill_experiment_assignment', $metadata );
 
@@ -575,12 +843,10 @@ function extrachill_experiment_attributes( $experiment_key, $surface, array $con
 		return '';
 	}
 
-	$definitions = extrachill_get_experiment_definitions();
-	$definition  = isset( $definitions[ $experiment_key ] )
-		? extrachill_normalize_experiment_definition( $definitions[ $experiment_key ] )
-		: null;
+	$definitions = extrachill_get_normalized_experiment_definitions();
+	$definition  = isset( $definitions[ $experiment_key ] ) ? $definitions[ $experiment_key ] : null;
 
-	if ( null === $definition || ! in_array( $surface, $definition['surfaces'], true ) ) {
+	if ( null === $definition || ! extrachill_experiment_is_active( $experiment_key, $surface, $context ) ) {
 		return '';
 	}
 

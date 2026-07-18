@@ -11,6 +11,8 @@
   },
   "metadata_keys": [
     "experiment_key",
+    "definition_version",
+    "assignment_policy",
     "variant",
     "surface"
   ]

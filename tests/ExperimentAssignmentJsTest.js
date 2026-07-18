@@ -41,7 +41,7 @@ function createElement() {
 	};
 }
 
-function createHarness( result, exposureAccepted = true ) {
+function createHarness( result, exposureAccepted = true, hasElements = true ) {
 	const element = createElement();
 	const requests = [];
 	const observers = [];
@@ -89,7 +89,7 @@ function createHarness( result, exposureAccepted = true ) {
 		window,
 		document: {
 			querySelectorAll() {
-				return [ element ];
+				return hasElements ? [ element ] : [];
 			},
 		},
 		CustomEvent: FakeCustomEvent,
@@ -106,8 +106,14 @@ function flushPromises() {
 }
 
 async function run() {
+	const noExperiment = createHarness( {}, true, false );
+	check( 'page without experiment attributes makes no Ability request', noExperiment.requests.length === 0 );
+	check( 'page without experiment attributes starts no exposure observer', noExperiment.observers.length === 0 );
+
 	const assigned = createHarness( {
 		experiment_key: 'geo-bridge-holdout',
+		definition_version: 1,
+		assignment_policy: 'weighted_random',
 		variant: 'treatment',
 		surface: 'single-post-bridge',
 		measurement_eligible: true,
@@ -133,7 +139,7 @@ async function run() {
 		assigned.element.events.length === 1 &&
 			assigned.element.events[ 0 ].type === 'extrachill:experiment-assignment' &&
 			Object.keys( assigned.element.events[ 0 ].detail ).sort().join( ',' ) ===
-				'experiment_key,surface,variant'
+				'assignment_policy,definition_version,experiment_key,surface,variant'
 	);
 	check( 'assignment alone is not an exposure', assigned.element.events.length === 1 );
 	check( 'exposure observer uses a 50% threshold', assigned.observers[ 0 ].options.threshold[ 0 ] === 0.5 );
@@ -149,6 +155,8 @@ async function run() {
 	check( 'viewport visibility calls the signed exposure ability', assigned.requests.length === 2 && assigned.requests[ 1 ].url === '/exposure' );
 	const exposureInput = JSON.parse( assigned.requests[ 1 ].options.body ).input;
 	check( 'exposure request carries the server-issued proof', exposureInput.exposure_token === '1700000000.' + '1'.repeat( 32 ) + '.' + 'a'.repeat( 64 ) );
+	check( 'exposure request carries signed definition version', exposureInput.definition_version === 1 );
+	check( 'exposure request carries signed assignment policy', exposureInput.assignment_policy === 'weighted_random' );
 	await flushPromises();
 	check(
 		'server-accepted viewport exposure emits separately',
@@ -159,6 +167,8 @@ async function run() {
 
 	const excluded = createHarness( {
 		experiment_key: 'geo-bridge-holdout',
+		definition_version: 1,
+		assignment_policy: 'weighted_random',
 		variant: 'control',
 		surface: 'single-post-bridge',
 		measurement_eligible: false,
@@ -174,6 +184,8 @@ async function run() {
 
 	const rejected = createHarness( {
 		experiment_key: 'geo-bridge-holdout',
+		definition_version: 1,
+		assignment_policy: 'weighted_random',
 		variant: 'treatment',
 		surface: 'single-post-bridge',
 		measurement_eligible: true,

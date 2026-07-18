@@ -24,6 +24,8 @@ $GLOBALS['experiment_actions']        = array();
 $GLOBALS['experiment_cache']          = array();
 $GLOBALS['experiment_cache_adds']     = array();
 $GLOBALS['experiment_external_cache'] = true;
+$GLOBALS['experiment_site_options']   = array();
+$GLOBALS['experiment_can_admin']      = false;
 
 class WP_Error {
 	public function __construct( public string $code ) {}
@@ -37,6 +39,16 @@ function __( $value ) {
 }
 function wp_register_ability( $name, $args ) {
 	$GLOBALS['experiment_abilities'][ $name ] = $args;
+}
+function get_site_option( $name, $fallback = false ) {
+	return array_key_exists( $name, $GLOBALS['experiment_site_options'] ) ? $GLOBALS['experiment_site_options'][ $name ] : $fallback;
+}
+function update_site_option( $name, $value ) {
+	$GLOBALS['experiment_site_options'][ $name ] = $value;
+	return true;
+}
+function current_user_can( $capability ) {
+	return 'manage_network_options' === $capability && $GLOBALS['experiment_can_admin'];
 }
 function wp_salt() {
 	return 'fixed-experiment-test-salt';
@@ -112,6 +124,10 @@ function experiment_check( string $label, bool $condition ): void {
 
 function experiment_definition( bool $eligible = true ): array {
 	return array(
+		'key'                  => 'geo-bridge-holdout',
+		'definition_version'   => 1,
+		'assignment_policy'    => 'weighted_random',
+		'default_state'        => 'active',
 		'default_variant'      => 'control',
 		'control_variant'      => 'control',
 		'variants'             => array(
@@ -217,13 +233,15 @@ experiment_check( 'provider-approved subject receives an assignment', true === $
 experiment_check( 'assignment stays within registered variants', in_array( $assigned['variant'], array( 'control', 'treatment' ), true ) );
 experiment_check( 'assignment returns a nonce-bearing opaque exposure proof', 1 === preg_match( '/^\d{10}\.[a-f0-9]{32}\.[a-f0-9]{64}$/', $assigned['exposure_token'] ) );
 experiment_check( 'trusted server assignment hook fires once', 1 === count( $GLOBALS['experiment_actions'] ) && 'extrachill_experiment_assignment' === $GLOBALS['experiment_actions'][0][0] );
-experiment_check( 'assignment hook contains only bounded metadata', 'experiment_key,variant,surface' === implode( ',', array_keys( $GLOBALS['experiment_actions'][0][1][0] ) ) );
+experiment_check( 'assignment hook contains only bounded metadata', 'experiment_key,definition_version,assignment_policy,variant,surface' === implode( ',', array_keys( $GLOBALS['experiment_actions'][0][1][0] ) ) );
 experiment_check( 'cross-contract fixture locks assignment hook name', $contract_fixture['server_actions']['assignment'] === $GLOBALS['experiment_actions'][0][0] );
 experiment_check( 'cross-contract fixture locks one metadata argument', 1 === $contract_fixture['server_actions']['accepted_args'] && 1 === count( $GLOBALS['experiment_actions'][0][1] ) );
 experiment_check( 'cross-contract fixture locks metadata keys', array_keys( $GLOBALS['experiment_actions'][0][1][0] ) === $contract_fixture['metadata_keys'] );
 
 $exposure = extrachill_validate_experiment_exposure(
 	'geo-bridge-holdout',
+	1,
+	'weighted_random',
 	$assigned['variant'],
 	'single-post-bridge',
 	array(),
@@ -231,9 +249,35 @@ $exposure = extrachill_validate_experiment_exposure(
 );
 experiment_check( 'matching signed exposure validates', is_array( $exposure ) );
 experiment_check(
+	'tampered definition version is rejected',
+	null === extrachill_validate_experiment_exposure(
+		'geo-bridge-holdout',
+		2,
+		'weighted_random',
+		$assigned['variant'],
+		'single-post-bridge',
+		array(),
+		$assigned['exposure_token']
+	)
+);
+experiment_check(
+	'tampered assignment policy is rejected',
+	null === extrachill_validate_experiment_exposure(
+		'geo-bridge-holdout',
+		1,
+		'other_policy',
+		$assigned['variant'],
+		'single-post-bridge',
+		array(),
+		$assigned['exposure_token']
+	)
+);
+experiment_check(
 	'tampered variant is rejected',
 	null === extrachill_validate_experiment_exposure(
 		'geo-bridge-holdout',
+		1,
+		'weighted_random',
 		'control' === $assigned['variant'] ? 'treatment' : 'control',
 		'single-post-bridge',
 		array(),
@@ -244,6 +288,8 @@ experiment_check(
 	'tampered context is rejected',
 	null === extrachill_validate_experiment_exposure(
 		'geo-bridge-holdout',
+		1,
+		'weighted_random',
 		$assigned['variant'],
 		'single-post-bridge',
 		array( 'post_id' => '99' ),
@@ -251,15 +297,19 @@ experiment_check(
 	)
 );
 $expired_metadata = array(
-	'experiment_key' => 'geo-bridge-holdout',
-	'variant'        => $assigned['variant'],
-	'surface'        => 'single-post-bridge',
+	'experiment_key'     => 'geo-bridge-holdout',
+	'definition_version' => 1,
+	'assignment_policy'  => 'weighted_random',
+	'variant'            => $assigned['variant'],
+	'surface'            => 'single-post-bridge',
 );
 $expired_token    = extrachill_experiment_exposure_token( $expired_metadata, 'visitor-123', array(), 1700000000, str_repeat( '1', 32 ) );
 experiment_check(
 	'expired exposure proof is rejected',
 	null === extrachill_validate_experiment_exposure(
 		'geo-bridge-holdout',
+		1,
+		'weighted_random',
 		$assigned['variant'],
 		'single-post-bridge',
 		array(),
@@ -276,6 +326,8 @@ experiment_check(
 	is_array(
 		extrachill_validate_experiment_exposure(
 			'geo-bridge-holdout',
+			1,
+			'weighted_random',
 			$assigned['variant'],
 			'single-post-bridge',
 			array(),
@@ -289,6 +341,8 @@ experiment_check(
 	is_array(
 		extrachill_validate_experiment_exposure(
 			'geo-bridge-holdout',
+			1,
+			'weighted_random',
 			$assigned['variant'],
 			'single-post-bridge',
 			array(),
@@ -308,6 +362,8 @@ experiment_check(
 	is_array(
 		extrachill_validate_experiment_exposure(
 			'geo-bridge-holdout',
+			1,
+			'weighted_random',
 			$assigned['variant'],
 			'single-post-bridge',
 			array(),
@@ -326,6 +382,8 @@ $race_issued                      = time() - 1;
 $race_token                       = extrachill_experiment_exposure_token( $expired_metadata, 'visitor-123', array(), $race_issued, str_repeat( '3', 32 ) );
 $race_first_validation            = extrachill_validate_experiment_exposure(
 	'geo-bridge-holdout',
+	1,
+	'weighted_random',
 	$assigned['variant'],
 	'single-post-bridge',
 	array(),
@@ -334,6 +392,8 @@ $race_first_validation            = extrachill_validate_experiment_exposure(
 );
 $race_second_validation           = extrachill_validate_experiment_exposure(
 	'geo-bridge-holdout',
+	1,
+	'weighted_random',
 	$assigned['variant'],
 	'single-post-bridge',
 	array(),
@@ -366,6 +426,9 @@ $GLOBALS['experiment_filters']['extrachill_experiment_definitions'] = array(
 $denied = extrachill_resolve_experiment_assignment( 'geo-bridge-holdout', 'single-post-bridge' );
 experiment_check( 'consumer denial cannot be escalated by assignment', 'control' === $denied['variant'] );
 experiment_check( 'consumer denial remains unmeasured', false === $denied['measurement_eligible'] );
+$GLOBALS['experiment_enqueued'] = array();
+experiment_check( 'consumer denial emits no experiment attributes', '' === extrachill_experiment_attributes( 'geo-bridge-holdout', 'single-post-bridge' ) );
+experiment_check( 'consumer denial enqueues no client asset', array() === $GLOBALS['experiment_enqueued'] );
 
 $GLOBALS['experiment_filters']['extrachill_experiment_definitions'] = array(
 	static function (): array {
@@ -410,10 +473,12 @@ $GLOBALS['experiment_cache']                                        = array();
 $GLOBALS['experiment_cache_adds']                                   = array();
 $exposure_result = $ability->execute_exposure(
 	array(
-		'experiment_key' => 'geo-bridge-holdout',
-		'variant'        => $assigned['variant'],
-		'surface'        => 'single-post-bridge',
-		'exposure_token' => $assigned['exposure_token'],
+		'experiment_key'     => 'geo-bridge-holdout',
+		'definition_version' => 1,
+		'assignment_policy'  => 'weighted_random',
+		'variant'            => $assigned['variant'],
+		'surface'            => 'single-post-bridge',
+		'exposure_token'     => $assigned['exposure_token'],
 	)
 );
 experiment_check( 'valid exposure ability call is accepted', true === $exposure_result['accepted'] );
@@ -423,24 +488,159 @@ experiment_check( 'cross-contract fixture locks exposure hook name', $contract_f
 experiment_check( 'exposure hook receives one bounded metadata array', 1 === count( $GLOBALS['experiment_actions'][0][1] ) && array_keys( $GLOBALS['experiment_actions'][0][1][0] ) === $contract_fixture['metadata_keys'] );
 $replayed_exposure = $ability->execute_exposure(
 	array(
-		'experiment_key' => 'geo-bridge-holdout',
-		'variant'        => $assigned['variant'],
-		'surface'        => 'single-post-bridge',
-		'exposure_token' => $assigned['exposure_token'],
+		'experiment_key'     => 'geo-bridge-holdout',
+		'definition_version' => 1,
+		'assignment_policy'  => 'weighted_random',
+		'variant'            => $assigned['variant'],
+		'surface'            => 'single-post-bridge',
+		'exposure_token'     => $assigned['exposure_token'],
 	)
 );
 experiment_check( 'replayed valid exposure token is rejected', $replayed_exposure instanceof WP_Error && 'experiment_exposure_already_consumed' === $replayed_exposure->code );
 experiment_check( 'replayed exposure emits no duplicate hook', 1 === count( $GLOBALS['experiment_actions'] ) );
 $invalid_exposure = $ability->execute_exposure(
 	array(
-		'experiment_key' => 'geo-bridge-holdout',
-		'variant'        => $assigned['variant'],
-		'surface'        => 'single-post-bridge',
-		'exposure_token' => '1700000000.' . str_repeat( '0', 32 ) . '.' . str_repeat( '0', 64 ),
+		'experiment_key'     => 'geo-bridge-holdout',
+		'definition_version' => 1,
+		'assignment_policy'  => 'weighted_random',
+		'variant'            => $assigned['variant'],
+		'surface'            => 'single-post-bridge',
+		'exposure_token'     => '1700000000.' . str_repeat( '0', 32 ) . '.' . str_repeat( '0', 64 ),
 	)
 );
 experiment_check( 'forged exposure is rejected server-side', $invalid_exposure instanceof WP_Error );
 experiment_check( 'forged exposure emits no server hook', 1 === count( $GLOBALS['experiment_actions'] ) );
+
+$missing_key = experiment_definition();
+unset( $missing_key['key'] );
+experiment_check( 'new definitions require an explicit stable key', null === extrachill_normalize_experiment_definition( $missing_key, 'geo-bridge-holdout' ) );
+$mismatched_key        = experiment_definition();
+$mismatched_key['key'] = 'other-experiment';
+experiment_check( 'declared key must match its registration key', null === extrachill_normalize_experiment_definition( $mismatched_key, 'geo-bridge-holdout' ) );
+$zero_version                       = experiment_definition();
+$zero_version['definition_version'] = 0;
+experiment_check( 'definition version must be a positive integer', null === extrachill_normalize_experiment_definition( $zero_version, 'geo-bridge-holdout' ) );
+$invalid_policy                      = experiment_definition();
+$invalid_policy['assignment_policy'] = 'deterministic';
+experiment_check( 'unknown assignment policies fail closed', null === extrachill_normalize_experiment_definition( $invalid_policy, 'geo-bridge-holdout' ) );
+$missing_default_state = experiment_definition();
+unset( $missing_default_state['default_state'] );
+experiment_check( 'new definitions require a reviewed default state', null === extrachill_normalize_experiment_definition( $missing_default_state, 'geo-bridge-holdout' ) );
+
+$legacy = experiment_definition();
+unset( $legacy['key'], $legacy['definition_version'], $legacy['assignment_policy'], $legacy['default_state'] );
+$legacy_normalized = extrachill_normalize_experiment_definition( $legacy, 'geo-bridge-holdout' );
+experiment_check( 'legacy keyed definitions migrate as version one', 1 === $legacy_normalized['definition_version'] );
+experiment_check( 'legacy keyed definitions preserve active behavior', 'active' === $legacy_normalized['default_state'] );
+experiment_check( 'legacy keyed definitions migrate to weighted random', 'weighted_random' === $legacy_normalized['assignment_policy'] );
+
+$lifecycle_definition                  = experiment_definition();
+$lifecycle_definition['default_state'] = 'inactive';
+$GLOBALS['experiment_filters']['extrachill_experiment_definitions'] = array(
+	static function () use ( &$lifecycle_definition ): array {
+		return array( 'geo-bridge-holdout' => $lifecycle_definition );
+	},
+);
+$GLOBALS['experiment_site_options']                                 = array();
+$GLOBALS['experiment_actions']                                      = array();
+$GLOBALS['experiment_enqueued']                                     = array();
+$inactive_assignment = extrachill_resolve_experiment_assignment( 'geo-bridge-holdout', 'single-post-bridge' );
+experiment_check( 'missing live state uses reviewed inactive default', false === $inactive_assignment['measurement_eligible'] );
+experiment_check( 'inactive experiment helper fails closed', ! extrachill_experiment_is_active( 'geo-bridge-holdout', 'single-post-bridge' ) );
+experiment_check( 'inactive experiment emits no attributes', '' === extrachill_experiment_attributes( 'geo-bridge-holdout', 'single-post-bridge' ) );
+experiment_check( 'inactive experiment enqueues no client asset', array() === $GLOBALS['experiment_enqueued'] );
+experiment_check( 'inactive experiment emits no trusted hook', array() === $GLOBALS['experiment_actions'] );
+
+$transition = extrachill_transition_experiment_state( 'geo-bridge-holdout', 1, 'active' );
+experiment_check( 'inactive transitions to active', is_array( $transition ) && 'inactive' === $transition['previous_state'] && 'active' === $transition['state'] );
+experiment_check( 'state transition emits one bounded audit action', 1 === count( $GLOBALS['experiment_actions'] ) && 'extrachill_experiment_state_changed' === $GLOBALS['experiment_actions'][0][0] && array( 'experiment_key', 'definition_version', 'previous_state', 'state' ) === array_keys( $GLOBALS['experiment_actions'][0][1][0] ) );
+experiment_check( 'state option contains only version and state', array( 'definition_version', 'state' ) === array_keys( $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ]['geo-bridge-holdout'] ) );
+experiment_check( 'active helper composes consumer eligibility', extrachill_experiment_is_active( 'geo-bridge-holdout', 'single-post-bridge' ) );
+$active_assignment = extrachill_resolve_experiment_assignment( 'geo-bridge-holdout', 'single-post-bridge' );
+experiment_check( 'active lifecycle resolves measured assignment', true === $active_assignment['measurement_eligible'] );
+experiment_check( 'active response includes definition version', 1 === $active_assignment['definition_version'] );
+experiment_check( 'active response includes assignment policy', 'weighted_random' === $active_assignment['assignment_policy'] );
+
+$paused = extrachill_transition_experiment_state( 'geo-bridge-holdout', 1, 'paused' );
+experiment_check( 'active transitions to paused', is_array( $paused ) && 'paused' === $paused['state'] );
+experiment_check( 'paused lifecycle rejects a previously issued exposure proof', null === extrachill_validate_experiment_exposure( 'geo-bridge-holdout', 1, 'weighted_random', $active_assignment['variant'], 'single-post-bridge', array(), $active_assignment['exposure_token'] ) );
+$GLOBALS['experiment_actions']  = array();
+$GLOBALS['experiment_enqueued'] = array();
+experiment_check( 'paused experiment emits no attributes', '' === extrachill_experiment_attributes( 'geo-bridge-holdout', 'single-post-bridge' ) );
+experiment_check( 'paused experiment enqueues no assets or hooks', array() === $GLOBALS['experiment_enqueued'] && array() === $GLOBALS['experiment_actions'] );
+$resumed = extrachill_transition_experiment_state( 'geo-bridge-holdout', 1, 'active' );
+experiment_check( 'paused transitions back to active', is_array( $resumed ) && 'active' === $resumed['state'] );
+$completed = extrachill_transition_experiment_state( 'geo-bridge-holdout', 1, 'completed' );
+experiment_check( 'active transitions to completed', is_array( $completed ) && 'completed' === $completed['state'] );
+$GLOBALS['experiment_actions']  = array();
+$GLOBALS['experiment_enqueued'] = array();
+experiment_check( 'completed experiment emits no attributes', '' === extrachill_experiment_attributes( 'geo-bridge-holdout', 'single-post-bridge' ) );
+experiment_check( 'completed experiment enqueues no assets or hooks', array() === $GLOBALS['experiment_enqueued'] && array() === $GLOBALS['experiment_actions'] );
+$restart = extrachill_transition_experiment_state( 'geo-bridge-holdout', 1, 'active' );
+experiment_check( 'completed definition version is terminal', $restart instanceof WP_Error && 'invalid_experiment_state_transition' === $restart->code );
+
+$lifecycle_definition['definition_version'] = 2;
+experiment_check( 'higher code version resets to reviewed default', ! extrachill_experiment_is_active( 'geo-bridge-holdout' ) );
+$version_two = extrachill_transition_experiment_state( 'geo-bridge-holdout', 2, 'active' );
+experiment_check( 'higher code version can restart completed experiment', is_array( $version_two ) && 2 === $version_two['definition_version'] );
+$version_two_paused = extrachill_transition_experiment_state( 'geo-bridge-holdout', 2, 'paused' );
+$version_two_done   = extrachill_transition_experiment_state( 'geo-bridge-holdout', 2, 'completed' );
+experiment_check( 'paused experiment can transition directly to completed', is_array( $version_two_paused ) && is_array( $version_two_done ) && 'completed' === $version_two_done['state'] );
+$stale_transition = extrachill_transition_experiment_state( 'geo-bridge-holdout', 1, 'active' );
+experiment_check( 'stale definition version cannot change live state', $stale_transition instanceof WP_Error && 'experiment_definition_version_mismatch' === $stale_transition->code );
+$unknown_transition = extrachill_transition_experiment_state( 'unknown-option-key', 1, 'active' );
+experiment_check( 'transition rejects arbitrary option keys', $unknown_transition instanceof WP_Error && 'experiment_not_registered' === $unknown_transition->code );
+
+$GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] = 'corrupt';
+experiment_check( 'non-array option corruption fails closed', ! extrachill_experiment_is_active( 'geo-bridge-holdout' ) );
+$corrupt_transition = extrachill_transition_experiment_state( 'geo-bridge-holdout', 2, 'active' );
+experiment_check( 'corrupt option cannot be overwritten by transition', $corrupt_transition instanceof WP_Error && 'invalid_experiment_lifecycle_option' === $corrupt_transition->code );
+$GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] = array(
+	'geo-bridge-holdout' => array(
+		'definition_version' => 2,
+		'state'              => 'unknown',
+	),
+);
+experiment_check( 'unknown stored state fails closed', ! extrachill_experiment_is_active( 'geo-bridge-holdout' ) );
+$GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] = array(
+	'arbitrary-key' => array(
+		'definition_version' => 1,
+		'state'              => 'active',
+	),
+);
+experiment_check( 'unregistered stored option key fails closed', ! extrachill_experiment_is_active( 'geo-bridge-holdout' ) );
+
+$GLOBALS['experiment_site_options'] = array();
+$list                               = extrachill_list_experiments();
+experiment_check( 'admin listing exposes normalized effective state', 1 === count( $list ) && 'inactive' === $list[0]['state'] );
+experiment_check( 'admin listing never exposes eligibility callback', ! isset( $list[0]['eligibility_callback'] ) );
+experiment_check( 'unregistered experiment helper fails closed', ! extrachill_experiment_is_active( 'unregistered' ) );
+
+$list_ability       = $GLOBALS['experiment_abilities']['extrachill/list-experiments'];
+$transition_ability = $GLOBALS['experiment_abilities']['extrachill/transition-experiment-state'];
+experiment_check( 'admin list ability is private by capability', false === $list_ability['permission_callback']() );
+experiment_check( 'admin transition ability rejects extra option properties', false === $transition_ability['input_schema']['additionalProperties'] );
+$GLOBALS['experiment_can_admin'] = true;
+experiment_check( 'network options capability permits lifecycle administration', true === $transition_ability['permission_callback']() );
+
+$lifecycle_definition['default_state'] = 'active';
+$GLOBALS['experiment_site_options']    = array();
+$cache_assignment                      = extrachill_resolve_experiment_assignment( 'geo-bridge-holdout', 'single-post-bridge' );
+$GLOBALS['experiment_external_cache']  = false;
+$GLOBALS['experiment_actions']         = array();
+$cache_failure                         = $ability->execute_exposure(
+	array(
+		'experiment_key'     => 'geo-bridge-holdout',
+		'definition_version' => 2,
+		'assignment_policy'  => 'weighted_random',
+		'variant'            => $cache_assignment['variant'],
+		'surface'            => 'single-post-bridge',
+		'exposure_token'     => $cache_assignment['exposure_token'],
+	)
+);
+experiment_check( 'missing shared cache fails exposure closed', $cache_failure instanceof WP_Error );
+experiment_check( 'cache failure emits no trusted exposure hook', array() === $GLOBALS['experiment_actions'] );
+$GLOBALS['experiment_external_cache'] = true;
 
 if ( $failures > 0 ) {
 	exit( 1 );
