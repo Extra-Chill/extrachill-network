@@ -371,20 +371,17 @@ function extrachill_network_bridge_collect( &$by_site, $term, $taxonomy, $allowe
  *
  * Community is active only on its own site, and switch_to_blog() does not load
  * destination plugins. This consumes Community's documented URL/state contract
- * without loading Community code into source sites: destination plugin state
- * and the destination-local term are verified first, then the canonical network
- * site resolver supplies the URL origin. Community remains authoritative for
- * request validation, composer permissions, and logged-out Users continuation.
+ * without loading Community code into source sites: its destination option
+ * publishes the supported schema, query keys, and taxonomies. Network validates
+ * that marker and the destination-local term, then the canonical site resolver
+ * supplies the URL origin. Community remains authoritative for request
+ * validation, composer permissions, and logged-out Users continuation.
  *
  * @param array $terms_by_taxonomy Map of taxonomy slug => WP_Term[].
  * @return array|null Link data, or null when the contract cannot be verified.
  */
 function extrachill_network_bridge_get_community_composer_fallback( $terms_by_taxonomy ) {
 	foreach ( $terms_by_taxonomy as $taxonomy => $terms ) {
-		if ( ! in_array( $taxonomy, array( 'artist', 'festival', 'location' ), true ) ) {
-			continue;
-		}
-
 		foreach ( $terms as $term ) {
 			if ( ! is_object( $term ) || empty( $term->slug ) || empty( $term->name ) ) {
 				continue;
@@ -429,8 +426,9 @@ function extrachill_network_bridge_get_community_composer_url( $taxonomy, $slug 
 		return '';
 	}
 
-	if ( ! in_array( $taxonomy, array( 'artist', 'festival', 'location' ), true )
+	if ( ! is_string( $taxonomy )
 		|| ! is_string( $slug )
+		|| '' === $taxonomy
 		|| '' === $slug
 		|| sanitize_key( $taxonomy ) !== $taxonomy
 		|| sanitize_title( $slug ) !== $slug ) {
@@ -440,6 +438,7 @@ function extrachill_network_bridge_get_community_composer_url( $taxonomy, $slug 
 	$community_blog_id = (int) ec_get_blog_id( 'community' );
 	$community_url     = ec_get_site_url( 'community' );
 	$community_site    = $community_blog_id ? get_site( $community_blog_id ) : null;
+	$contract          = $community_blog_id ? extrachill_network_bridge_get_community_composer_contract( $community_blog_id ) : null;
 
 	if ( ! $community_blog_id
 		|| ! is_string( $community_url )
@@ -448,7 +447,8 @@ function extrachill_network_bridge_get_community_composer_url( $taxonomy, $slug 
 		|| ! empty( $community_site->deleted )
 		|| ! empty( $community_site->archived )
 		|| ! empty( $community_site->spam )
-		|| ! extrachill_network_bridge_is_community_plugin_active( $community_blog_id ) ) {
+		|| ! $contract
+		|| ! in_array( $taxonomy, $contract['supported_taxonomies'], true ) ) {
 		return '';
 	}
 
@@ -472,26 +472,60 @@ function extrachill_network_bridge_get_community_composer_url( $taxonomy, $slug 
 
 	return add_query_arg(
 		array(
-			'compose'         => 'discussion',
-			'entity_taxonomy' => $taxonomy,
-			'entity_slug'     => $destination_term->slug,
+			$contract['query_parameters']['action']   => $contract['action'],
+			$contract['query_parameters']['taxonomy'] => $taxonomy,
+			$contract['query_parameters']['slug']     => $destination_term->slug,
 		),
 		trailingslashit( $community_url )
 	);
 }
 
 /**
- * Whether the Community-owned composer contract is installed on its site.
+ * Read and validate Community's deployment-discoverable composer contract.
  *
  * @param int $community_blog_id Community blog ID.
- * @return bool True when the Community plugin is active for the destination.
+ * @return array|null Supported contract, or null when absent or incompatible.
  */
-function extrachill_network_bridge_is_community_plugin_active( $community_blog_id ) {
-	$plugin_file     = 'extrachill-community/extrachill-community.php';
-	$network_plugins = (array) get_site_option( 'active_sitewide_plugins', array() );
-	$site_plugins    = (array) get_blog_option( $community_blog_id, 'active_plugins', array() );
+function extrachill_network_bridge_get_community_composer_contract( $community_blog_id ) {
+	$contract = get_blog_option( $community_blog_id, 'extrachill_community_discussion_composer_contract', null );
+	if ( ! is_array( $contract )
+		|| 1 !== ( $contract['schema_version'] ?? null )
+		|| ! is_string( $contract['action'] ?? null )
+		|| '' === $contract['action']
+		|| sanitize_key( $contract['action'] ) !== $contract['action']
+		|| ! is_array( $contract['query_parameters'] ?? null )
+		|| ! is_array( $contract['supported_taxonomies'] ?? null )
+		|| array() === $contract['supported_taxonomies'] ) {
+		return null;
+	}
 
-	return isset( $network_plugins[ $plugin_file ] ) || in_array( $plugin_file, $site_plugins, true );
+	$query_parameters = $contract['query_parameters'];
+	$query_keys       = array_keys( $query_parameters );
+	sort( $query_keys );
+	if ( array( 'action', 'slug', 'taxonomy' ) !== $query_keys ) {
+		return null;
+	}
+
+	foreach ( $query_parameters as $key ) {
+		if ( ! is_string( $key ) || '' === $key || sanitize_key( $key ) !== $key ) {
+			return null;
+		}
+	}
+
+	if ( count( $query_parameters ) !== count( array_unique( $query_parameters ) ) ) {
+		return null;
+	}
+
+	foreach ( $contract['supported_taxonomies'] as $taxonomy ) {
+		if ( ! is_string( $taxonomy ) || '' === $taxonomy || sanitize_key( $taxonomy ) !== $taxonomy ) {
+			return null;
+		}
+	}
+	if ( count( $contract['supported_taxonomies'] ) !== count( array_unique( $contract['supported_taxonomies'] ) ) ) {
+		return null;
+	}
+
+	return $contract;
 }
 
 /**

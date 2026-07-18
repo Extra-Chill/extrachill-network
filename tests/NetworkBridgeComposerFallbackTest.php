@@ -23,8 +23,17 @@ class WP_Site {
 
 $GLOBALS['ec_test_blog_id']          = 1;
 $GLOBALS['ec_test_blog_stack']       = array();
-$GLOBALS['ec_test_community_active'] = true;
 $GLOBALS['ec_test_community_site']   = true;
+$GLOBALS['ec_test_contract']         = array(
+	'schema_version'       => 1,
+	'action'               => 'discussion',
+	'query_parameters'     => array(
+		'action'   => 'compose',
+		'taxonomy' => 'entity_taxonomy',
+		'slug'     => 'entity_slug',
+	),
+	'supported_taxonomies' => array( 'location', 'festival', 'artist' ),
+);
 $GLOBALS['ec_test_community_terms']  = array(
 	'artist' => array( 'phish' => new WP_Term( 102, 'phish', 'Phish' ) ),
 );
@@ -43,10 +52,9 @@ function get_current_blog_id(): int { return $GLOBALS['ec_test_blog_id']; }
 function ec_get_blog_id( string $key ): int { return 'community' === $key ? 2 : 0; }
 function ec_get_site_url( string $key ): ?string { return 'community' === $key ? 'https://community.extrachill.com' : null; }
 function get_site( int $blog_id ): ?WP_Site { return 2 === $blog_id && $GLOBALS['ec_test_community_site'] ? new WP_Site() : null; }
-function get_site_option( string $key, $default = false ) { return $default; }
 function get_blog_option( int $blog_id, string $key, $default = false ) {
-	return 2 === $blog_id && 'active_plugins' === $key && $GLOBALS['ec_test_community_active']
-		? array( 'extrachill-community/extrachill-community.php' )
+	return 2 === $blog_id && 'extrachill_community_discussion_composer_contract' === $key
+		? $GLOBALS['ec_test_contract']
 		: $default;
 }
 function switch_to_blog( int $blog_id ): void {
@@ -122,10 +130,29 @@ $missing = extrachill_network_bridge_build_cards(
 );
 bridge_assert( array() === $missing, 'A missing destination term must fail closed.' );
 
-$GLOBALS['ec_test_community_active'] = false;
-$absent                              = extrachill_network_bridge_build_cards( $terms, array( 'community' ), array( 'community' ), 'blog' );
-bridge_assert( array() === $absent, 'An absent Community plugin must fail closed.' );
-$GLOBALS['ec_test_community_active'] = true;
+$valid_contract              = $GLOBALS['ec_test_contract'];
+$GLOBALS['ec_test_contract'] = null;
+$absent                      = extrachill_network_bridge_build_cards( $terms, array( 'community' ), array( 'community' ), 'blog' );
+bridge_assert( array() === $absent, 'An absent Community contract marker must fail closed.' );
+
+$GLOBALS['ec_test_contract']                   = $valid_contract;
+$GLOBALS['ec_test_contract']['schema_version'] = 2;
+$unsupported_version                           = extrachill_network_bridge_build_cards( $terms, array( 'community' ), array( 'community' ), 'blog' );
+bridge_assert( array() === $unsupported_version, 'An unsupported Community contract schema must fail closed.' );
+
+$GLOBALS['ec_test_contract']                     = $valid_contract;
+$GLOBALS['ec_test_contract']['query_parameters'] = array(
+	'action'   => 'compose',
+	'taxonomy' => 'entity',
+);
+$malformed_query_topology                        = extrachill_network_bridge_build_cards( $terms, array( 'community' ), array( 'community' ), 'blog' );
+bridge_assert( array() === $malformed_query_topology, 'A malformed query-key contract must fail closed.' );
+
+$GLOBALS['ec_test_contract']                         = $valid_contract;
+$GLOBALS['ec_test_contract']['supported_taxonomies'] = array( 'festival', 'location' );
+$unsupported_taxonomy_topology                       = extrachill_network_bridge_build_cards( $terms, array( 'community' ), array( 'community' ), 'blog' );
+bridge_assert( array() === $unsupported_taxonomy_topology, 'A marker that does not support the entity taxonomy must fail closed.' );
+$GLOBALS['ec_test_contract'] = $valid_contract;
 
 $GLOBALS['ec_test_community_site'] = false;
 $missing_site                      = extrachill_network_bridge_build_cards( $terms, array( 'community' ), array( 'community' ), 'blog' );
