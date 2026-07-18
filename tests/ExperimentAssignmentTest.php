@@ -15,22 +15,22 @@ define( 'ABSPATH', __DIR__ . '/' );
 define( 'EXTRACHILL_NETWORK_PLUGIN_DIR', dirname( __DIR__ ) . '/' );
 define( 'EXTRACHILL_NETWORK_PLUGIN_URL', 'https://example.com/wp-content/plugins/extrachill-network/' );
 
-$GLOBALS['experiment_filters']               = array();
-$GLOBALS['experiment_user_id']               = 0;
-$GLOBALS['experiment_blog_id']               = 1;
-$GLOBALS['experiment_enqueued']              = array();
-$GLOBALS['experiment_abilities']             = array();
-$GLOBALS['experiment_actions']               = array();
-$GLOBALS['experiment_cache']                 = array();
-$GLOBALS['experiment_cache_adds']            = array();
-$GLOBALS['experiment_external_cache']        = true;
-$GLOBALS['experiment_site_options']          = array();
-$GLOBALS['experiment_can_admin']             = false;
-$GLOBALS['experiment_option_cache']          = array();
-$GLOBALS['experiment_simulate_option_cache'] = false;
-$GLOBALS['experiment_cache_deletes']         = array();
-$GLOBALS['experiment_cache_set_success']     = true;
-$GLOBALS['experiment_cache_delete_success']  = true;
+$GLOBALS['experiment_filters']                   = array();
+$GLOBALS['experiment_user_id']                   = 0;
+$GLOBALS['experiment_blog_id']                   = 1;
+$GLOBALS['experiment_enqueued']                  = array();
+$GLOBALS['experiment_abilities']                 = array();
+$GLOBALS['experiment_actions']                   = array();
+$GLOBALS['experiment_cache']                     = array();
+$GLOBALS['experiment_cache_adds']                = array();
+$GLOBALS['experiment_external_cache']            = true;
+$GLOBALS['experiment_site_options']              = array();
+$GLOBALS['experiment_can_admin']                 = false;
+$GLOBALS['experiment_option_cache']              = array();
+$GLOBALS['experiment_simulate_option_cache']     = false;
+$GLOBALS['experiment_cache_deletes']             = array();
+$GLOBALS['experiment_cache_set_success']         = true;
+$GLOBALS['experiment_cache_delete_success']      = true;
 $GLOBALS['experiment_post_write_cache_mismatch'] = false;
 $GLOBALS['experiment_durable_read_failure']      = false;
 $GLOBALS['experiment_durable_write_mismatch']    = false;
@@ -77,7 +77,7 @@ class ExperimentWpdb {
 			return null;
 		}
 
-		return (object) array( 'meta_value' => maybe_serialize( $GLOBALS['experiment_site_options'][ $name ] ) );
+		return (object) array( 'meta_value' => maybe_serialize( $GLOBALS['experiment_site_options'][ $name ] ) ); // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Fixture mirrors the exact sitemeta row shape.
 	}
 }
 
@@ -117,14 +117,14 @@ function update_site_option( $name, $value ) {
 	return true;
 }
 function maybe_serialize( $value ) {
-	return is_array( $value ) || is_object( $value ) ? serialize( $value ) : $value;
+	return is_array( $value ) || is_object( $value ) ? serialize( $value ) : $value; // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize -- Fixture mirrors Core option serialization.
 }
 function maybe_unserialize( $value ) {
 	if ( ! is_string( $value ) || ! preg_match( '/^[aObisCdN]:/', $value ) ) {
 		return $value;
 	}
 
-	return unserialize( $value );
+	return unserialize( $value ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_unserialize -- Fixture input is locally serialized test data.
 }
 function current_user_can( $capability ) {
 	return 'manage_network_options' === $capability && $GLOBALS['experiment_can_admin'];
@@ -871,13 +871,13 @@ $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] = 
 	),
 );
 $GLOBALS['experiment_simulate_option_cache']                                  = true;
-$GLOBALS['experiment_option_cache']  = array();
-$GLOBALS['experiment_cache_deletes'] = array();
-$preloaded_stale_snapshot            = get_site_option( EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION );
-$notoptions_key                      = get_current_network_id() . ':notoptions';
+$GLOBALS['experiment_option_cache']                    = array();
+$GLOBALS['experiment_cache_deletes']                   = array();
+$preloaded_stale_snapshot                              = get_site_option( EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION );
+$notoptions_key                                        = get_current_network_id() . ':notoptions';
 $GLOBALS['experiment_option_cache'][ $notoptions_key ] = array( EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION => true );
 experiment_check( 'request A preloads stale lifecycle cache before lock', 'inactive' === $preloaded_stale_snapshot['unrelated-experiment']['state'] );
-$query_count_before_stale = count( $GLOBALS['wpdb']->queries );
+$query_count_before_stale    = count( $GLOBALS['wpdb']->queries );
 $GLOBALS['wpdb']->on_acquire = static function (): void {
 	// Request B commits durable state while request A still holds its stale local cache.
 	$GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ]['unrelated-experiment']['state'] = 'active';
@@ -891,45 +891,45 @@ experiment_check( 'successful update restores lifecycle cache coherence', $GLOBA
 experiment_check( 'successful update removes stale exact notoptions marker', ! isset( $GLOBALS['experiment_option_cache'][ $notoptions_key ][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] ) );
 
 $GLOBALS['experiment_option_cache'][ $coherent_cache_key ] = array( 'stale' => true );
-$GLOBALS['experiment_cache_delete_success']                 = false;
-$GLOBALS['experiment_actions']                              = array();
-$cache_delete_failure = extrachill_transition_experiment_state( 'unrelated-experiment', 1, 'paused' );
+$GLOBALS['experiment_cache_delete_success']                = false;
+$GLOBALS['experiment_actions']                             = array();
+$cache_delete_failure                                      = extrachill_transition_experiment_state( 'unrelated-experiment', 1, 'paused' );
 experiment_check( 'cache delete failure returns error and suppresses audit', $cache_delete_failure instanceof WP_Error && 'experiment_lifecycle_cache_sync_failed' === $cache_delete_failure->code && array() === $GLOBALS['experiment_actions'] );
 $GLOBALS['experiment_cache_delete_success'] = true;
 unset( $GLOBALS['experiment_option_cache'][ $coherent_cache_key ] );
 
 $GLOBALS['experiment_cache_set_success'] = false;
 $GLOBALS['experiment_actions']           = array();
-$cache_restore_failure = extrachill_transition_experiment_state( 'unrelated-experiment', 1, 'paused' );
+$cache_restore_failure                   = extrachill_transition_experiment_state( 'unrelated-experiment', 1, 'paused' );
 experiment_check( 'cache set failure returns error and suppresses audit', $cache_restore_failure instanceof WP_Error && 'experiment_lifecycle_cache_sync_failed' === $cache_restore_failure->code && array() === $GLOBALS['experiment_actions'] );
 $GLOBALS['experiment_cache_set_success'] = true;
 
 $GLOBALS['experiment_durable_read_failure'] = true;
 $GLOBALS['experiment_actions']              = array();
-$query_count_before_read_failure             = count( $GLOBALS['wpdb']->queries );
-$durable_read_failure                        = extrachill_transition_experiment_state( 'unrelated-experiment', 1, 'paused' );
+$query_count_before_read_failure            = count( $GLOBALS['wpdb']->queries );
+$durable_read_failure                       = extrachill_transition_experiment_state( 'unrelated-experiment', 1, 'paused' );
 experiment_check( 'durable read failure returns error and suppresses audit', $durable_read_failure instanceof WP_Error && 'experiment_lifecycle_durable_read_failed' === $durable_read_failure->code && array() === $GLOBALS['experiment_actions'] );
 experiment_check( 'durable read failure still releases lock in finally', false !== strpos( $GLOBALS['wpdb']->queries[ count( $GLOBALS['wpdb']->queries ) - 1 ]['query'], 'RELEASE_LOCK' ) && count( $GLOBALS['wpdb']->queries ) === $query_count_before_read_failure + 3 );
 $GLOBALS['experiment_durable_read_failure'] = false;
 
-$durable_baseline = $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ];
+$durable_baseline                             = $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ];
 $GLOBALS['experiment_durable_write_mismatch'] = true;
 $GLOBALS['experiment_actions']                = array();
-$durable_write_mismatch = extrachill_transition_experiment_state( 'unrelated-experiment', 1, 'paused' );
+$durable_write_mismatch                       = extrachill_transition_experiment_state( 'unrelated-experiment', 1, 'paused' );
 experiment_check( 'durable post-write mismatch returns error and suppresses audit', $durable_write_mismatch instanceof WP_Error && 'experiment_lifecycle_durable_write_mismatch' === $durable_write_mismatch->code && array() === $GLOBALS['experiment_actions'] );
-$GLOBALS['experiment_durable_write_mismatch'] = false;
+$GLOBALS['experiment_durable_write_mismatch']                                 = false;
 $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] = $durable_baseline;
 
 $GLOBALS['experiment_post_write_cache_mismatch'] = true;
 $GLOBALS['experiment_write_completed']           = false;
 $GLOBALS['experiment_actions']                   = array();
-$post_write_cache_mismatch = extrachill_transition_experiment_state( 'unrelated-experiment', 1, 'paused' );
+$post_write_cache_mismatch                       = extrachill_transition_experiment_state( 'unrelated-experiment', 1, 'paused' );
 experiment_check( 'post-write cache mismatch returns error and suppresses audit', $post_write_cache_mismatch instanceof WP_Error && 'experiment_lifecycle_cache_sync_failed' === $post_write_cache_mismatch->code && array() === $GLOBALS['experiment_actions'] );
-$GLOBALS['experiment_post_write_cache_mismatch'] = false;
-$GLOBALS['experiment_write_completed']           = false;
+$GLOBALS['experiment_post_write_cache_mismatch']                              = false;
+$GLOBALS['experiment_write_completed']                                        = false;
 $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] = $durable_baseline;
-$GLOBALS['experiment_simulate_option_cache'] = false;
-$GLOBALS['experiment_option_cache']          = array();
+$GLOBALS['experiment_simulate_option_cache']                                  = false;
+$GLOBALS['experiment_option_cache'] = array();
 
 $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] = array(
 	'geo-bridge-holdout'   => array(

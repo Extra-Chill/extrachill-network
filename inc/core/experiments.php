@@ -533,13 +533,19 @@ function extrachill_read_experiment_lifecycle_option_durable() {
 		return new \WP_Error( 'experiment_lifecycle_durable_read_failed', __( 'Experiment lifecycle storage could not be read.', 'extrachill-network' ), array( 'status' => 500 ) );
 	}
 	if ( null === $row ) {
-		return array( 'exists' => false, 'value' => false );
+		return array(
+			'exists' => false,
+			'value'  => false,
+		);
 	}
 	if ( ! is_object( $row ) || ! property_exists( $row, 'meta_value' ) ) {
 		return new \WP_Error( 'experiment_lifecycle_durable_read_failed', __( 'Experiment lifecycle storage could not be read.', 'extrachill-network' ), array( 'status' => 500 ) );
 	}
 
-	return array( 'exists' => true, 'value' => maybe_unserialize( $row->meta_value ) );
+	return array(
+		'exists' => true,
+		'value'  => maybe_unserialize( $row->meta_value ),
+	);
 }
 
 /**
@@ -547,6 +553,7 @@ function extrachill_read_experiment_lifecycle_option_durable() {
  *
  * @param array{exists: bool, value: mixed} $snapshot Durable option snapshot.
  * @return true|\WP_Error True on success, otherwise a fail-closed error.
+ * @throws \RuntimeException When a cache operation or verification fails internally.
  */
 function extrachill_restore_experiment_lifecycle_option_cache( array $snapshot ) {
 	$keys = extrachill_experiment_lifecycle_cache_keys();
@@ -579,7 +586,7 @@ function extrachill_restore_experiment_lifecycle_option_cache( array $snapshot )
 			$snapshot['exists'] !== $found
 			|| ( $snapshot['exists'] && $snapshot['value'] !== $cached_value )
 			|| ! is_array( $notoptions )
-			|| $snapshot['exists'] === isset( $notoptions[ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] )
+			|| isset( $notoptions[ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] ) === $snapshot['exists']
 		) {
 			throw new \RuntimeException( 'cache verification failed' );
 		}
