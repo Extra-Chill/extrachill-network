@@ -136,7 +136,10 @@
 	 * @param {Element} link Bridge link element.
 	 */
 	function expose( link ) {
-		if ( exposedLinks.indexOf( link ) !== -1 || isUnavailable( link ) ) {
+		if ( exposedLinks.indexOf( link ) !== -1 ) {
+			return true;
+		}
+		if ( isUnavailable( link ) ) {
 			return false;
 		}
 
