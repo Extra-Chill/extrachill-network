@@ -17,7 +17,7 @@
 		}
 	},
 	"scripts": {
-		"test": "php tests/FrontendPathResolverTest.php && php tests/FrontendPathResolverRuntimeTest.php && php tests/AdPolicyTest.php",
+		"test": "php tests/FrontendPathResolverTest.php && php tests/FrontendPathResolverRuntimeTest.php && php tests/AdPolicyTest.php && php tests/NetworkBridgeComposerFallbackTest.php",
 		"lint:php": "phpcs --standard=WordPress --exclude=WordPress.Files.FileName inc/core/frontend-path-resolver.php inc/core/ad-policy.php inc/integrations/ad-delivery.php inc/integrations/member-ad-benefit.php inc/Abilities/AdPolicyAbility.php admin/network-ad-settings.php && php -l tests/FrontendPathResolverTest.php && php -l tests/FrontendPathResolverRuntimeProbe.php && php -l tests/FrontendPathResolverRuntimeTest.php && php -l tests/FrontendPathResolverTransportProbe.php && php -l tests/AdPolicyTest.php",
 		"lint:fix": "phpcbf --standard=WordPress ."
 	},
