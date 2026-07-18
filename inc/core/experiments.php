@@ -4,8 +4,8 @@
  *
  * Network owns allocation only. Consumers register code-owned definitions and
  * decide eligibility; identity/privacy providers contribute through generic
- * filters; measurement consumers listen for browser events without Network
- * persisting them.
+ * filters; measurement consumers listen to trusted server hooks without
+ * Network persisting outcomes.
  *
  * @package ExtraChillNetwork
  */
@@ -13,6 +13,24 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
+
+/**
+ * Maximum accepted value for one variant weight.
+ *
+ * This is deliberately far below the 2^32 hash draw.
+ */
+const EXTRACHILL_EXPERIMENT_MAX_VARIANT_WEIGHT = 500000;
+
+/**
+ * Maximum accepted sum of all variant weights.
+ *
+ * This keeps addition overflow checks explicit and the allocation range safely
+ * below the 2^32 hash draw used by rejection sampling.
+ */
+const EXTRACHILL_EXPERIMENT_MAX_TOTAL_WEIGHT = 1000000;
+
+/** Short lifetime for a browser exposure proof. */
+const EXTRACHILL_EXPERIMENT_EXPOSURE_TOKEN_TTL = 3600;
 
 /**
  * Return registered experiment definitions.
@@ -77,6 +95,8 @@ function extrachill_normalize_experiment_definition( $definition ) {
 			|| 1 !== preg_match( '/^[a-z0-9][a-z0-9_-]{0,63}$/', $variant )
 			|| ! is_int( $weight )
 			|| $weight <= 0
+			|| $weight > EXTRACHILL_EXPERIMENT_MAX_VARIANT_WEIGHT
+			|| $total_weight > EXTRACHILL_EXPERIMENT_MAX_TOTAL_WEIGHT - $weight
 		) {
 			return null;
 		}
@@ -130,6 +150,40 @@ function extrachill_experiment_variant_for_bucket( array $definition, $bucket ) 
 }
 
 /**
+ * Convert a deterministic seed to an unbiased zero-based bucket.
+ *
+ * SHA-256 supplies successive unsigned 32-bit draws. Values in the incomplete
+ * high tail are rejected before modulo reduction, so every bucket receives the
+ * same number of possible draws. Rehashing with a counter supplies more draws
+ * without a biased fallback.
+ *
+ * @param string $seed  Deterministic allocation seed.
+ * @param int    $total Number of buckets.
+ * @return int|null Unbiased bucket, or null for an invalid total.
+ */
+function extrachill_experiment_unbiased_bucket( $seed, $total ) {
+	$total = (int) $total;
+	if ( $total <= 0 || $total > EXTRACHILL_EXPERIMENT_MAX_TOTAL_WEIGHT ) {
+		return null;
+	}
+
+	$range = 4294967296;
+	$limit = $range - ( $range % $total );
+	$round = 0;
+
+	while ( true ) {
+		$hash = hash( 'sha256', $seed . "\0" . $round );
+		for ( $offset = 0; $offset < 64; $offset += 8 ) {
+			$draw = hexdec( substr( $hash, $offset, 8 ) );
+			if ( $draw < $limit ) {
+				return (int) ( $draw % $total );
+			}
+		}
+		++$round;
+	}
+}
+
+/**
  * Pure deterministic allocation from an explicit subject key.
  *
  * Blog/site identity is intentionally absent from the hash, so a subject keeps
@@ -148,10 +202,141 @@ function extrachill_allocate_experiment_variant( $experiment_key, array $definit
 		return $default;
 	}
 
-	$hash   = hash( 'sha256', $experiment_key . "\0" . $subject_key );
-	$bucket = (int) ( hexdec( substr( $hash, 0, 8 ) ) % $total );
+	$bucket = extrachill_experiment_unbiased_bucket( $experiment_key . "\0" . $subject_key, $total );
+	if ( null === $bucket ) {
+		return $default;
+	}
 
 	return extrachill_experiment_variant_for_bucket( $definition, $bucket );
+}
+
+/**
+ * Resolve the current request's explicit subject and privacy eligibility.
+ *
+ * @param string               $experiment_key Experiment key.
+ * @param string               $surface        Registered surface.
+ * @param array<string, mixed> $context        Consumer context.
+ * @return string Eligible subject key, or an empty string.
+ */
+function extrachill_experiment_subject( $experiment_key, $surface, array $context ) {
+	$user_id     = function_exists( 'get_current_user_id' ) ? (int) get_current_user_id() : 0;
+	$subject_key = $user_id > 0 ? 'wp-user:' . $user_id : '';
+	$subject_key = (string) apply_filters(
+		'extrachill_experiment_subject_key',
+		$subject_key,
+		$experiment_key,
+		$surface,
+		$context
+	);
+	$subject_key = trim( $subject_key );
+	$eligible    = (bool) apply_filters(
+		'extrachill_experiment_measurement_eligible',
+		false,
+		$experiment_key,
+		$surface,
+		$context
+	);
+
+	return '' !== $subject_key && strlen( $subject_key ) <= 256 && $eligible ? $subject_key : '';
+}
+
+/**
+ * Canonicalize bounded scalar context for exposure signing.
+ *
+ * @param array<string, mixed> $context Consumer context.
+ * @return string Canonical JSON.
+ */
+function extrachill_experiment_context_json( array $context ) {
+	$bounded = array();
+	foreach ( $context as $key => $value ) {
+		if ( is_string( $key ) && is_scalar( $value ) && ! is_null( $value ) ) {
+			$bounded[ $key ] = $value;
+		}
+	}
+	ksort( $bounded, SORT_STRING );
+
+	return (string) wp_json_encode( $bounded );
+}
+
+/**
+ * Create a short-lived proof binding exposure to a server assignment.
+ *
+ * @param array<string, string> $metadata    Assignment metadata.
+ * @param string                $subject_key Resolved subject key.
+ * @param array<string, mixed>  $context     Consumer context.
+ * @param int|null              $issued_at   Optional issue time for tests.
+ * @return string Signed exposure token.
+ */
+function extrachill_experiment_exposure_token( array $metadata, $subject_key, array $context, $issued_at = null ) {
+	$issued_at = null === $issued_at ? time() : (int) $issued_at;
+	$message   = implode(
+		"\0",
+		array(
+			$metadata['experiment_key'],
+			$metadata['variant'],
+			$metadata['surface'],
+			(string) $issued_at,
+			extrachill_experiment_context_json( $context ),
+			$subject_key,
+		)
+	);
+	$signature = hash_hmac( 'sha256', $message, wp_salt( 'auth' ) );
+
+	return $issued_at . '.' . $signature;
+}
+
+/**
+ * Validate an exposure proof and return trusted bounded metadata.
+ *
+ * @param string               $experiment_key Experiment key.
+ * @param string               $variant        Assigned variant.
+ * @param string               $surface        Registered surface.
+ * @param array<string, mixed> $context        Consumer context.
+ * @param string               $token          Signed assignment proof.
+ * @param int|null             $now            Optional current time for tests.
+ * @return array<string, string>|null Trusted metadata, or null when invalid.
+ */
+function extrachill_validate_experiment_exposure( $experiment_key, $variant, $surface, array $context, $token, $now = null ) {
+	if ( 1 !== preg_match( '/^(\d{10})\.([a-f0-9]{64})$/', (string) $token, $matches ) ) {
+		return null;
+	}
+
+	$now       = null === $now ? time() : (int) $now;
+	$issued_at = (int) $matches[1];
+	if ( $issued_at > $now + 60 || $issued_at < $now - EXTRACHILL_EXPERIMENT_EXPOSURE_TOKEN_TTL ) {
+		return null;
+	}
+
+	$definitions = extrachill_get_experiment_definitions();
+	$definition  = isset( $definitions[ $experiment_key ] )
+		? extrachill_normalize_experiment_definition( $definitions[ $experiment_key ] )
+		: null;
+	if (
+		null === $definition
+		|| ! in_array( $surface, $definition['surfaces'], true )
+		|| ! isset( $definition['variants'][ $variant ] )
+	) {
+		return null;
+	}
+
+	try {
+		$eligible = (bool) call_user_func( $definition['eligibility_callback'], $context, $surface );
+	} catch ( \Throwable $error ) {
+		$eligible = false;
+	}
+	$subject_key = $eligible ? extrachill_experiment_subject( $experiment_key, $surface, $context ) : '';
+	if ( '' === $subject_key || extrachill_allocate_experiment_variant( $experiment_key, $definition, $subject_key ) !== $variant ) {
+		return null;
+	}
+
+	$metadata = array(
+		'experiment_key' => (string) $experiment_key,
+		'variant'        => (string) $variant,
+		'surface'        => (string) $surface,
+	);
+	$expected = extrachill_experiment_exposure_token( $metadata, $subject_key, $context, $issued_at );
+
+	return hash_equals( $expected, (string) $token ) ? $metadata : null;
 }
 
 /**
@@ -174,6 +359,7 @@ function extrachill_resolve_experiment_assignment( $experiment_key, $surface, ar
 			'variant'              => 'control',
 			'surface'              => $surface,
 			'measurement_eligible' => false,
+			'exposure_token'       => '',
 		);
 	}
 
@@ -191,6 +377,7 @@ function extrachill_resolve_experiment_assignment( $experiment_key, $surface, ar
 		'variant'              => $fallback,
 		'surface'              => $surface,
 		'measurement_eligible' => false,
+		'exposure_token'       => '',
 	);
 	$definition     = extrachill_normalize_experiment_definition( $raw_definition );
 
@@ -209,30 +396,33 @@ function extrachill_resolve_experiment_assignment( $experiment_key, $surface, ar
 		return $result;
 	}
 
-	$user_id          = function_exists( 'get_current_user_id' ) ? (int) get_current_user_id() : 0;
-	$subject_key      = $user_id > 0 ? 'wp-user:' . $user_id : '';
-	$subject_key      = (string) apply_filters(
-		'extrachill_experiment_subject_key',
-		$subject_key,
-		$experiment_key,
-		$surface,
-		$context
-	);
-	$subject_key      = trim( $subject_key );
-	$privacy_eligible = (bool) apply_filters(
-		'extrachill_experiment_measurement_eligible',
-		false,
-		$experiment_key,
-		$surface,
-		$context
-	);
-
-	if ( '' === $subject_key || strlen( $subject_key ) > 256 || ! $privacy_eligible ) {
+	$subject_key = extrachill_experiment_subject( $experiment_key, $surface, $context );
+	if ( '' === $subject_key ) {
 		return $result;
 	}
 
-	$result['variant']              = extrachill_allocate_experiment_variant( $experiment_key, $definition, $subject_key );
+	$metadata = array(
+		'experiment_key' => $experiment_key,
+		'variant'        => extrachill_allocate_experiment_variant( $experiment_key, $definition, $subject_key ),
+		'surface'        => $surface,
+	);
+	$token    = extrachill_experiment_exposure_token( $metadata, $subject_key, $context );
+	if ( '' === $token ) {
+		return $result;
+	}
+
+	$result['variant']              = $metadata['variant'];
 	$result['measurement_eligible'] = true;
+	$result['exposure_token']       = $token;
+	/**
+	 * Fires after a privacy-eligible assignment is resolved server-side.
+	 *
+	 * Analytics may consume this hook for persistence. The payload deliberately
+	 * excludes subject identity and consumer context.
+	 *
+	 * @param array{experiment_key: string, variant: string, surface: string} $metadata Bounded assignment metadata.
+	 */
+	do_action( 'extrachill_experiment_assignment', $metadata );
 
 	return $result;
 }
@@ -260,7 +450,8 @@ function extrachill_register_experiment_assignment_script() {
 		'extrachill-experiment-assignment',
 		'ecExperimentAssignment',
 		array(
-			'endpoint' => rest_url( 'wp-abilities/v1/abilities/extrachill/resolve-experiment-assignment/run' ),
+			'assignmentEndpoint' => rest_url( 'wp-abilities/v1/abilities/extrachill/resolve-experiment-assignment/run' ),
+			'exposureEndpoint'   => rest_url( 'wp-abilities/v1/abilities/extrachill/record-experiment-exposure/run' ),
 		)
 	);
 }

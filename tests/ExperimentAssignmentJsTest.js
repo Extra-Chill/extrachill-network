@@ -41,7 +41,7 @@ function createElement() {
 	};
 }
 
-function createHarness( result ) {
+function createHarness( result, exposureAccepted = true ) {
 	const element = createElement();
 	const requests = [];
 	const observers = [];
@@ -55,12 +55,18 @@ function createHarness( result ) {
 	}
 
 	const window = {
-		ecExperimentAssignment: { endpoint: '/assignment' },
+		ecExperimentAssignment: {
+			assignmentEndpoint: '/assignment',
+			exposureEndpoint: '/exposure',
+		},
 		fetch( url, options ) {
 			requests.push( { url, options } );
+			const response = url === '/exposure'
+				? { accepted: exposureAccepted }
+				: result;
 			return Promise.resolve( {
 				ok: true,
-				json: () => Promise.resolve( result ),
+				json: () => Promise.resolve( response ),
 			} );
 		},
 		IntersectionObserver: class {
@@ -105,6 +111,7 @@ async function run() {
 		variant: 'treatment',
 		surface: 'single-post-bridge',
 		measurement_eligible: true,
+		exposure_token: '1700000000.' + 'a'.repeat( 64 ),
 	} );
 
 	check(
@@ -138,8 +145,13 @@ async function run() {
 	assigned.observers[ 0 ].callback( [
 		{ isIntersecting: true, intersectionRatio: 0.5 },
 	] );
+	check( 'viewport visibility alone is not trusted exposure', assigned.element.events.length === 1 );
+	check( 'viewport visibility calls the signed exposure ability', assigned.requests.length === 2 && assigned.requests[ 1 ].url === '/exposure' );
+	const exposureInput = JSON.parse( assigned.requests[ 1 ].options.body ).input;
+	check( 'exposure request carries the server-issued proof', exposureInput.exposure_token === '1700000000.' + 'a'.repeat( 64 ) );
+	await flushPromises();
 	check(
-		'actual viewport exposure emits separately',
+		'server-accepted viewport exposure emits separately',
 		assigned.element.events.length === 2 &&
 			assigned.element.events[ 1 ].type === 'extrachill:experiment-exposure'
 	);
@@ -150,6 +162,7 @@ async function run() {
 		variant: 'control',
 		surface: 'single-post-bridge',
 		measurement_eligible: false,
+		exposure_token: '',
 	} );
 	await flushPromises();
 	check(
@@ -158,6 +171,20 @@ async function run() {
 	);
 	check( 'privacy-excluded response emits no events', excluded.element.events.length === 0 );
 	check( 'privacy-excluded response starts no exposure observer', excluded.observers.length === 0 );
+
+	const rejected = createHarness( {
+		experiment_key: 'geo-bridge-holdout',
+		variant: 'treatment',
+		surface: 'single-post-bridge',
+		measurement_eligible: true,
+		exposure_token: '1700000000.' + 'b'.repeat( 64 ),
+	}, false );
+	await flushPromises();
+	rejected.observers[ 0 ].callback( [
+		{ isIntersecting: true, intersectionRatio: 1 },
+	] );
+	await flushPromises();
+	check( 'server-rejected exposure emits no exposure event', rejected.element.events.length === 1 );
 
 	if ( failures > 0 ) {
 		process.exit( 1 );
