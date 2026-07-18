@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.7.0] - 2026-07-18
+
+### Added
+- complete experiment lifecycle primitive
+- add cache-safe experiment assignment
+- add Community composer fallback to empty bridges
+- add artist profile discussions
+
+### Fixed
+- ignore hidden bridge impressions
+- align bridge exposure and CTR semantics
+
 ## [2.6.0] - 2026-07-15
 
 ### Added
