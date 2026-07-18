@@ -31,12 +31,18 @@ $GLOBALS['experiment_simulate_option_cache'] = false;
 $GLOBALS['experiment_cache_deletes']         = array();
 $GLOBALS['experiment_cache_set_success']     = true;
 $GLOBALS['experiment_cache_delete_success']  = true;
+$GLOBALS['experiment_post_write_cache_mismatch'] = false;
+$GLOBALS['experiment_durable_read_failure']      = false;
+$GLOBALS['experiment_durable_write_mismatch']    = false;
+$GLOBALS['experiment_write_completed']           = false;
 
 class ExperimentWpdb {
 	public int $acquire_result = 1;
 	public int $release_result = 1;
 	public array $queries      = array();
 	public $on_acquire         = null;
+	public string $sitemeta    = 'wp_sitemeta';
+	public string $last_error  = '';
 
 	public function prepare( $query, ...$args ) {
 		return array(
@@ -57,6 +63,21 @@ class ExperimentWpdb {
 		}
 
 		return $this->release_result;
+	}
+
+	public function get_row( $prepared ) {
+		$this->queries[] = $prepared;
+		if ( $GLOBALS['experiment_durable_read_failure'] ) {
+			$this->last_error = 'simulated durable read failure';
+			return null;
+		}
+		$this->last_error = '';
+		$name             = $prepared['args'][1];
+		if ( ! array_key_exists( $name, $GLOBALS['experiment_site_options'] ) ) {
+			return null;
+		}
+
+		return (object) array( 'meta_value' => maybe_serialize( $GLOBALS['experiment_site_options'][ $name ] ) );
 	}
 }
 
@@ -88,11 +109,22 @@ function get_site_option( $name, $fallback = false ) {
 	return array_key_exists( $name, $GLOBALS['experiment_site_options'] ) ? $GLOBALS['experiment_site_options'][ $name ] : $fallback;
 }
 function update_site_option( $name, $value ) {
-	$GLOBALS['experiment_site_options'][ $name ] = $value;
+	$GLOBALS['experiment_site_options'][ $name ] = $GLOBALS['experiment_durable_write_mismatch'] ? array( 'mismatch' => true ) : $value;
 	if ( $GLOBALS['experiment_simulate_option_cache'] ) {
 		$GLOBALS['experiment_option_cache'][ get_current_network_id() . ':' . $name ] = $value;
 	}
+	$GLOBALS['experiment_write_completed'] = true;
 	return true;
+}
+function maybe_serialize( $value ) {
+	return is_array( $value ) || is_object( $value ) ? serialize( $value ) : $value;
+}
+function maybe_unserialize( $value ) {
+	if ( ! is_string( $value ) || ! preg_match( '/^[aObisCdN]:/', $value ) ) {
+		return $value;
+	}
+
+	return unserialize( $value );
 }
 function current_user_can( $capability ) {
 	return 'manage_network_options' === $capability && $GLOBALS['experiment_can_admin'];
@@ -110,19 +142,23 @@ function wp_using_ext_object_cache() {
 	return $GLOBALS['experiment_external_cache'];
 }
 function wp_cache_add_global_groups() {}
-function wp_cache_get( $key, $group = '' ) {
+function wp_cache_get( $key, $group = '', $force = false, &$found = null ) {
 	if ( 'site-options' !== $group ) {
+		$found = false;
 		return false;
 	}
 
-	return array_key_exists( $key, $GLOBALS['experiment_option_cache'] ) ? $GLOBALS['experiment_option_cache'][ $key ] : false;
+	$found = array_key_exists( $key, $GLOBALS['experiment_option_cache'] );
+	return $found ? $GLOBALS['experiment_option_cache'][ $key ] : false;
 }
 function wp_cache_set( $key, $value, $group = '' ) {
 	if ( ! $GLOBALS['experiment_cache_set_success'] ) {
 		return false;
 	}
 	if ( 'site-options' === $group ) {
-		$GLOBALS['experiment_option_cache'][ $key ] = $value;
+		$GLOBALS['experiment_option_cache'][ $key ] = $GLOBALS['experiment_post_write_cache_mismatch'] && $GLOBALS['experiment_write_completed'] && false !== strpos( $key, ':' . EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION )
+			? array( 'mismatch' => true )
+			: $value;
 	}
 	return true;
 }
@@ -841,6 +877,7 @@ $preloaded_stale_snapshot            = get_site_option( EXTRACHILL_EXPERIMENT_LI
 $notoptions_key                      = get_current_network_id() . ':notoptions';
 $GLOBALS['experiment_option_cache'][ $notoptions_key ] = array( EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION => true );
 experiment_check( 'request A preloads stale lifecycle cache before lock', 'inactive' === $preloaded_stale_snapshot['unrelated-experiment']['state'] );
+$query_count_before_stale = count( $GLOBALS['wpdb']->queries );
 $GLOBALS['wpdb']->on_acquire = static function (): void {
 	// Request B commits durable state while request A still holds its stale local cache.
 	$GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ]['unrelated-experiment']['state'] = 'active';
@@ -848,22 +885,49 @@ $GLOBALS['wpdb']->on_acquire = static function (): void {
 $stale_snapshot_transition   = extrachill_transition_experiment_state( 'geo-bridge-holdout', 2, 'active' );
 experiment_check( 'lock acquisition precedes lifecycle snapshot read', is_array( $stale_snapshot_transition ) && extrachill_experiment_is_active( 'unrelated-experiment' ) );
 experiment_check( 'fresh locked snapshot preserves concurrent unrelated write', 'active' === $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ]['unrelated-experiment']['state'] );
-experiment_check( 'locked read invalidates exact Core network-option cache key', array( get_current_network_id() . ':' . EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION, 'site-options' ) === $GLOBALS['experiment_cache_deletes'][0] );
+experiment_check( 'locked snapshot reads exact durable row after GET_LOCK', false !== strpos( $GLOBALS['wpdb']->queries[ $query_count_before_stale ]['query'], 'GET_LOCK' ) && false !== strpos( $GLOBALS['wpdb']->queries[ $query_count_before_stale + 1 ]['query'], 'SELECT meta_value' ) && array( get_current_network_id(), EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ) === $GLOBALS['wpdb']->queries[ $query_count_before_stale + 1 ]['args'] );
 $coherent_cache_key = get_current_network_id() . ':' . EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION;
 experiment_check( 'successful update restores lifecycle cache coherence', $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] === $GLOBALS['experiment_option_cache'][ $coherent_cache_key ] );
-experiment_check( 'locked refresh removes stale notoptions marker', ! isset( $GLOBALS['experiment_option_cache'][ $notoptions_key ][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] ) );
+experiment_check( 'successful update removes stale exact notoptions marker', ! isset( $GLOBALS['experiment_option_cache'][ $notoptions_key ][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] ) );
 
 $GLOBALS['experiment_option_cache'][ $coherent_cache_key ] = array( 'stale' => true );
 $GLOBALS['experiment_cache_delete_success']                 = false;
+$GLOBALS['experiment_actions']                              = array();
 $cache_delete_failure = extrachill_transition_experiment_state( 'unrelated-experiment', 1, 'paused' );
-experiment_check( 'surviving stale cache fails transition closed', $cache_delete_failure instanceof WP_Error && 'experiment_lifecycle_cache_invalidation_failed' === $cache_delete_failure->code );
+experiment_check( 'cache delete failure returns error and suppresses audit', $cache_delete_failure instanceof WP_Error && 'experiment_lifecycle_cache_sync_failed' === $cache_delete_failure->code && array() === $GLOBALS['experiment_actions'] );
 $GLOBALS['experiment_cache_delete_success'] = true;
 unset( $GLOBALS['experiment_option_cache'][ $coherent_cache_key ] );
 
 $GLOBALS['experiment_cache_set_success'] = false;
+$GLOBALS['experiment_actions']           = array();
 $cache_restore_failure = extrachill_transition_experiment_state( 'unrelated-experiment', 1, 'paused' );
-experiment_check( 'cache restore failure is reported and suppresses success', $cache_restore_failure instanceof WP_Error && 'experiment_lifecycle_cache_restore_failed' === $cache_restore_failure->code );
+experiment_check( 'cache set failure returns error and suppresses audit', $cache_restore_failure instanceof WP_Error && 'experiment_lifecycle_cache_sync_failed' === $cache_restore_failure->code && array() === $GLOBALS['experiment_actions'] );
 $GLOBALS['experiment_cache_set_success'] = true;
+
+$GLOBALS['experiment_durable_read_failure'] = true;
+$GLOBALS['experiment_actions']              = array();
+$query_count_before_read_failure             = count( $GLOBALS['wpdb']->queries );
+$durable_read_failure                        = extrachill_transition_experiment_state( 'unrelated-experiment', 1, 'paused' );
+experiment_check( 'durable read failure returns error and suppresses audit', $durable_read_failure instanceof WP_Error && 'experiment_lifecycle_durable_read_failed' === $durable_read_failure->code && array() === $GLOBALS['experiment_actions'] );
+experiment_check( 'durable read failure still releases lock in finally', false !== strpos( $GLOBALS['wpdb']->queries[ count( $GLOBALS['wpdb']->queries ) - 1 ]['query'], 'RELEASE_LOCK' ) && count( $GLOBALS['wpdb']->queries ) === $query_count_before_read_failure + 3 );
+$GLOBALS['experiment_durable_read_failure'] = false;
+
+$durable_baseline = $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ];
+$GLOBALS['experiment_durable_write_mismatch'] = true;
+$GLOBALS['experiment_actions']                = array();
+$durable_write_mismatch = extrachill_transition_experiment_state( 'unrelated-experiment', 1, 'paused' );
+experiment_check( 'durable post-write mismatch returns error and suppresses audit', $durable_write_mismatch instanceof WP_Error && 'experiment_lifecycle_durable_write_mismatch' === $durable_write_mismatch->code && array() === $GLOBALS['experiment_actions'] );
+$GLOBALS['experiment_durable_write_mismatch'] = false;
+$GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] = $durable_baseline;
+
+$GLOBALS['experiment_post_write_cache_mismatch'] = true;
+$GLOBALS['experiment_write_completed']           = false;
+$GLOBALS['experiment_actions']                   = array();
+$post_write_cache_mismatch = extrachill_transition_experiment_state( 'unrelated-experiment', 1, 'paused' );
+experiment_check( 'post-write cache mismatch returns error and suppresses audit', $post_write_cache_mismatch instanceof WP_Error && 'experiment_lifecycle_cache_sync_failed' === $post_write_cache_mismatch->code && array() === $GLOBALS['experiment_actions'] );
+$GLOBALS['experiment_post_write_cache_mismatch'] = false;
+$GLOBALS['experiment_write_completed']           = false;
+$GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] = $durable_baseline;
 $GLOBALS['experiment_simulate_option_cache'] = false;
 $GLOBALS['experiment_option_cache']          = array();
 
@@ -883,7 +947,7 @@ experiment_check( 'serialized different-experiment transitions preserve both wri
 
 $query_count_before_invalid = count( $GLOBALS['wpdb']->queries );
 $invalid_locked_transition  = extrachill_transition_experiment_state( 'geo-bridge-holdout', 2, 'inactive' );
-experiment_check( 'invalid locked transition still releases in finally', $invalid_locked_transition instanceof WP_Error && count( $GLOBALS['wpdb']->queries ) === $query_count_before_invalid + 2 && false !== strpos( $GLOBALS['wpdb']->queries[ count( $GLOBALS['wpdb']->queries ) - 1 ]['query'], 'RELEASE_LOCK' ) );
+experiment_check( 'invalid locked transition still releases in finally', $invalid_locked_transition instanceof WP_Error && count( $GLOBALS['wpdb']->queries ) === $query_count_before_invalid + 3 && false !== strpos( $GLOBALS['wpdb']->queries[ count( $GLOBALS['wpdb']->queries ) - 1 ]['query'], 'RELEASE_LOCK' ) );
 
 $snapshot_before_lock_failure       = $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ];
 $GLOBALS['wpdb']->acquire_result    = 0;
@@ -892,10 +956,14 @@ $acquire_failure                    = extrachill_transition_experiment_state( 'u
 experiment_check( 'advisory lock acquisition failure fails closed without write', $acquire_failure instanceof WP_Error && 'experiment_lifecycle_lock_failed' === $acquire_failure->code && $snapshot_before_lock_failure === $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] );
 experiment_check( 'failed acquisition does not release an unheld lock', count( $GLOBALS['wpdb']->queries ) === $query_count_before_acquire_failure + 1 );
 $GLOBALS['wpdb']->acquire_result = 1;
+$GLOBALS['experiment_actions']   = array();
+$lock_retry                      = extrachill_transition_experiment_state( 'unrelated-experiment', 1, 'paused' );
+experiment_check( 'lock contention retry succeeds without losing unrelated transition', is_array( $lock_retry ) && 'paused' === $lock_retry['state'] && 'active' === $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ]['geo-bridge-holdout']['state'] );
+experiment_check( 'successful contention retry emits one audit action', 1 === count( $GLOBALS['experiment_actions'] ) && 'extrachill_experiment_state_changed' === $GLOBALS['experiment_actions'][0][0] );
 
 $GLOBALS['experiment_actions']   = array();
 $GLOBALS['wpdb']->release_result = 0;
-$release_failure                 = extrachill_transition_experiment_state( 'unrelated-experiment', 1, 'paused' );
+$release_failure                 = extrachill_transition_experiment_state( 'unrelated-experiment', 1, 'active' );
 experiment_check( 'advisory lock release failure fails closed', $release_failure instanceof WP_Error && 'experiment_lifecycle_lock_release_failed' === $release_failure->code );
 experiment_check( 'release failure suppresses lifecycle audit action', array() === $GLOBALS['experiment_actions'] );
 $GLOBALS['wpdb']->release_result = 1;
