@@ -30,6 +30,8 @@
 				bubbles: true,
 				detail: {
 					experiment_key: detail.experiment_key,
+					definition_version: detail.definition_version,
+					assignment_policy: detail.assignment_policy,
 					variant: detail.variant,
 					surface: detail.surface,
 				},
@@ -49,6 +51,8 @@
 				body: JSON.stringify( {
 					input: {
 						experiment_key: detail.experiment_key,
+						definition_version: detail.definition_version,
+						assignment_policy: detail.assignment_policy,
 						variant: detail.variant,
 						surface: detail.surface,
 						context: context,
@@ -132,6 +136,9 @@
 					result.measurement_eligible !== true ||
 					result.experiment_key !== experimentKey ||
 					result.surface !== surface ||
+					! Number.isInteger( result.definition_version ) ||
+					result.definition_version < 1 ||
+					result.assignment_policy !== 'weighted_random' ||
 					typeof result.variant !== 'string' ||
 					typeof result.exposure_token !== 'string' ||
 					! result.exposure_token
