@@ -111,7 +111,7 @@ async function run() {
 		variant: 'treatment',
 		surface: 'single-post-bridge',
 		measurement_eligible: true,
-		exposure_token: '1700000000.' + 'a'.repeat( 64 ),
+		exposure_token: '1700000000.' + '1'.repeat( 32 ) + '.' + 'a'.repeat( 64 ),
 	} );
 
 	check(
@@ -148,7 +148,7 @@ async function run() {
 	check( 'viewport visibility alone is not trusted exposure', assigned.element.events.length === 1 );
 	check( 'viewport visibility calls the signed exposure ability', assigned.requests.length === 2 && assigned.requests[ 1 ].url === '/exposure' );
 	const exposureInput = JSON.parse( assigned.requests[ 1 ].options.body ).input;
-	check( 'exposure request carries the server-issued proof', exposureInput.exposure_token === '1700000000.' + 'a'.repeat( 64 ) );
+	check( 'exposure request carries the server-issued proof', exposureInput.exposure_token === '1700000000.' + '1'.repeat( 32 ) + '.' + 'a'.repeat( 64 ) );
 	await flushPromises();
 	check(
 		'server-accepted viewport exposure emits separately',
@@ -177,7 +177,7 @@ async function run() {
 		variant: 'treatment',
 		surface: 'single-post-bridge',
 		measurement_eligible: true,
-		exposure_token: '1700000000.' + 'b'.repeat( 64 ),
+		exposure_token: '1700000000.' + '2'.repeat( 32 ) + '.' + 'b'.repeat( 64 ),
 	}, false );
 	await flushPromises();
 	rejected.observers[ 0 ].callback( [

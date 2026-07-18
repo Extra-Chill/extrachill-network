@@ -66,7 +66,7 @@ class ExperimentAssignmentAbility {
 						'measurement_eligible' => array( 'type' => 'boolean' ),
 						'exposure_token'       => array(
 							'type'      => 'string',
-							'maxLength' => 80,
+							'maxLength' => 108,
 						),
 					),
 				),
@@ -99,8 +99,8 @@ class ExperimentAssignmentAbility {
 						'context'        => $this->context_schema(),
 						'exposure_token' => array(
 							'type'      => 'string',
-							'pattern'   => '^\\d{10}\\.[a-f0-9]{64}$',
-							'maxLength' => 75,
+							'pattern'   => '^\\d{10}\\.[a-f0-9]{32}\\.[a-f0-9]{64}$',
+							'maxLength' => 108,
 						),
 					),
 				),

@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Maximum accepted value for one variant weight.
  *
- * This is deliberately far below the 2^32 hash draw.
+ * This is deliberately below the signed-32-bit-safe 2^28 draw domain.
  */
 const EXTRACHILL_EXPERIMENT_MAX_VARIANT_WEIGHT = 500000;
 
@@ -25,12 +25,18 @@ const EXTRACHILL_EXPERIMENT_MAX_VARIANT_WEIGHT = 500000;
  * Maximum accepted sum of all variant weights.
  *
  * This keeps addition overflow checks explicit and the allocation range safely
- * below the 2^32 hash draw used by rejection sampling.
+ * below the 2^28 hash draw used by rejection sampling.
  */
 const EXTRACHILL_EXPERIMENT_MAX_TOTAL_WEIGHT = 1000000;
 
+/** 2^28 allocation domain; its maximum value fits signed 32-bit PHP. */
+const EXTRACHILL_EXPERIMENT_DRAW_RANGE = 268435456;
+
 /** Short lifetime for a browser exposure proof. */
 const EXTRACHILL_EXPERIMENT_EXPOSURE_TOKEN_TTL = 3600;
+
+/** Accepted clock skew for tokens issued slightly in the future. */
+const EXTRACHILL_EXPERIMENT_EXPOSURE_FUTURE_SKEW = 60;
 
 /** Shared atomic-cache group for consumed exposure proofs. */
 const EXTRACHILL_EXPERIMENT_EXPOSURE_CACHE_GROUP = 'extrachill_experiment_exposures';
@@ -163,12 +169,39 @@ function extrachill_experiment_variant_for_bucket( array $definition, $bucket ) 
 }
 
 /**
+ * Reduce one bounded draw to a bucket without modulo bias.
+ *
+ * @param int $draw  Unsigned 28-bit draw.
+ * @param int $total Number of buckets.
+ * @return int|null Bucket, or null when the draw/total is invalid or rejected.
+ */
+function extrachill_experiment_reduce_draw( $draw, $total ) {
+	$draw  = (int) $draw;
+	$total = (int) $total;
+	if (
+		$draw < 0
+		|| $draw >= EXTRACHILL_EXPERIMENT_DRAW_RANGE
+		|| $total <= 0
+		|| $total > EXTRACHILL_EXPERIMENT_MAX_TOTAL_WEIGHT
+	) {
+		return null;
+	}
+
+	$limit = EXTRACHILL_EXPERIMENT_DRAW_RANGE - ( EXTRACHILL_EXPERIMENT_DRAW_RANGE % $total );
+	if ( $draw >= $limit ) {
+		return null;
+	}
+
+	return $draw % $total;
+}
+
+/**
  * Convert a deterministic seed to an unbiased zero-based bucket.
  *
- * SHA-256 supplies successive unsigned 32-bit draws. Values in the incomplete
- * high tail are rejected before modulo reduction, so every bucket receives the
- * same number of possible draws. Rehashing with a counter supplies more draws
- * without a biased fallback.
+ * SHA-256 supplies successive unsigned 28-bit draws, each no larger than
+ * 268,435,455 and therefore safe when PHP_INT_SIZE is 4. Values in the
+ * incomplete high tail are rejected before modulo reduction. Rehashing with a
+ * counter supplies more draws without a biased fallback.
  *
  * @param string $seed  Deterministic allocation seed.
  * @param int    $total Number of buckets.
@@ -180,16 +213,14 @@ function extrachill_experiment_unbiased_bucket( $seed, $total ) {
 		return null;
 	}
 
-	$range = 4294967296;
-	$limit = $range - ( $range % $total );
 	$round = 0;
 
 	while ( true ) {
 		$hash = hash( 'sha256', $seed . "\0" . $round );
-		for ( $offset = 0; $offset < 64; $offset += 8 ) {
-			$draw = hexdec( substr( $hash, $offset, 8 ) );
-			if ( $draw < $limit ) {
-				return (int) ( $draw % $total );
+		for ( $offset = 0; $offset <= 56; $offset += 7 ) {
+			$bucket = extrachill_experiment_reduce_draw( hexdec( substr( $hash, $offset, 7 ) ), $total );
+			if ( null !== $bucket ) {
+				return $bucket;
 			}
 		}
 		++$round;
@@ -278,10 +309,23 @@ function extrachill_experiment_context_json( array $context ) {
  * @param string                $subject_key Resolved subject key.
  * @param array<string, mixed>  $context     Consumer context.
  * @param int|null              $issued_at   Optional issue time for tests.
+ * @param string|null           $nonce       Optional 128-bit hex nonce for tests.
  * @return string Signed exposure token.
  */
-function extrachill_experiment_exposure_token( array $metadata, $subject_key, array $context, $issued_at = null ) {
+function extrachill_experiment_exposure_token( array $metadata, $subject_key, array $context, $issued_at = null, $nonce = null ) {
 	$issued_at = null === $issued_at ? time() : (int) $issued_at;
+	if ( null === $nonce ) {
+		try {
+			$nonce = bin2hex( random_bytes( 16 ) );
+		} catch ( \Throwable $error ) {
+			return '';
+		}
+	} else {
+		$nonce = (string) $nonce;
+	}
+	if ( 1 !== preg_match( '/^[a-f0-9]{32}$/', $nonce ) ) {
+		return '';
+	}
 	$message   = implode(
 		"\0",
 		array(
@@ -289,13 +333,14 @@ function extrachill_experiment_exposure_token( array $metadata, $subject_key, ar
 			$metadata['variant'],
 			$metadata['surface'],
 			(string) $issued_at,
+			$nonce,
 			extrachill_experiment_context_json( $context ),
 			$subject_key,
 		)
 	);
 	$signature = hash_hmac( 'sha256', $message, wp_salt( 'auth' ) );
 
-	return $issued_at . '.' . $signature;
+	return $issued_at . '.' . $nonce . '.' . $signature;
 }
 
 /**
@@ -310,13 +355,13 @@ function extrachill_experiment_exposure_token( array $metadata, $subject_key, ar
  * @return array<string, string>|null Trusted metadata, or null when invalid.
  */
 function extrachill_validate_experiment_exposure( $experiment_key, $variant, $surface, array $context, $token, $now = null ) {
-	if ( 1 !== preg_match( '/^(\d{10})\.([a-f0-9]{64})$/', (string) $token, $matches ) ) {
+	if ( 1 !== preg_match( '/^(\d{10})\.([a-f0-9]{32})\.([a-f0-9]{64})$/', (string) $token, $matches ) ) {
 		return null;
 	}
 
 	$now       = null === $now ? time() : (int) $now;
 	$issued_at = (int) $matches[1];
-	if ( $issued_at > $now + 60 || $issued_at < $now - EXTRACHILL_EXPERIMENT_EXPOSURE_TOKEN_TTL ) {
+	if ( $issued_at > $now + EXTRACHILL_EXPERIMENT_EXPOSURE_FUTURE_SKEW || $issued_at < $now - EXTRACHILL_EXPERIMENT_EXPOSURE_TOKEN_TTL ) {
 		return null;
 	}
 
@@ -347,7 +392,7 @@ function extrachill_validate_experiment_exposure( $experiment_key, $variant, $su
 		'variant'        => (string) $variant,
 		'surface'        => (string) $surface,
 	);
-	$expected = extrachill_experiment_exposure_token( $metadata, $subject_key, $context, $issued_at );
+	$expected = extrachill_experiment_exposure_token( $metadata, $subject_key, $context, $issued_at, $matches[2] );
 
 	return hash_equals( $expected, (string) $token ) ? $metadata : null;
 }
@@ -368,17 +413,18 @@ function extrachill_consume_experiment_exposure_token( $token, $now = null ) {
 	if ( function_exists( 'wp_using_ext_object_cache' ) && ! wp_using_ext_object_cache() ) {
 		return false;
 	}
-	if ( 1 !== preg_match( '/^(\d{10})\.[a-f0-9]{64}$/', (string) $token, $matches ) ) {
+	if ( 1 !== preg_match( '/^(\d{10})\.[a-f0-9]{32}\.[a-f0-9]{64}$/', (string) $token, $matches ) ) {
 		return false;
 	}
 
 	$now       = null === $now ? time() : (int) $now;
 	$issued_at = (int) $matches[1];
-	$ttl       = min(
-		EXTRACHILL_EXPERIMENT_EXPOSURE_TOKEN_TTL,
-		$issued_at + EXTRACHILL_EXPERIMENT_EXPOSURE_TOKEN_TTL - $now
-	);
-	if ( $ttl <= 0 ) {
+	$ttl       = $issued_at + EXTRACHILL_EXPERIMENT_EXPOSURE_TOKEN_TTL - $now;
+	if (
+		$issued_at > $now + EXTRACHILL_EXPERIMENT_EXPOSURE_FUTURE_SKEW
+		|| $ttl <= 0
+		|| $ttl > EXTRACHILL_EXPERIMENT_EXPOSURE_TOKEN_TTL + EXTRACHILL_EXPERIMENT_EXPOSURE_FUTURE_SKEW
+	) {
 		return false;
 	}
 
