@@ -29,6 +29,8 @@ $GLOBALS['experiment_can_admin']             = false;
 $GLOBALS['experiment_option_cache']          = array();
 $GLOBALS['experiment_simulate_option_cache'] = false;
 $GLOBALS['experiment_cache_deletes']         = array();
+$GLOBALS['experiment_cache_set_success']     = true;
+$GLOBALS['experiment_cache_delete_success']  = true;
 
 class ExperimentWpdb {
 	public int $acquire_result = 1;
@@ -116,6 +118,9 @@ function wp_cache_get( $key, $group = '' ) {
 	return array_key_exists( $key, $GLOBALS['experiment_option_cache'] ) ? $GLOBALS['experiment_option_cache'][ $key ] : false;
 }
 function wp_cache_set( $key, $value, $group = '' ) {
+	if ( ! $GLOBALS['experiment_cache_set_success'] ) {
+		return false;
+	}
 	if ( 'site-options' === $group ) {
 		$GLOBALS['experiment_option_cache'][ $key ] = $value;
 	}
@@ -123,6 +128,9 @@ function wp_cache_set( $key, $value, $group = '' ) {
 }
 function wp_cache_delete( $key, $group = '' ) {
 	$GLOBALS['experiment_cache_deletes'][] = array( $key, $group );
+	if ( ! $GLOBALS['experiment_cache_delete_success'] ) {
+		return false;
+	}
 	if ( 'site-options' === $group ) {
 		unset( $GLOBALS['experiment_option_cache'][ $key ] );
 	}
@@ -830,6 +838,8 @@ $GLOBALS['experiment_simulate_option_cache']                                  = 
 $GLOBALS['experiment_option_cache']  = array();
 $GLOBALS['experiment_cache_deletes'] = array();
 $preloaded_stale_snapshot            = get_site_option( EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION );
+$notoptions_key                      = get_current_network_id() . ':notoptions';
+$GLOBALS['experiment_option_cache'][ $notoptions_key ] = array( EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION => true );
 experiment_check( 'request A preloads stale lifecycle cache before lock', 'inactive' === $preloaded_stale_snapshot['unrelated-experiment']['state'] );
 $GLOBALS['wpdb']->on_acquire = static function (): void {
 	// Request B commits durable state while request A still holds its stale local cache.
@@ -841,6 +851,19 @@ experiment_check( 'fresh locked snapshot preserves concurrent unrelated write', 
 experiment_check( 'locked read invalidates exact Core network-option cache key', array( get_current_network_id() . ':' . EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION, 'site-options' ) === $GLOBALS['experiment_cache_deletes'][0] );
 $coherent_cache_key = get_current_network_id() . ':' . EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION;
 experiment_check( 'successful update restores lifecycle cache coherence', $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] === $GLOBALS['experiment_option_cache'][ $coherent_cache_key ] );
+experiment_check( 'locked refresh removes stale notoptions marker', ! isset( $GLOBALS['experiment_option_cache'][ $notoptions_key ][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] ) );
+
+$GLOBALS['experiment_option_cache'][ $coherent_cache_key ] = array( 'stale' => true );
+$GLOBALS['experiment_cache_delete_success']                 = false;
+$cache_delete_failure = extrachill_transition_experiment_state( 'unrelated-experiment', 1, 'paused' );
+experiment_check( 'surviving stale cache fails transition closed', $cache_delete_failure instanceof WP_Error && 'experiment_lifecycle_cache_invalidation_failed' === $cache_delete_failure->code );
+$GLOBALS['experiment_cache_delete_success'] = true;
+unset( $GLOBALS['experiment_option_cache'][ $coherent_cache_key ] );
+
+$GLOBALS['experiment_cache_set_success'] = false;
+$cache_restore_failure = extrachill_transition_experiment_state( 'unrelated-experiment', 1, 'paused' );
+experiment_check( 'cache restore failure is reported and suppresses success', $cache_restore_failure instanceof WP_Error && 'experiment_lifecycle_cache_restore_failed' === $cache_restore_failure->code );
+$GLOBALS['experiment_cache_set_success'] = true;
 $GLOBALS['experiment_simulate_option_cache'] = false;
 $GLOBALS['experiment_option_cache']          = array();
 

@@ -494,14 +494,53 @@ function extrachill_invalidate_experiment_lifecycle_option_cache() {
 	$notoptions_key = $network_id . ':notoptions';
 
 	try {
-		wp_cache_delete( $cache_key, 'site-options' );
+		$deleted = wp_cache_delete( $cache_key, 'site-options' );
+		if ( ! $deleted && false !== wp_cache_get( $cache_key, 'site-options' ) ) {
+			return new \WP_Error( 'experiment_lifecycle_cache_invalidation_failed', __( 'Experiment lifecycle cache could not be refreshed.', 'extrachill-network' ), array( 'status' => 500 ) );
+		}
 		$notoptions = wp_cache_get( $notoptions_key, 'site-options' );
 		if ( is_array( $notoptions ) && isset( $notoptions[ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] ) ) {
 			unset( $notoptions[ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] );
-			wp_cache_set( $notoptions_key, $notoptions, 'site-options' );
+			if ( ! wp_cache_set( $notoptions_key, $notoptions, 'site-options' ) ) {
+				return new \WP_Error( 'experiment_lifecycle_cache_invalidation_failed', __( 'Experiment lifecycle cache could not be refreshed.', 'extrachill-network' ), array( 'status' => 500 ) );
+			}
+			$verified_notoptions = wp_cache_get( $notoptions_key, 'site-options' );
+			if ( ! is_array( $verified_notoptions ) || isset( $verified_notoptions[ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] ) ) {
+				return new \WP_Error( 'experiment_lifecycle_cache_invalidation_failed', __( 'Experiment lifecycle cache could not be refreshed.', 'extrachill-network' ), array( 'status' => 500 ) );
+			}
 		}
 	} catch ( \Throwable $error ) {
 		return new \WP_Error( 'experiment_lifecycle_cache_invalidation_failed', __( 'Experiment lifecycle cache could not be refreshed.', 'extrachill-network' ), array( 'status' => 500 ) );
+	}
+
+	return true;
+}
+
+/**
+ * Restore and verify Core's network-option cache after a lifecycle write.
+ *
+ * @param array $states Normalized lifecycle states persisted to the database.
+ * @return true|\WP_Error True on success, otherwise a fail-closed error.
+ */
+function extrachill_restore_experiment_lifecycle_option_cache( $states ) {
+	$network_id     = function_exists( 'get_current_network_id' ) ? (int) get_current_network_id() : 1;
+	$network_id     = max( 1, $network_id );
+	$cache_key      = $network_id . ':' . EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION;
+	$notoptions_key = $network_id . ':notoptions';
+
+	try {
+		if ( ! wp_cache_set( $cache_key, $states, 'site-options' ) || $states !== wp_cache_get( $cache_key, 'site-options' ) ) {
+			return new \WP_Error( 'experiment_lifecycle_cache_restore_failed', __( 'Experiment lifecycle cache could not be restored.', 'extrachill-network' ), array( 'status' => 500 ) );
+		}
+		$notoptions = wp_cache_get( $notoptions_key, 'site-options' );
+		if ( is_array( $notoptions ) && isset( $notoptions[ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] ) ) {
+			unset( $notoptions[ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] );
+			if ( ! wp_cache_set( $notoptions_key, $notoptions, 'site-options' ) ) {
+				return new \WP_Error( 'experiment_lifecycle_cache_restore_failed', __( 'Experiment lifecycle cache could not be restored.', 'extrachill-network' ), array( 'status' => 500 ) );
+			}
+		}
+	} catch ( \Throwable $error ) {
+		return new \WP_Error( 'experiment_lifecycle_cache_restore_failed', __( 'Experiment lifecycle cache could not be restored.', 'extrachill-network' ), array( 'status' => 500 ) );
 	}
 
 	return true;
@@ -618,6 +657,10 @@ function extrachill_transition_experiment_state_locked( $experiment_key, $defini
 	}
 	if ( ! update_site_option( EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION, $lifecycle['states'] ) ) {
 		return new \WP_Error( 'experiment_state_update_failed', __( 'Experiment lifecycle state could not be saved.', 'extrachill-network' ), array( 'status' => 500 ) );
+	}
+	$cache_restored = extrachill_restore_experiment_lifecycle_option_cache( $lifecycle['states'] );
+	if ( $cache_restored instanceof \WP_Error ) {
+		return $cache_restored;
 	}
 
 	return $result;
