@@ -477,6 +477,37 @@ function extrachill_experiment_lifecycle_lock_name() {
 }
 
 /**
+ * Invalidate Core's exact network-option cache entry before a locked read.
+ *
+ * A request may have preloaded stale `site-options` data before waiting for the
+ * advisory lock. Deleting the exact `network_id:option_name` key after lock
+ * acquisition forces `get_network_option()` to observe durable state committed
+ * by the previous lock holder. The matching notoptions marker is also removed
+ * so a concurrent first write cannot remain hidden as a cached miss.
+ *
+ * @return true|\WP_Error True on success, otherwise a fail-closed error.
+ */
+function extrachill_invalidate_experiment_lifecycle_option_cache() {
+	$network_id     = function_exists( 'get_current_network_id' ) ? (int) get_current_network_id() : 1;
+	$network_id     = max( 1, $network_id );
+	$cache_key      = $network_id . ':' . EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION;
+	$notoptions_key = $network_id . ':notoptions';
+
+	try {
+		wp_cache_delete( $cache_key, 'site-options' );
+		$notoptions = wp_cache_get( $notoptions_key, 'site-options' );
+		if ( is_array( $notoptions ) && isset( $notoptions[ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] ) ) {
+			unset( $notoptions[ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] );
+			wp_cache_set( $notoptions_key, $notoptions, 'site-options' );
+		}
+	} catch ( \Throwable $error ) {
+		return new \WP_Error( 'experiment_lifecycle_cache_invalidation_failed', __( 'Experiment lifecycle cache could not be refreshed.', 'extrachill-network' ), array( 'status' => 500 ) );
+	}
+
+	return true;
+}
+
+/**
  * Acquire the lifecycle write lock without waiting.
  *
  * @return true|\WP_Error True when held, otherwise a fail-closed error.
@@ -547,6 +578,10 @@ function extrachill_transition_experiment_state_locked( $experiment_key, $defini
 		return new \WP_Error( 'invalid_experiment_state', __( 'Experiment lifecycle state is invalid.', 'extrachill-network' ), array( 'status' => 400 ) );
 	}
 
+	$cache_invalidated = extrachill_invalidate_experiment_lifecycle_option_cache();
+	if ( $cache_invalidated instanceof \WP_Error ) {
+		return $cache_invalidated;
+	}
 	$lifecycle = extrachill_get_experiment_lifecycle_option();
 	if ( empty( $lifecycle['valid'] ) ) {
 		return new \WP_Error( 'invalid_experiment_lifecycle_option', __( 'Experiment lifecycle storage is corrupt.', 'extrachill-network' ), array( 'status' => 500 ) );

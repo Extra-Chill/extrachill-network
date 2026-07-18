@@ -15,17 +15,20 @@ define( 'ABSPATH', __DIR__ . '/' );
 define( 'EXTRACHILL_NETWORK_PLUGIN_DIR', dirname( __DIR__ ) . '/' );
 define( 'EXTRACHILL_NETWORK_PLUGIN_URL', 'https://example.com/wp-content/plugins/extrachill-network/' );
 
-$GLOBALS['experiment_filters']        = array();
-$GLOBALS['experiment_user_id']        = 0;
-$GLOBALS['experiment_blog_id']        = 1;
-$GLOBALS['experiment_enqueued']       = array();
-$GLOBALS['experiment_abilities']      = array();
-$GLOBALS['experiment_actions']        = array();
-$GLOBALS['experiment_cache']          = array();
-$GLOBALS['experiment_cache_adds']     = array();
-$GLOBALS['experiment_external_cache'] = true;
-$GLOBALS['experiment_site_options']   = array();
-$GLOBALS['experiment_can_admin']      = false;
+$GLOBALS['experiment_filters']               = array();
+$GLOBALS['experiment_user_id']               = 0;
+$GLOBALS['experiment_blog_id']               = 1;
+$GLOBALS['experiment_enqueued']              = array();
+$GLOBALS['experiment_abilities']             = array();
+$GLOBALS['experiment_actions']               = array();
+$GLOBALS['experiment_cache']                 = array();
+$GLOBALS['experiment_cache_adds']            = array();
+$GLOBALS['experiment_external_cache']        = true;
+$GLOBALS['experiment_site_options']          = array();
+$GLOBALS['experiment_can_admin']             = false;
+$GLOBALS['experiment_option_cache']          = array();
+$GLOBALS['experiment_simulate_option_cache'] = false;
+$GLOBALS['experiment_cache_deletes']         = array();
 
 class ExperimentWpdb {
 	public int $acquire_result = 1;
@@ -71,10 +74,22 @@ function wp_register_ability( $name, $args ) {
 	$GLOBALS['experiment_abilities'][ $name ] = $args;
 }
 function get_site_option( $name, $fallback = false ) {
+	if ( $GLOBALS['experiment_simulate_option_cache'] ) {
+		$cache_key = get_current_network_id() . ':' . $name;
+		if ( array_key_exists( $cache_key, $GLOBALS['experiment_option_cache'] ) ) {
+			return $GLOBALS['experiment_option_cache'][ $cache_key ];
+		}
+		$value = array_key_exists( $name, $GLOBALS['experiment_site_options'] ) ? $GLOBALS['experiment_site_options'][ $name ] : $fallback;
+		$GLOBALS['experiment_option_cache'][ $cache_key ] = $value;
+		return $value;
+	}
 	return array_key_exists( $name, $GLOBALS['experiment_site_options'] ) ? $GLOBALS['experiment_site_options'][ $name ] : $fallback;
 }
 function update_site_option( $name, $value ) {
 	$GLOBALS['experiment_site_options'][ $name ] = $value;
+	if ( $GLOBALS['experiment_simulate_option_cache'] ) {
+		$GLOBALS['experiment_option_cache'][ get_current_network_id() . ':' . $name ] = $value;
+	}
 	return true;
 }
 function current_user_can( $capability ) {
@@ -93,6 +108,26 @@ function wp_using_ext_object_cache() {
 	return $GLOBALS['experiment_external_cache'];
 }
 function wp_cache_add_global_groups() {}
+function wp_cache_get( $key, $group = '' ) {
+	if ( 'site-options' !== $group ) {
+		return false;
+	}
+
+	return array_key_exists( $key, $GLOBALS['experiment_option_cache'] ) ? $GLOBALS['experiment_option_cache'][ $key ] : false;
+}
+function wp_cache_set( $key, $value, $group = '' ) {
+	if ( 'site-options' === $group ) {
+		$GLOBALS['experiment_option_cache'][ $key ] = $value;
+	}
+	return true;
+}
+function wp_cache_delete( $key, $group = '' ) {
+	$GLOBALS['experiment_cache_deletes'][] = array( $key, $group );
+	if ( 'site-options' === $group ) {
+		unset( $GLOBALS['experiment_option_cache'][ $key ] );
+	}
+	return true;
+}
 function wp_cache_add( $key, $value, $group, $ttl ) {
 	$cache_key                          = $group . ':' . $key;
 	$GLOBALS['experiment_cache_adds'][] = array(
@@ -791,12 +826,23 @@ $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] = 
 		'state'              => 'inactive',
 	),
 );
+$GLOBALS['experiment_simulate_option_cache']                                  = true;
+$GLOBALS['experiment_option_cache']  = array();
+$GLOBALS['experiment_cache_deletes'] = array();
+$preloaded_stale_snapshot            = get_site_option( EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION );
+experiment_check( 'request A preloads stale lifecycle cache before lock', 'inactive' === $preloaded_stale_snapshot['unrelated-experiment']['state'] );
 $GLOBALS['wpdb']->on_acquire = static function (): void {
+	// Request B commits durable state while request A still holds its stale local cache.
 	$GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ]['unrelated-experiment']['state'] = 'active';
 };
 $stale_snapshot_transition   = extrachill_transition_experiment_state( 'geo-bridge-holdout', 2, 'active' );
 experiment_check( 'lock acquisition precedes lifecycle snapshot read', is_array( $stale_snapshot_transition ) && extrachill_experiment_is_active( 'unrelated-experiment' ) );
 experiment_check( 'fresh locked snapshot preserves concurrent unrelated write', 'active' === $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ]['unrelated-experiment']['state'] );
+experiment_check( 'locked read invalidates exact Core network-option cache key', array( get_current_network_id() . ':' . EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION, 'site-options' ) === $GLOBALS['experiment_cache_deletes'][0] );
+$coherent_cache_key = get_current_network_id() . ':' . EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION;
+experiment_check( 'successful update restores lifecycle cache coherence', $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] === $GLOBALS['experiment_option_cache'][ $coherent_cache_key ] );
+$GLOBALS['experiment_simulate_option_cache'] = false;
+$GLOBALS['experiment_option_cache']          = array();
 
 $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] = array(
 	'geo-bridge-holdout'   => array(
