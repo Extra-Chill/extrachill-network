@@ -708,7 +708,10 @@ function extrachill_transition_experiment_state_locked( $experiment_key, $defini
 		return new \WP_Error( 'experiment_state_update_failed', __( 'Experiment lifecycle state could not be saved.', 'extrachill-network' ), array( 'status' => 500 ) );
 	}
 	$written = extrachill_read_experiment_lifecycle_option_durable();
-	if ( $written instanceof \WP_Error || empty( $written['exists'] ) || $intended !== $written['value'] ) {
+	if ( $written instanceof \WP_Error ) {
+		return $written;
+	}
+	if ( empty( $written['exists'] ) || $intended !== $written['value'] ) {
 		return new \WP_Error( 'experiment_lifecycle_durable_write_mismatch', __( 'Experiment lifecycle state could not be verified.', 'extrachill-network' ), array( 'status' => 500 ) );
 	}
 	$cache_restored = extrachill_restore_experiment_lifecycle_option_cache( $written );
