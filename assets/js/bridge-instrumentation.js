@@ -104,6 +104,22 @@
 		}
 	}
 
+	/**
+	 * Whether a bridge link is unavailable to the visitor.
+	 *
+	 * Hidden experiment candidates may already exist in cache-neutral markup.
+	 * They become measurable only after their owning consumer activates them.
+	 *
+	 * @param {Element} link Bridge link element.
+	 * @return {boolean} Whether the link is hidden or inert.
+	 */
+	function isUnavailable( link ) {
+		return !! (
+			link.closest &&
+			link.closest( '[hidden], [inert], [aria-hidden="true"]' )
+		);
+	}
+
 	var matchingLinks = document.getElementsByClassName( config.linkClass );
 	var links = [];
 	for ( var linkIndex = 0; linkIndex < matchingLinks.length; linkIndex++ ) {
@@ -120,8 +136,8 @@
 	 * @param {Element} link Bridge link element.
 	 */
 	function expose( link ) {
-		if ( exposedLinks.indexOf( link ) !== -1 ) {
-			return;
+		if ( exposedLinks.indexOf( link ) !== -1 || isUnavailable( link ) ) {
+			return false;
 		}
 
 		exposedLinks.push( link );
@@ -135,6 +151,8 @@
 			dest_site: param( href, 'utm_campaign' ),
 			term: link.textContent ? link.textContent.trim() : '',
 		} );
+
+		return true;
 	}
 
 	/**
@@ -144,6 +162,10 @@
 	 * @return {boolean} Whether the element meets the exposure threshold.
 	 */
 	function isVisible( link ) {
+		if ( isUnavailable( link ) ) {
+			return false;
+		}
+
 		var rect = link.getBoundingClientRect();
 		var width = Math.max(
 			0,
@@ -175,8 +197,9 @@
 							entries[ i ].isIntersecting &&
 							entries[ i ].intersectionRatio >= exposureThreshold
 						) {
-							expose( entries[ i ].target );
-							observer.unobserve( entries[ i ].target );
+							if ( expose( entries[ i ].target ) ) {
+								observer.unobserve( entries[ i ].target );
+							}
 						}
 					}
 				},
@@ -241,7 +264,7 @@
 			if ( ! link || links.indexOf( link ) === -1 ) {
 				return;
 			}
-			if ( clickedLinks.indexOf( link ) !== -1 ) {
+			if ( clickedLinks.indexOf( link ) !== -1 || isUnavailable( link ) ) {
 				return;
 			}
 

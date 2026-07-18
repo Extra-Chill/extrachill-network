@@ -22,6 +22,7 @@ function makeLink( destination, label, rect ) {
 	return {
 		textContent: label,
 		rect,
+		unavailable: false,
 		getAttribute( name ) {
 			return name === 'href'
 				? `https://${ destination }.extrachill.com/item?utm_campaign=${ destination }`
@@ -31,7 +32,12 @@ function makeLink( destination, label, rect ) {
 			return this.rect;
 		},
 		closest( selector ) {
-			return selector === '.ec-cross-site-link' ? this : null;
+			if ( selector === '.ec-cross-site-link' ) {
+				return this;
+			}
+			return selector === '[hidden], [inert], [aria-hidden="true"]' && this.unavailable
+				? this
+				: null;
 		},
 	};
 }
@@ -250,6 +256,26 @@ check(
 	observerHarness.events.filter( ( event ) => event.endpoint === '/click' ).length ===
 		observerHarness.events.filter( ( event ) => event.endpoint === '/impression' ).length
 );
+
+const communityLink = makeLink( 'community', 'Community', visibleRect );
+communityLink.unavailable = true;
+const hiddenHarness = createHarness( [ communityLink ], true );
+const hiddenObserver = hiddenHarness.observers[ 0 ];
+hiddenObserver.callback( [
+	{ target: communityLink, isIntersecting: true, intersectionRatio: 1 },
+] );
+check( 'hidden or inert candidates do not count', hiddenHarness.events.length === 0 );
+check( 'hidden candidates remain observed for later activation', ! hiddenObserver.unobserved.includes( communityLink ) );
+
+communityLink.unavailable = false;
+hiddenObserver.callback( [
+	{ target: communityLink, isIntersecting: true, intersectionRatio: 1 },
+] );
+check( 'activated treatment candidate counts exactly once', hiddenHarness.events.length === 1 );
+hiddenObserver.callback( [
+	{ target: communityLink, isIntersecting: true, intersectionRatio: 1 },
+] );
+check( 'activated treatment exposure remains deduped', hiddenHarness.events.length === 1 );
 
 const duplicateOne = makeLink( 'events', 'Events One', visibleRect );
 const duplicateTwo = makeLink( 'events', 'Events Two', visibleRect );
