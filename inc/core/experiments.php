@@ -722,33 +722,24 @@ function extrachill_resolve_experiment_assignment( $experiment_key, $surface, ar
 			'experiment_key'       => $experiment_key,
 			'definition_version'   => 0,
 			'assignment_policy'    => '',
-			'variant'              => 'control',
+			'variant'              => '',
 			'surface'              => $surface,
 			'measurement_eligible' => false,
 			'exposure_token'       => '',
 		);
 	}
 
-	$raw_definitions = extrachill_get_experiment_definitions();
-	$definitions     = extrachill_get_normalized_experiment_definitions();
-	$raw_definition  = isset( $raw_definitions[ $experiment_key ] ) ? $raw_definitions[ $experiment_key ] : null;
-	$fallback        = is_array( $raw_definition )
-		&& isset( $raw_definition['default_variant'], $raw_definition['control_variant'] )
-		&& $raw_definition['default_variant'] === $raw_definition['control_variant']
-		&& is_string( $raw_definition['default_variant'] )
-		&& 1 === preg_match( '/^[a-z0-9][a-z0-9_-]{0,63}$/', $raw_definition['default_variant'] )
-			? $raw_definition['default_variant']
-			: 'control';
-	$result          = array(
+	$definitions = extrachill_get_normalized_experiment_definitions();
+	$result      = array(
 		'experiment_key'       => $experiment_key,
 		'definition_version'   => 0,
 		'assignment_policy'    => '',
-		'variant'              => $fallback,
+		'variant'              => '',
 		'surface'              => $surface,
 		'measurement_eligible' => false,
 		'exposure_token'       => '',
 	);
-	$definition      = isset( $definitions[ $experiment_key ] ) ? $definitions[ $experiment_key ] : null;
+	$definition  = isset( $definitions[ $experiment_key ] ) ? $definitions[ $experiment_key ] : null;
 
 	if ( null === $definition ) {
 		return $result;
@@ -756,7 +747,11 @@ function extrachill_resolve_experiment_assignment( $experiment_key, $surface, ar
 
 	$result['definition_version'] = $definition['definition_version'];
 	$result['assignment_policy']  = $definition['assignment_policy'];
-	$result['variant']            = $definition['default_variant'];
+	if ( 'active' !== extrachill_get_experiment_state( $definition ) ) {
+		return $result;
+	}
+
+	$result['variant'] = $definition['default_variant'];
 	if ( ! extrachill_experiment_is_active( $experiment_key, $surface, $context ) ) {
 		return $result;
 	}

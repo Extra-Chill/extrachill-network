@@ -122,6 +122,10 @@ function experiment_check( string $label, bool $condition ): void {
 	++$failures;
 }
 
+function experiment_consumer_behavior( array $assignment ): string {
+	return '' === $assignment['variant'] ? 'normal-feature' : $assignment['variant'];
+}
+
 function experiment_definition( bool $eligible = true ): array {
 	return array(
 		'key'                  => 'geo-bridge-holdout',
@@ -451,7 +455,7 @@ $GLOBALS['experiment_filters']['extrachill_experiment_definitions'] = array(
 	},
 );
 $broken = extrachill_resolve_experiment_assignment( 'broken', 'single-post-bridge' );
-experiment_check( 'invalid configuration falls back to control', 'control' === $broken['variant'] );
+experiment_check( 'invalid configuration produces no assignment', '' === $broken['variant'] );
 experiment_check( 'invalid configuration remains unmeasured', false === $broken['measurement_eligible'] );
 
 $ability = new \ExtraChillNetwork\Abilities\ExperimentAssignmentAbility();
@@ -546,6 +550,10 @@ $GLOBALS['experiment_actions']                                      = array();
 $GLOBALS['experiment_enqueued']                                     = array();
 $inactive_assignment = extrachill_resolve_experiment_assignment( 'geo-bridge-holdout', 'single-post-bridge' );
 experiment_check( 'missing live state uses reviewed inactive default', false === $inactive_assignment['measurement_eligible'] );
+experiment_check( 'geo bridge holdout is inactive by code default', 'inactive' === $lifecycle_definition['default_state'] );
+experiment_check( 'inactive default requires explicit operator activation', ! isset( $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] ) );
+experiment_check( 'inactive experiment returns no forced treatment', '' === $inactive_assignment['variant'] );
+experiment_check( 'inactive lifecycle preserves normal consumer behavior', 'normal-feature' === experiment_consumer_behavior( $inactive_assignment ) );
 experiment_check( 'inactive experiment helper fails closed', ! extrachill_experiment_is_active( 'geo-bridge-holdout', 'single-post-bridge' ) );
 experiment_check( 'inactive experiment emits no attributes', '' === extrachill_experiment_attributes( 'geo-bridge-holdout', 'single-post-bridge' ) );
 experiment_check( 'inactive experiment enqueues no client asset', array() === $GLOBALS['experiment_enqueued'] );
@@ -564,6 +572,9 @@ experiment_check( 'active response includes assignment policy', 'weighted_random
 $paused = extrachill_transition_experiment_state( 'geo-bridge-holdout', 1, 'paused' );
 experiment_check( 'active transitions to paused', is_array( $paused ) && 'paused' === $paused['state'] );
 experiment_check( 'paused lifecycle rejects a previously issued exposure proof', null === extrachill_validate_experiment_exposure( 'geo-bridge-holdout', 1, 'weighted_random', $active_assignment['variant'], 'single-post-bridge', array(), $active_assignment['exposure_token'] ) );
+$paused_assignment = extrachill_resolve_experiment_assignment( 'geo-bridge-holdout', 'single-post-bridge' );
+experiment_check( 'paused experiment returns no forced treatment', '' === $paused_assignment['variant'] );
+experiment_check( 'paused lifecycle preserves normal consumer behavior', 'normal-feature' === experiment_consumer_behavior( $paused_assignment ) );
 $GLOBALS['experiment_actions']  = array();
 $GLOBALS['experiment_enqueued'] = array();
 experiment_check( 'paused experiment emits no attributes', '' === extrachill_experiment_attributes( 'geo-bridge-holdout', 'single-post-bridge' ) );
@@ -572,6 +583,9 @@ $resumed = extrachill_transition_experiment_state( 'geo-bridge-holdout', 1, 'act
 experiment_check( 'paused transitions back to active', is_array( $resumed ) && 'active' === $resumed['state'] );
 $completed = extrachill_transition_experiment_state( 'geo-bridge-holdout', 1, 'completed' );
 experiment_check( 'active transitions to completed', is_array( $completed ) && 'completed' === $completed['state'] );
+$completed_assignment = extrachill_resolve_experiment_assignment( 'geo-bridge-holdout', 'single-post-bridge' );
+experiment_check( 'completed experiment returns no forced treatment', '' === $completed_assignment['variant'] );
+experiment_check( 'completed lifecycle preserves normal consumer behavior', 'normal-feature' === experiment_consumer_behavior( $completed_assignment ) );
 $GLOBALS['experiment_actions']  = array();
 $GLOBALS['experiment_enqueued'] = array();
 experiment_check( 'completed experiment emits no attributes', '' === extrachill_experiment_attributes( 'geo-bridge-holdout', 'single-post-bridge' ) );

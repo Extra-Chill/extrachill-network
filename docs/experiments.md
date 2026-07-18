@@ -27,7 +27,7 @@ add_filter(
 );
 ```
 
-The stable key must match the filter array key. Versions are positive integers. `weighted_random` is the only policy. The default and control must be the same declared variant. Consumers must explicitly review `default_state`; use `inactive` for new experiments.
+The stable key must match the filter array key. Versions are positive integers. `weighted_random` is the only policy. The default and control must be the same declared variant. Consumers must explicitly review `default_state`; use `inactive` for new experiments. The first `geo-bridge-holdout` definition is inactive by default and requires an explicit operator transition before allocation starts.
 
 The pre-lifecycle keyed shape is normalized as version `1`, policy `weighted_random`, and default state `active` to preserve the merged assignment behavior during migration. Consumers should move to the explicit contract when next edited.
 
@@ -52,9 +52,9 @@ Missing state uses the code default. Corrupt, unknown, unregistered, or future-v
 
 - `extrachill_experiment_is_active( $key, $surface, $context )` checks current lifecycle, registered surface, and consumer eligibility before rendering or enqueueing.
 - `extrachill_experiment_attributes( $key, $surface, $context )` returns cache-neutral control attributes and enqueues the assignment client only for an active, consumer-eligible experiment.
-- `extrachill_resolve_experiment_assignment( $key, $surface, $context )` returns the default unmeasured unless lifecycle, consumer eligibility, subject, and privacy checks all pass.
+- `extrachill_resolve_experiment_assignment( $key, $surface, $context )` returns an empty variant for lifecycle no-ops. Once active, consumer eligibility, subject, or privacy failure returns cache-neutral control unmeasured.
 
-Inactive, paused, completed, unregistered, invalid, and ineligible experiments are true no-ops: no experiment attributes, client enqueue, assignment request, token, assignment/exposure hook, DOM event, or downstream Analytics event.
+Inactive, paused, completed, unregistered, and invalid experiments are true no-ops: no assigned variant, experiment attributes, client enqueue, assignment request, token, assignment/exposure hook, DOM event, or downstream Analytics event. The consumer's normal feature behavior continues unchanged; Network does not force control or treatment while lifecycle is non-active. Active but consumer-ineligible or privacy-excluded requests retain cache-neutral control delivery without measurement.
 
 ## Abilities And Hooks
 
