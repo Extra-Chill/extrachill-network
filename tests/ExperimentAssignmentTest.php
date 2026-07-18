@@ -109,6 +109,10 @@ require dirname( __DIR__ ) . '/inc/Abilities/ExperimentAssignmentAbility.php';
 
 // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local cross-plugin contract fixture.
 $contract_fixture = json_decode( file_get_contents( __DIR__ . '/experiment-contract.fixture.json' ), true );
+// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Coordinated Blog contract fixture.
+$blog_contract_fixture = json_decode( file_get_contents( __DIR__ . '/blog-experiment-contract.fixture.json' ), true );
+// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Coordinated Analytics contract fixture.
+$analytics_contract_fixture = json_decode( file_get_contents( __DIR__ . '/analytics-experiment-contract.fixture.json' ), true );
 
 $failures = 0;
 function experiment_check( string $label, bool $condition ): void {
@@ -147,6 +151,18 @@ function experiment_definition( bool $eligible = true ): array {
 
 $normalized = extrachill_normalize_experiment_definition( experiment_definition() );
 experiment_check( 'valid definitions normalize', is_array( $normalized ) );
+$blog_fixture_definition                         = $blog_contract_fixture['definition'];
+$blog_fixture_definition['eligibility_callback'] = static function (): bool {
+	return true;
+};
+$normalized_blog_fixture                         = extrachill_normalize_experiment_definition( $blog_fixture_definition, 'geo-bridge-holdout' );
+experiment_check( 'Blog cross-contract fixture locks exact normalized definition', is_array( $normalized_blog_fixture ) && $blog_contract_fixture['definition']['key'] === $normalized_blog_fixture['key'] && $blog_contract_fixture['definition']['definition_version'] === $normalized_blog_fixture['definition_version'] && $blog_contract_fixture['definition']['assignment_policy'] === $normalized_blog_fixture['assignment_policy'] && $blog_contract_fixture['definition']['default_state'] === $normalized_blog_fixture['default_state'] && $blog_contract_fixture['definition']['default_variant'] === $normalized_blog_fixture['default_variant'] && $blog_contract_fixture['definition']['control_variant'] === $normalized_blog_fixture['control_variant'] && $blog_contract_fixture['definition']['variants'] === $normalized_blog_fixture['variants'] && $blog_contract_fixture['definition']['surfaces'] === $normalized_blog_fixture['surfaces'] );
+experiment_check( 'Blog cross-contract fixture locks eligibility callback owner', 'extrachill_blog_geographic_bridge_experiment_eligible' === $blog_contract_fixture['definition']['eligibility_callback'] );
+experiment_check( 'Blog cross-contract fixture locks non-active abstention', array( 'inactive', 'paused', 'completed' ) === $blog_contract_fixture['non_active_contract']['states'] && '' === $blog_contract_fixture['non_active_contract']['assigned_variant'] && true === $blog_contract_fixture['non_active_contract']['normal_geography'] );
+experiment_check( 'Analytics cross-contract fixture locks version bound', EXTRACHILL_EXPERIMENT_MAX_DEFINITION_VERSION === $analytics_contract_fixture['definition_version']['maximum'] );
+experiment_check( 'Analytics cross-contract fixture locks trusted metadata order', $contract_fixture['metadata_keys'] === $analytics_contract_fixture['metadata_keys'] );
+experiment_check( 'Analytics cross-contract fixture locks trusted action names', $contract_fixture['server_actions'] === $analytics_contract_fixture['server_actions'] );
+experiment_check( 'Analytics cross-contract fixture locks assignment policy', EXTRACHILL_EXPERIMENT_ASSIGNMENT_POLICY === $analytics_contract_fixture['assignment_policy'] );
 experiment_check( 'first control bucket is control', 'control' === extrachill_experiment_variant_for_bucket( $normalized, 0 ) );
 experiment_check( 'last control bucket is control', 'control' === extrachill_experiment_variant_for_bucket( $normalized, 1 ) );
 experiment_check( 'first treatment bucket is treatment', 'treatment' === extrachill_experiment_variant_for_bucket( $normalized, 2 ) );
@@ -524,6 +540,9 @@ experiment_check( 'declared key must match its registration key', null === extra
 $zero_version                       = experiment_definition();
 $zero_version['definition_version'] = 0;
 experiment_check( 'definition version must be a positive integer', null === extrachill_normalize_experiment_definition( $zero_version, 'geo-bridge-holdout' ) );
+$oversized_version                       = experiment_definition();
+$oversized_version['definition_version'] = EXTRACHILL_EXPERIMENT_MAX_DEFINITION_VERSION + 1;
+experiment_check( 'definition version must fit Analytics contract', null === extrachill_normalize_experiment_definition( $oversized_version, 'geo-bridge-holdout' ) );
 $invalid_policy                      = experiment_definition();
 $invalid_policy['assignment_policy'] = 'deterministic';
 experiment_check( 'unknown assignment policies fail closed', null === extrachill_normalize_experiment_definition( $invalid_policy, 'geo-bridge-holdout' ) );
@@ -609,20 +628,58 @@ $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] = 
 experiment_check( 'non-array option corruption fails closed', ! extrachill_experiment_is_active( 'geo-bridge-holdout' ) );
 $corrupt_transition = extrachill_transition_experiment_state( 'geo-bridge-holdout', 2, 'active' );
 experiment_check( 'corrupt option cannot be overwritten by transition', $corrupt_transition instanceof WP_Error && 'invalid_experiment_lifecycle_option' === $corrupt_transition->code );
-$GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] = array(
-	'geo-bridge-holdout' => array(
-		'definition_version' => 2,
-		'state'              => 'unknown',
-	),
+$other_definition                  = experiment_definition();
+$other_definition['key']           = 'unrelated-experiment';
+$other_definition['default_state'] = 'inactive';
+$GLOBALS['experiment_filters']['extrachill_experiment_definitions']           = array(
+	static function () use ( &$lifecycle_definition, &$other_definition ): array {
+		return array(
+			'geo-bridge-holdout'   => $lifecycle_definition,
+			'unrelated-experiment' => $other_definition,
+		);
+	},
 );
-experiment_check( 'unknown stored state fails closed', ! extrachill_experiment_is_active( 'geo-bridge-holdout' ) );
 $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ] = array(
-	'arbitrary-key' => array(
+	'geo-bridge-holdout'   => array(
+		'definition_version' => 1,
+		'state'              => 'completed',
+	),
+	'unrelated-experiment' => array(
 		'definition_version' => 1,
 		'state'              => 'active',
 	),
+	'removed-experiment'   => array(
+		'definition_version' => 4,
+		'state'              => 'paused',
+	),
+	'unknown-broken'       => 'corrupt',
 );
-experiment_check( 'unregistered stored option key fails closed', ! extrachill_experiment_is_active( 'geo-bridge-holdout' ) );
+$recovered_lifecycle = extrachill_get_experiment_lifecycle_option();
+experiment_check( 'removed stored key does not invalidate lifecycle option', true === $recovered_lifecycle['valid'] );
+experiment_check( 'removed and malformed unknown keys are reported as orphaned', 2 === count( $recovered_lifecycle['orphaned'] ) && 'removed-experiment' === $recovered_lifecycle['orphaned'][0]['key'] && 'unknown-broken' === $recovered_lifecycle['orphaned'][1]['key'] && 0 === $recovered_lifecycle['orphaned'][1]['definition_version'] );
+experiment_check( 'orphan does not disable unrelated active experiment', extrachill_experiment_is_active( 'unrelated-experiment' ) );
+$orphaned_list = extrachill_list_experiments();
+experiment_check( 'admin output reports normalized orphan items', 4 === count( $orphaned_list ) && true === $orphaned_list[2]['orphaned'] && false === $orphaned_list[2]['registered'] && 4 === $orphaned_list[2]['definition_version'] && 'paused' === $orphaned_list[2]['state'] && 0 === $orphaned_list[3]['definition_version'] && 'inactive' === $orphaned_list[3]['state'] );
+$migration_recovery = extrachill_transition_experiment_state( 'geo-bridge-holdout', 2, 'inactive' );
+experiment_check( 'authorized idempotent write migrates current definition version', is_array( $migration_recovery ) && 2 === $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ]['geo-bridge-holdout']['definition_version'] );
+experiment_check( 'authorized state write prunes removed experiment record', ! isset( $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ]['removed-experiment'] ) );
+experiment_check( 'authorized state write prunes malformed unknown record', ! isset( $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ]['unknown-broken'] ) );
+experiment_check( 'recovery write preserves unrelated active state', 'active' === $GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ]['unrelated-experiment']['state'] && extrachill_experiment_is_active( 'unrelated-experiment' ) );
+
+$GLOBALS['experiment_site_options'][ EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION ]['geo-bridge-holdout'] = array(
+	'definition_version' => 2,
+	'state'              => 'unknown',
+);
+$isolated_corruption = extrachill_get_experiment_lifecycle_option();
+experiment_check( 'invalid registered state is isolated to its experiment', true === $isolated_corruption['valid'] && ! extrachill_experiment_is_active( 'geo-bridge-holdout' ) && extrachill_experiment_is_active( 'unrelated-experiment' ) );
+$repair_transition = extrachill_transition_experiment_state( 'geo-bridge-holdout', 2, 'active' );
+experiment_check( 'authorized transition repairs isolated registered state', is_array( $repair_transition ) && extrachill_experiment_is_active( 'geo-bridge-holdout' ) && extrachill_experiment_is_active( 'unrelated-experiment' ) );
+
+$GLOBALS['experiment_filters']['extrachill_experiment_definitions'] = array(
+	static function () use ( &$lifecycle_definition ): array {
+		return array( 'geo-bridge-holdout' => $lifecycle_definition );
+	},
+);
 
 $GLOBALS['experiment_site_options'] = array();
 $list                               = extrachill_list_experiments();
@@ -633,6 +690,10 @@ experiment_check( 'unregistered experiment helper fails closed', ! extrachill_ex
 $list_ability       = $GLOBALS['experiment_abilities']['extrachill/list-experiments'];
 $transition_ability = $GLOBALS['experiment_abilities']['extrachill/transition-experiment-state'];
 experiment_check( 'admin list ability is private by capability', false === $list_ability['permission_callback']() );
+$list_item_schema = $list_ability['output_schema']['items'];
+experiment_check( 'admin list schema rejects undeclared item properties', false === $list_item_schema['additionalProperties'] );
+experiment_check( 'admin list schema declares every normalized item property', array_keys( $list_item_schema['properties'] ) === $list_item_schema['required'] && array_keys( $list[0] ) === $list_item_schema['required'] );
+experiment_check( 'admin list schema bounds definition versions to Analytics contract', EXTRACHILL_EXPERIMENT_MAX_DEFINITION_VERSION === $list_item_schema['properties']['definition_version']['maximum'] );
 experiment_check( 'admin transition ability rejects extra option properties', false === $transition_ability['input_schema']['additionalProperties'] );
 $GLOBALS['experiment_can_admin'] = true;
 experiment_check( 'network options capability permits lifecycle administration', true === $transition_ability['permission_callback']() );

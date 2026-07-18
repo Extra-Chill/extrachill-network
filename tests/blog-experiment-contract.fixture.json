@@ -1,0 +1,32 @@
+{
+  "repository": "Extra-Chill/extrachill-blog",
+  "issue": 73,
+  "definition": {
+    "key": "geo-bridge-holdout",
+    "definition_version": 1,
+    "assignment_policy": "weighted_random",
+    "default_state": "inactive",
+    "default_variant": "control",
+    "control_variant": "control",
+    "variants": {
+      "control": 50,
+      "treatment": 50
+    },
+    "surfaces": [
+      "single-post-bridge"
+    ],
+    "eligibility_callback": "extrachill_blog_geographic_bridge_experiment_eligible"
+  },
+  "non_active_contract": {
+    "states": [
+      "inactive",
+      "paused",
+      "completed"
+    ],
+    "assigned_variant": "",
+    "normal_geography": true,
+    "experiment_attributes": false,
+    "experiment_assets": false,
+    "assignment_request": false
+  }
+}

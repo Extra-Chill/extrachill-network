@@ -47,6 +47,9 @@ const EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION = 'extrachill_experiment_lifecycle'
 /** The only supported allocation policy. */
 const EXTRACHILL_EXPERIMENT_ASSIGNMENT_POLICY = 'weighted_random';
 
+/** Maximum code definition version accepted across Network and Analytics. */
+const EXTRACHILL_EXPERIMENT_MAX_DEFINITION_VERSION = 1000000;
+
 /** Bounded lifecycle states. */
 const EXTRACHILL_EXPERIMENT_STATES = array( 'inactive', 'active', 'paused', 'completed' );
 
@@ -133,6 +136,7 @@ function extrachill_normalize_experiment_definition( $definition, $registered_ke
 		|| ( '' !== $key && 1 !== preg_match( '/^[a-z0-9][a-z0-9_-]{0,63}$/', $key ) )
 		|| ! is_int( $version )
 		|| $version <= 0
+		|| $version > EXTRACHILL_EXPERIMENT_MAX_DEFINITION_VERSION
 		|| EXTRACHILL_EXPERIMENT_ASSIGNMENT_POLICY !== $policy
 		|| ! in_array( $default_state, EXTRACHILL_EXPERIMENT_STATES, true )
 		|| '' === $default
@@ -212,48 +216,62 @@ function extrachill_get_normalized_experiment_definitions() {
 /**
  * Read and validate the bounded live-state option.
  *
- * @return array{valid: bool, states: array<string, array{definition_version: int, state: string}>}
+ * @return array{valid: bool, states: array<string, array{definition_version: int, state: string}>, orphaned: array<int, array{key: string, definition_version: int, state: string}>, invalid_keys: array<string, bool>}
  */
 function extrachill_get_experiment_lifecycle_option() {
 	$value = get_site_option( EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION, false );
 	if ( false === $value ) {
 		return array(
-			'valid'  => true,
-			'states' => array(),
+			'valid'        => true,
+			'states'       => array(),
+			'orphaned'     => array(),
+			'invalid_keys' => array(),
 		);
 	}
 	if ( ! is_array( $value ) ) {
 		return array(
-			'valid'  => false,
-			'states' => array(),
+			'valid'        => false,
+			'states'       => array(),
+			'orphaned'     => array(),
+			'invalid_keys' => array(),
 		);
 	}
 
 	$states          = array();
+	$orphaned        = array();
+	$invalid_keys    = array();
 	$registered_keys = array_keys( extrachill_get_normalized_experiment_definitions() );
 	foreach ( $value as $key => $record ) {
+		$key_is_valid = is_string( $key ) && 1 === preg_match( '/^[a-z0-9][a-z0-9_-]{0,63}$/', $key );
+		if ( ! $key_is_valid || ! in_array( $key, $registered_keys, true ) ) {
+			$orphaned[] = array(
+				'key'                => $key_is_valid ? $key : 'invalid-' . substr( hash( 'sha256', (string) $key ), 0, 16 ),
+				'definition_version' => is_array( $record ) && isset( $record['definition_version'] ) && is_int( $record['definition_version'] ) && $record['definition_version'] > 0 && $record['definition_version'] <= EXTRACHILL_EXPERIMENT_MAX_DEFINITION_VERSION ? $record['definition_version'] : 0,
+				'state'              => is_array( $record ) && isset( $record['state'] ) && is_string( $record['state'] ) && in_array( $record['state'], EXTRACHILL_EXPERIMENT_STATES, true ) ? $record['state'] : 'inactive',
+			);
+			continue;
+		}
+
 		if (
-			! is_string( $key )
-			|| 1 !== preg_match( '/^[a-z0-9][a-z0-9_-]{0,63}$/', $key )
-			|| ! in_array( $key, $registered_keys, true )
-			|| ! is_array( $record )
+			! is_array( $record )
 			|| array( 'definition_version', 'state' ) !== array_keys( $record )
 			|| ! is_int( $record['definition_version'] )
 			|| $record['definition_version'] <= 0
+			|| $record['definition_version'] > EXTRACHILL_EXPERIMENT_MAX_DEFINITION_VERSION
 			|| ! is_string( $record['state'] )
 			|| ! in_array( $record['state'], EXTRACHILL_EXPERIMENT_STATES, true )
 		) {
-			return array(
-				'valid'  => false,
-				'states' => array(),
-			);
+			$invalid_keys[ $key ] = true;
+			continue;
 		}
 		$states[ $key ] = $record;
 	}
 
 	return array(
-		'valid'  => true,
-		'states' => $states,
+		'valid'        => true,
+		'states'       => $states,
+		'orphaned'     => $orphaned,
+		'invalid_keys' => $invalid_keys,
 	);
 }
 
@@ -273,7 +291,10 @@ function extrachill_get_experiment_state( array $definition, $lifecycle = null )
 		return 'inactive';
 	}
 
-	$key    = $definition['key'];
+	$key = $definition['key'];
+	if ( ! empty( $lifecycle['invalid_keys'][ $key ] ) ) {
+		return 'inactive';
+	}
 	$record = isset( $lifecycle['states'][ $key ] ) ? $lifecycle['states'][ $key ] : null;
 	if ( null === $record || $record['definition_version'] < $definition['definition_version'] ) {
 		return $definition['default_state'];
@@ -328,6 +349,8 @@ function extrachill_list_experiments() {
 	foreach ( extrachill_get_normalized_experiment_definitions() as $definition ) {
 		$output[] = array(
 			'key'                => $definition['key'],
+			'registered'         => true,
+			'orphaned'           => false,
 			'definition_version' => $definition['definition_version'],
 			'assignment_policy'  => $definition['assignment_policy'],
 			'default_state'      => $definition['default_state'],
@@ -336,6 +359,21 @@ function extrachill_list_experiments() {
 			'control_variant'    => $definition['control_variant'],
 			'variants'           => $definition['variants'],
 			'surfaces'           => $definition['surfaces'],
+		);
+	}
+	foreach ( $lifecycle['orphaned'] as $orphaned ) {
+		$output[] = array(
+			'key'                => $orphaned['key'],
+			'registered'         => false,
+			'orphaned'           => true,
+			'definition_version' => $orphaned['definition_version'],
+			'assignment_policy'  => '',
+			'default_state'      => 'inactive',
+			'state'              => $orphaned['state'],
+			'default_variant'    => '',
+			'control_variant'    => '',
+			'variants'           => array(),
+			'surfaces'           => array(),
 		);
 	}
 
@@ -378,25 +416,32 @@ function extrachill_transition_experiment_state( $experiment_key, $definition_ve
 		return new \WP_Error( 'invalid_experiment_state_transition', __( 'Experiment lifecycle transition is invalid.', 'extrachill-network' ), array( 'status' => 409 ) );
 	}
 
-	$result = array(
+	$result           = array(
 		'experiment_key'     => $definition['key'],
 		'definition_version' => $definition['definition_version'],
 		'previous_state'     => $old_state,
 		'state'              => $new_state,
 	);
-	if ( $old_state === $new_state ) {
+	$stored_record    = isset( $lifecycle['states'][ $definition['key'] ] ) ? $lifecycle['states'][ $definition['key'] ] : null;
+	$version_mismatch = null !== $stored_record && $stored_record['definition_version'] !== $definition['definition_version'];
+	$needs_recovery   = ! empty( $lifecycle['orphaned'] ) || ! empty( $lifecycle['invalid_keys'] ) || $version_mismatch;
+	if ( $old_state === $new_state && ! $needs_recovery ) {
 		return $result;
 	}
 
-	$lifecycle['states'][ $definition['key'] ] = array(
-		'definition_version' => $definition['definition_version'],
-		'state'              => $new_state,
-	);
+	if ( $old_state !== $new_state || ! empty( $lifecycle['invalid_keys'][ $definition['key'] ] ) || $version_mismatch ) {
+		$lifecycle['states'][ $definition['key'] ] = array(
+			'definition_version' => $definition['definition_version'],
+			'state'              => $new_state,
+		);
+	}
 	if ( ! update_site_option( EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION, $lifecycle['states'] ) ) {
 		return new \WP_Error( 'experiment_state_update_failed', __( 'Experiment lifecycle state could not be saved.', 'extrachill-network' ), array( 'status' => 500 ) );
 	}
 
-	do_action( 'extrachill_experiment_state_changed', $result );
+	if ( $old_state !== $new_state ) {
+		do_action( 'extrachill_experiment_state_changed', $result );
+	}
 	return $result;
 }
 

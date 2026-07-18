@@ -61,7 +61,11 @@ class ExperimentAssignmentAbility {
 					'additionalProperties' => false,
 					'properties'           => array(
 						'experiment_key'       => array( 'type' => 'string' ),
-						'definition_version'   => array( 'type' => 'integer' ),
+						'definition_version'   => array(
+							'type'    => 'integer',
+							'minimum' => 0,
+							'maximum' => \EXTRACHILL_EXPERIMENT_MAX_DEFINITION_VERSION,
+						),
 						'assignment_policy'    => array( 'type' => 'string' ),
 						'variant'              => array( 'type' => 'string' ),
 						'surface'              => array( 'type' => 'string' ),
@@ -99,6 +103,7 @@ class ExperimentAssignmentAbility {
 						'definition_version' => array(
 							'type'    => 'integer',
 							'minimum' => 1,
+							'maximum' => \EXTRACHILL_EXPERIMENT_MAX_DEFINITION_VERSION,
 						),
 						'assignment_policy'  => array(
 							'type' => 'string',
@@ -141,7 +146,56 @@ class ExperimentAssignmentAbility {
 				'category'            => 'extrachill-network',
 				'output_schema'       => array(
 					'type'  => 'array',
-					'items' => array( 'type' => 'object' ),
+					'items' => array(
+						'type'                 => 'object',
+						'required'             => array( 'key', 'registered', 'orphaned', 'definition_version', 'assignment_policy', 'default_state', 'state', 'default_variant', 'control_variant', 'variants', 'surfaces' ),
+						'additionalProperties' => false,
+						'properties'           => array(
+							'key'                => $this->identifier_schema(),
+							'registered'         => array( 'type' => 'boolean' ),
+							'orphaned'           => array( 'type' => 'boolean' ),
+							'definition_version' => array(
+								'type'    => 'integer',
+								'minimum' => 0,
+								'maximum' => \EXTRACHILL_EXPERIMENT_MAX_DEFINITION_VERSION,
+							),
+							'assignment_policy'  => array(
+								'type' => 'string',
+								'enum' => array( '', \EXTRACHILL_EXPERIMENT_ASSIGNMENT_POLICY ),
+							),
+							'default_state'      => array(
+								'type' => 'string',
+								'enum' => \EXTRACHILL_EXPERIMENT_STATES,
+							),
+							'state'              => array(
+								'type' => 'string',
+								'enum' => \EXTRACHILL_EXPERIMENT_STATES,
+							),
+							'default_variant'    => array(
+								'type'      => 'string',
+								'maxLength' => 64,
+							),
+							'control_variant'    => array(
+								'type'      => 'string',
+								'maxLength' => 64,
+							),
+							'variants'           => array(
+								'type'                 => 'object',
+								'maxProperties'        => 64,
+								'additionalProperties' => array(
+									'type'    => 'integer',
+									'minimum' => 1,
+									'maximum' => \EXTRACHILL_EXPERIMENT_MAX_VARIANT_WEIGHT,
+								),
+							),
+							'surfaces'           => array(
+								'type'        => 'array',
+								'maxItems'    => 64,
+								'uniqueItems' => true,
+								'items'       => $this->identifier_schema(),
+							),
+						),
+					),
 				),
 				'execute_callback'    => array( $this, 'execute_list' ),
 				'permission_callback' => array( $this, 'check_admin_permission' ),
@@ -170,6 +224,7 @@ class ExperimentAssignmentAbility {
 						'definition_version' => array(
 							'type'    => 'integer',
 							'minimum' => 1,
+							'maximum' => \EXTRACHILL_EXPERIMENT_MAX_DEFINITION_VERSION,
 						),
 						'state'              => array(
 							'type' => 'string',
@@ -183,7 +238,11 @@ class ExperimentAssignmentAbility {
 					'additionalProperties' => false,
 					'properties'           => array(
 						'experiment_key'     => array( 'type' => 'string' ),
-						'definition_version' => array( 'type' => 'integer' ),
+						'definition_version' => array(
+							'type'    => 'integer',
+							'minimum' => 1,
+							'maximum' => \EXTRACHILL_EXPERIMENT_MAX_DEFINITION_VERSION,
+						),
 						'previous_state'     => array( 'type' => 'string' ),
 						'state'              => array( 'type' => 'string' ),
 					),

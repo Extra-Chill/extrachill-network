@@ -1,0 +1,21 @@
+{
+  "repository": "Extra-Chill/extrachill-analytics",
+  "pull_request": 212,
+  "server_actions": {
+    "assignment": "extrachill_experiment_assignment",
+    "exposure": "extrachill_experiment_exposure",
+    "accepted_args": 1
+  },
+  "metadata_keys": [
+    "experiment_key",
+    "definition_version",
+    "assignment_policy",
+    "variant",
+    "surface"
+  ],
+  "definition_version": {
+    "minimum": 1,
+    "maximum": 1000000
+  },
+  "assignment_policy": "weighted_random"
+}

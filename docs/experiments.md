@@ -46,7 +46,7 @@ array(
 
 Valid transitions are `inactive -> active`, `active -> paused`, `paused -> active`, `active -> completed`, and `paused -> completed`. Repeating the effective state is idempotent. A completed definition version is terminal. A higher code definition version resets to its reviewed default and may be activated as a new run.
 
-Missing state uses the code default. Corrupt, unknown, unregistered, or future-version state fails closed. Option keys cannot be supplied by callers; lifecycle writes resolve only registered code definitions.
+Missing state uses the code default. Corrupt or future-version state fails closed for the affected registered experiment without disabling unrelated experiments. Stored keys whose code definitions were removed are ignored during resolution and reported as normalized `orphaned` items by `extrachill/list-experiments`. The next authorized state write prunes orphaned records and repairs the targeted version while preserving unrelated registered state. Option keys cannot be supplied by callers; lifecycle writes resolve only registered code definitions.
 
 ## Public Helpers
 
@@ -69,3 +69,5 @@ Private lifecycle abilities require `manage_network_options`. Cookie-authenticat
 - `extrachill/transition-experiment-state`
 
 Assignment responses, exposure requests, signed proofs, DOM events, and trusted `extrachill_experiment_assignment` / `extrachill_experiment_exposure` metadata include `definition_version` and `assignment_policy`. State changes emit `extrachill_experiment_state_changed` with only the experiment key, definition version, previous state, and new state for optional audit integration; Network adds no audit storage.
+
+The coordinated dependency fixtures in `tests/blog-experiment-contract.fixture.json` and `tests/analytics-experiment-contract.fixture.json` lock Blog #73's exact inactive geo definition/no-op boundary and Analytics PR #212's exact trusted hook metadata/version boundary.
