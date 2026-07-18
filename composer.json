@@ -17,7 +17,7 @@
 		}
 	},
 	"scripts": {
-		"test": "php tests/FrontendPathResolverTest.php && php tests/FrontendPathResolverRuntimeTest.php && php tests/AdPolicyTest.php && php tests/NetworkBridgeComposerFallbackTest.php && php tests/ExperimentAssignmentTest.php && node tests/ExperimentAssignmentJsTest.js",
+		"test": "php tests/FrontendPathResolverTest.php && php tests/FrontendPathResolverRuntimeTest.php && php tests/AdPolicyTest.php && php tests/NetworkBridgeComposerFallbackTest.php && php tests/ExperimentAssignmentTest.php && node tests/ExperimentAssignmentJsTest.js && node tests/BridgeInstrumentationJsTest.js",
 		"lint:php": "phpcs --standard=WordPress --exclude=WordPress.Files.FileName inc/core/frontend-path-resolver.php inc/core/ad-policy.php inc/core/experiments.php inc/integrations/ad-delivery.php inc/integrations/member-ad-benefit.php inc/Abilities/AdPolicyAbility.php inc/Abilities/ExperimentAssignmentAbility.php admin/network-ad-settings.php tests/ExperimentAssignmentTest.php && php -l tests/FrontendPathResolverTest.php && php -l tests/FrontendPathResolverRuntimeProbe.php && php -l tests/FrontendPathResolverRuntimeTest.php && php -l tests/FrontendPathResolverTransportProbe.php && php -l tests/AdPolicyTest.php && php -l tests/ExperimentAssignmentTest.php && node --check assets/js/experiment-assignment.js && node --check tests/ExperimentAssignmentJsTest.js",
 		"lint:fix": "phpcbf --standard=WordPress ."
 	},

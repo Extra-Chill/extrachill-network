@@ -22,6 +22,7 @@ function makeLink( destination, label, rect ) {
 	return {
 		textContent: label,
 		rect,
+		unavailable: '',
 		getAttribute( name ) {
 			return name === 'href'
 				? `https://${ destination }.extrachill.com/item?utm_campaign=${ destination }`
@@ -31,7 +32,21 @@ function makeLink( destination, label, rect ) {
 			return this.rect;
 		},
 		closest( selector ) {
-			return selector === '.ec-cross-site-link' ? this : null;
+			if ( selector === '.ec-cross-site-link' ) {
+				return this;
+			}
+			if ( ! this.unavailable ) {
+				return null;
+			}
+			if ( this.unavailable === 'hidden' && selector.includes( '[hidden]' ) ) {
+				return this;
+			}
+			if ( this.unavailable === 'inert' && selector.includes( '[inert]' ) ) {
+				return this;
+			}
+			return this.unavailable === 'aria-hidden' && selector.includes( '[aria-hidden="true"]' )
+				? this
+				: null;
 		},
 	};
 }
@@ -250,6 +265,48 @@ check(
 	observerHarness.events.filter( ( event ) => event.endpoint === '/click' ).length ===
 		observerHarness.events.filter( ( event ) => event.endpoint === '/impression' ).length
 );
+
+const communityLink = makeLink( 'community', 'Community', visibleRect );
+const hiddenLink = makeLink( 'events', 'Hidden Events', visibleRect );
+const inertLink = makeLink( 'wire', 'Inert Wire', visibleRect );
+communityLink.unavailable = 'aria-hidden';
+hiddenLink.unavailable = 'hidden';
+inertLink.unavailable = 'inert';
+const hiddenHarness = createHarness( [ communityLink, hiddenLink, inertLink ], true );
+const hiddenObserver = hiddenHarness.observers[ 0 ];
+hiddenObserver.callback( [
+	{ target: communityLink, isIntersecting: true, intersectionRatio: 1 },
+	{ target: hiddenLink, isIntersecting: true, intersectionRatio: 1 },
+	{ target: inertLink, isIntersecting: true, intersectionRatio: 1 },
+] );
+check( 'hidden, inert, and aria-hidden candidates do not count', hiddenHarness.events.length === 0 );
+check( 'hidden candidates remain observed for later activation', ! hiddenObserver.unobserved.includes( communityLink ) );
+
+communityLink.unavailable = '';
+hiddenObserver.callback( [
+	{ target: communityLink, isIntersecting: true, intersectionRatio: 1 },
+] );
+check( 'activated treatment candidate counts exactly once', hiddenHarness.events.length === 1 );
+hiddenObserver.callback( [
+	{ target: communityLink, isIntersecting: true, intersectionRatio: 1 },
+] );
+check( 'activated treatment exposure remains deduped', hiddenHarness.events.length === 1 );
+
+const hiddenFallbackLink = makeLink( 'community', 'Hidden Community', visibleRect );
+hiddenFallbackLink.unavailable = 'hidden';
+const hiddenFallbackHarness = createHarness( [ hiddenFallbackLink ], false );
+check( 'fallback does not expose hidden candidates', hiddenFallbackHarness.events.length === 0 );
+hiddenFallbackHarness.click( hiddenFallbackLink );
+check( 'delegated clicks ignore unavailable candidates', hiddenFallbackHarness.events.length === 0 );
+
+const clickFirstLink = makeLink( 'events', 'Click First', visibleRect );
+const clickFirstHarness = createHarness( [ clickFirstLink ], true );
+const clickFirstObserver = clickFirstHarness.observers[ 0 ];
+clickFirstHarness.click( clickFirstLink );
+clickFirstObserver.callback( [
+	{ target: clickFirstLink, isIntersecting: true, intersectionRatio: 1 },
+] );
+check( 'click-first exposed links stop being observed', clickFirstObserver.unobserved.includes( clickFirstLink ) );
 
 const duplicateOne = makeLink( 'events', 'Events One', visibleRect );
 const duplicateTwo = makeLink( 'events', 'Events Two', visibleRect );
