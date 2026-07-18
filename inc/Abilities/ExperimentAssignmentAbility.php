@@ -186,6 +186,9 @@ class ExperimentAssignmentAbility {
 		if ( null === $metadata ) {
 			return new \WP_Error( 'invalid_experiment_exposure', __( 'Experiment exposure proof is invalid or expired.', 'extrachill-network' ), array( 'status' => 400 ) );
 		}
+		if ( ! extrachill_consume_experiment_exposure_token( (string) $input['exposure_token'] ) ) {
+			return new \WP_Error( 'experiment_exposure_already_consumed', __( 'Experiment exposure proof was already consumed.', 'extrachill-network' ), array( 'status' => 409 ) );
+		}
 
 		/**
 		 * Fires after a signed viewport exposure is validated server-side.

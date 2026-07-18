@@ -32,6 +32,19 @@ const EXTRACHILL_EXPERIMENT_MAX_TOTAL_WEIGHT = 1000000;
 /** Short lifetime for a browser exposure proof. */
 const EXTRACHILL_EXPERIMENT_EXPOSURE_TOKEN_TTL = 3600;
 
+/** Shared atomic-cache group for consumed exposure proofs. */
+const EXTRACHILL_EXPERIMENT_EXPOSURE_CACHE_GROUP = 'extrachill_experiment_exposures';
+
+/**
+ * Make exposure proof consumption network-global on multisite caches.
+ */
+function extrachill_register_experiment_cache_group() {
+	if ( function_exists( 'wp_cache_add_global_groups' ) ) {
+		wp_cache_add_global_groups( array( EXTRACHILL_EXPERIMENT_EXPOSURE_CACHE_GROUP ) );
+	}
+}
+add_action( 'init', 'extrachill_register_experiment_cache_group', 0 );
+
 /**
  * Return registered experiment definitions.
  *
@@ -337,6 +350,46 @@ function extrachill_validate_experiment_exposure( $experiment_key, $variant, $su
 	$expected = extrachill_experiment_exposure_token( $metadata, $subject_key, $context, $issued_at );
 
 	return hash_equals( $expected, (string) $token ) ? $metadata : null;
+}
+
+/**
+ * Atomically claim one validated exposure proof before emitting its hook.
+ *
+ * The persistent object-cache `add` operation is the compare-and-set boundary:
+ * exactly one concurrent request can create a digest key. Installations without
+ * a shared external object cache fail closed rather than claiming replay safety
+ * that the request-local core cache cannot provide.
+ *
+ * @param string   $token Validated exposure token.
+ * @param int|null $now   Optional current time for tests.
+ * @return bool True only for the first consumer of this token.
+ */
+function extrachill_consume_experiment_exposure_token( $token, $now = null ) {
+	if ( function_exists( 'wp_using_ext_object_cache' ) && ! wp_using_ext_object_cache() ) {
+		return false;
+	}
+	if ( 1 !== preg_match( '/^(\d{10})\.[a-f0-9]{64}$/', (string) $token, $matches ) ) {
+		return false;
+	}
+
+	$now       = null === $now ? time() : (int) $now;
+	$issued_at = (int) $matches[1];
+	$ttl       = min(
+		EXTRACHILL_EXPERIMENT_EXPOSURE_TOKEN_TTL,
+		$issued_at + EXTRACHILL_EXPERIMENT_EXPOSURE_TOKEN_TTL - $now
+	);
+	if ( $ttl <= 0 ) {
+		return false;
+	}
+
+	$digest = hash( 'sha256', (string) $token );
+
+	return wp_cache_add(
+		'exposure_' . $digest,
+		1,
+		EXTRACHILL_EXPERIMENT_EXPOSURE_CACHE_GROUP,
+		$ttl
+	);
 }
 
 /**

@@ -15,12 +15,15 @@ define( 'ABSPATH', __DIR__ . '/' );
 define( 'EXTRACHILL_NETWORK_PLUGIN_DIR', dirname( __DIR__ ) . '/' );
 define( 'EXTRACHILL_NETWORK_PLUGIN_URL', 'https://example.com/wp-content/plugins/extrachill-network/' );
 
-$GLOBALS['experiment_filters']   = array();
-$GLOBALS['experiment_user_id']   = 0;
-$GLOBALS['experiment_blog_id']   = 1;
-$GLOBALS['experiment_enqueued']  = array();
-$GLOBALS['experiment_abilities'] = array();
-$GLOBALS['experiment_actions']   = array();
+$GLOBALS['experiment_filters']        = array();
+$GLOBALS['experiment_user_id']        = 0;
+$GLOBALS['experiment_blog_id']        = 1;
+$GLOBALS['experiment_enqueued']       = array();
+$GLOBALS['experiment_abilities']      = array();
+$GLOBALS['experiment_actions']        = array();
+$GLOBALS['experiment_cache']          = array();
+$GLOBALS['experiment_cache_adds']     = array();
+$GLOBALS['experiment_external_cache'] = true;
 
 class WP_Error {
 	public function __construct( public string $code ) {}
@@ -40,6 +43,24 @@ function wp_salt() {
 }
 function do_action( $name, ...$args ) {
 	$GLOBALS['experiment_actions'][] = array( $name, $args );
+}
+function wp_using_ext_object_cache() {
+	return $GLOBALS['experiment_external_cache'];
+}
+function wp_cache_add_global_groups() {}
+function wp_cache_add( $key, $value, $group, $ttl ) {
+	$cache_key                          = $group . ':' . $key;
+	$GLOBALS['experiment_cache_adds'][] = array(
+		'key'   => $key,
+		'group' => $group,
+		'ttl'   => $ttl,
+	);
+	if ( array_key_exists( $cache_key, $GLOBALS['experiment_cache'] ) ) {
+		return false;
+	}
+
+	$GLOBALS['experiment_cache'][ $cache_key ] = $value;
+	return true;
 }
 function rest_url( $path ) {
 	return 'https://example.com/wp-json/' . $path;
@@ -73,6 +94,9 @@ function apply_filters( $name, $value, ...$args ) {
 
 require dirname( __DIR__ ) . '/inc/core/experiments.php';
 require dirname( __DIR__ ) . '/inc/Abilities/ExperimentAssignmentAbility.php';
+
+// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local cross-plugin contract fixture.
+$contract_fixture = json_decode( file_get_contents( __DIR__ . '/experiment-contract.fixture.json' ), true );
 
 $failures = 0;
 function experiment_check( string $label, bool $condition ): void {
@@ -186,6 +210,9 @@ experiment_check( 'assignment stays within registered variants', in_array( $assi
 experiment_check( 'assignment returns an opaque exposure proof', 1 === preg_match( '/^\d{10}\.[a-f0-9]{64}$/', $assigned['exposure_token'] ) );
 experiment_check( 'trusted server assignment hook fires once', 1 === count( $GLOBALS['experiment_actions'] ) && 'extrachill_experiment_assignment' === $GLOBALS['experiment_actions'][0][0] );
 experiment_check( 'assignment hook contains only bounded metadata', 'experiment_key,variant,surface' === implode( ',', array_keys( $GLOBALS['experiment_actions'][0][1][0] ) ) );
+experiment_check( 'cross-contract fixture locks assignment hook name', $contract_fixture['server_actions']['assignment'] === $GLOBALS['experiment_actions'][0][0] );
+experiment_check( 'cross-contract fixture locks one metadata argument', 1 === $contract_fixture['server_actions']['accepted_args'] && 1 === count( $GLOBALS['experiment_actions'][0][1] ) );
+experiment_check( 'cross-contract fixture locks metadata keys', array_keys( $GLOBALS['experiment_actions'][0][1][0] ) === $contract_fixture['metadata_keys'] );
 
 $exposure = extrachill_validate_experiment_exposure(
 	'geo-bridge-holdout',
@@ -232,6 +259,32 @@ experiment_check(
 		1700000000 + EXTRACHILL_EXPERIMENT_EXPOSURE_TOKEN_TTL + 1
 	)
 );
+
+$race_issued                      = time() - 1;
+$race_token                       = extrachill_experiment_exposure_token( $expired_metadata, 'visitor-123', array(), $race_issued );
+$race_first_validation            = extrachill_validate_experiment_exposure(
+	'geo-bridge-holdout',
+	$assigned['variant'],
+	'single-post-bridge',
+	array(),
+	$race_token,
+	$race_issued + 1
+);
+$race_second_validation           = extrachill_validate_experiment_exposure(
+	'geo-bridge-holdout',
+	$assigned['variant'],
+	'single-post-bridge',
+	array(),
+	$race_token,
+	$race_issued + 1
+);
+$GLOBALS['experiment_cache']      = array();
+$GLOBALS['experiment_cache_adds'] = array();
+experiment_check( 'concurrent requests can both finish stateless validation', is_array( $race_first_validation ) && is_array( $race_second_validation ) );
+experiment_check( 'first concurrent request atomically consumes token', extrachill_consume_experiment_exposure_token( $race_token, $race_issued + 1 ) );
+experiment_check( 'second concurrent request loses atomic cache race', ! extrachill_consume_experiment_exposure_token( $race_token, $race_issued + 1 ) );
+experiment_check( 'atomic claim uses the network exposure cache group', EXTRACHILL_EXPERIMENT_EXPOSURE_CACHE_GROUP === $GLOBALS['experiment_cache_adds'][0]['group'] );
+experiment_check( 'atomic claim expires within token TTL', $GLOBALS['experiment_cache_adds'][0]['ttl'] > 0 && $GLOBALS['experiment_cache_adds'][0]['ttl'] <= EXTRACHILL_EXPERIMENT_EXPOSURE_TOKEN_TTL );
 
 $first_blog_variant            = $assigned['variant'];
 $GLOBALS['experiment_blog_id'] = 9;
@@ -291,6 +344,8 @@ $GLOBALS['experiment_filters']['extrachill_experiment_definitions'] = array(
 	},
 );
 $GLOBALS['experiment_actions']                                      = array();
+$GLOBALS['experiment_cache']                                        = array();
+$GLOBALS['experiment_cache_adds']                                   = array();
 $exposure_result = $ability->execute_exposure(
 	array(
 		'experiment_key' => 'geo-bridge-holdout',
@@ -300,7 +355,20 @@ $exposure_result = $ability->execute_exposure(
 	)
 );
 experiment_check( 'valid exposure ability call is accepted', true === $exposure_result['accepted'] );
+experiment_check( 'first exposure use creates one atomic digest claim', 1 === count( $GLOBALS['experiment_cache_adds'] ) && 0 === strpos( $GLOBALS['experiment_cache_adds'][0]['key'], 'exposure_' ) );
 experiment_check( 'valid exposure emits one trusted server hook', 1 === count( $GLOBALS['experiment_actions'] ) && 'extrachill_experiment_exposure' === $GLOBALS['experiment_actions'][0][0] );
+experiment_check( 'cross-contract fixture locks exposure hook name', $contract_fixture['server_actions']['exposure'] === $GLOBALS['experiment_actions'][0][0] );
+experiment_check( 'exposure hook receives one bounded metadata array', 1 === count( $GLOBALS['experiment_actions'][0][1] ) && array_keys( $GLOBALS['experiment_actions'][0][1][0] ) === $contract_fixture['metadata_keys'] );
+$replayed_exposure = $ability->execute_exposure(
+	array(
+		'experiment_key' => 'geo-bridge-holdout',
+		'variant'        => $assigned['variant'],
+		'surface'        => 'single-post-bridge',
+		'exposure_token' => $assigned['exposure_token'],
+	)
+);
+experiment_check( 'replayed valid exposure token is rejected', $replayed_exposure instanceof WP_Error && 'experiment_exposure_already_consumed' === $replayed_exposure->code );
+experiment_check( 'replayed exposure emits no duplicate hook', 1 === count( $GLOBALS['experiment_actions'] ) );
 $invalid_exposure = $ability->execute_exposure(
 	array(
 		'experiment_key' => 'geo-bridge-holdout',
