@@ -27,7 +27,9 @@ add_filter(
 );
 ```
 
-The stable key must match the filter array key. Versions are positive integers. `weighted_random` is the only policy. The default and control must be the same declared variant. Consumers must explicitly review `default_state`; use `inactive` for new experiments. The first `geo-bridge-holdout` definition is inactive by default and requires an explicit operator transition before allocation starts.
+The stable key must match the filter array key. Versions are positive integers up to `1,000,000`. `weighted_random` is the only policy. The default and control must be the same declared variant. Consumers must explicitly review `default_state`; use `inactive` for new experiments. The first `geo-bridge-holdout` definition is inactive by default and requires an explicit operator transition before allocation starts.
+
+Hard registry bounds are 64 registered definitions, 64 variants per definition, and 64 surfaces per definition. An over-bound registry or definition is rejected rather than partially admitted.
 
 The pre-lifecycle keyed shape is normalized as version `1`, policy `weighted_random`, and default state `active` to preserve the merged assignment behavior during migration. Consumers should move to the explicit contract when next edited.
 
@@ -46,7 +48,9 @@ array(
 
 Valid transitions are `inactive -> active`, `active -> paused`, `paused -> active`, `active -> completed`, and `paused -> completed`. Repeating the effective state is idempotent. A completed definition version is terminal. A higher code definition version resets to its reviewed default and may be activated as a new run.
 
-Missing state uses the code default. Corrupt or future-version state fails closed for the affected registered experiment without disabling unrelated experiments. Stored keys whose code definitions were removed are ignored during resolution and reported as normalized `orphaned` items by `extrachill/list-experiments`. The next authorized state write prunes orphaned records and repairs the targeted version while preserving unrelated registered state. Option keys cannot be supplied by callers; lifecycle writes resolve only registered code definitions.
+Missing state uses the code default. Corrupt or future-version state fails closed for the affected registered experiment without disabling unrelated experiments. Stored keys whose code definitions were removed are ignored during resolution. `extrachill/list-experiments` returns an envelope containing registered items/count, up to 64 normalized orphan samples, a bounded orphan count, truncation status, and an over-bound option flag. Its item output is capped at 128. The next authorized state write prunes every orphan record and repairs the targeted version while preserving unrelated registered state. Option keys cannot be supplied by callers; lifecycle writes resolve only registered code definitions.
+
+Lifecycle option writes acquire a network-scoped MySQL advisory lock with `GET_LOCK(..., 0)` before reading the option. The complete read/modify/write occurs while held, and `RELEASE_LOCK()` is guaranteed in `finally`. Acquisition or release errors fail closed. This prevents stale snapshots and serializes transitions for different experiments sharing the same network option.
 
 ## Public Helpers
 
@@ -63,7 +67,7 @@ Public browser abilities:
 - `extrachill/resolve-experiment-assignment`
 - `extrachill/record-experiment-exposure`
 
-Private lifecycle abilities require `manage_network_options`. Cookie-authenticated REST requests also pass WordPress REST nonce validation before the Ability permission callback:
+Private lifecycle abilities require `manage_network_options` for REST and web callers. Trusted local `WP_CLI` execution is also allowed because shell automation commonly runs as WordPress user `0`. Cookie-authenticated REST requests pass WordPress REST nonce validation before the Ability permission callback:
 
 - `extrachill/list-experiments`
 - `extrachill/transition-experiment-state`

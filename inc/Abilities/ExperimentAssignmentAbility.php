@@ -145,56 +145,76 @@ class ExperimentAssignmentAbility {
 				'description'         => __( 'List normalized code definitions and their effective network lifecycle states.', 'extrachill-network' ),
 				'category'            => 'extrachill-network',
 				'output_schema'       => array(
-					'type'  => 'array',
-					'items' => array(
-						'type'                 => 'object',
-						'required'             => array( 'key', 'registered', 'orphaned', 'definition_version', 'assignment_policy', 'default_state', 'state', 'default_variant', 'control_variant', 'variants', 'surfaces' ),
-						'additionalProperties' => false,
-						'properties'           => array(
-							'key'                => $this->identifier_schema(),
-							'registered'         => array( 'type' => 'boolean' ),
-							'orphaned'           => array( 'type' => 'boolean' ),
-							'definition_version' => array(
-								'type'    => 'integer',
-								'minimum' => 0,
-								'maximum' => \EXTRACHILL_EXPERIMENT_MAX_DEFINITION_VERSION,
-							),
-							'assignment_policy'  => array(
-								'type' => 'string',
-								'enum' => array( '', \EXTRACHILL_EXPERIMENT_ASSIGNMENT_POLICY ),
-							),
-							'default_state'      => array(
-								'type' => 'string',
-								'enum' => \EXTRACHILL_EXPERIMENT_STATES,
-							),
-							'state'              => array(
-								'type' => 'string',
-								'enum' => \EXTRACHILL_EXPERIMENT_STATES,
-							),
-							'default_variant'    => array(
-								'type'      => 'string',
-								'maxLength' => 64,
-							),
-							'control_variant'    => array(
-								'type'      => 'string',
-								'maxLength' => 64,
-							),
-							'variants'           => array(
+					'type'                 => 'object',
+					'required'             => array( 'items', 'registered_count', 'orphan_count', 'orphan_samples_truncated', 'lifecycle_over_bound' ),
+					'additionalProperties' => false,
+					'properties'           => array(
+						'items'                    => array(
+							'type'     => 'array',
+							'maxItems' => \EXTRACHILL_EXPERIMENT_MAX_LIST_ITEMS,
+							'items'    => array(
 								'type'                 => 'object',
-								'maxProperties'        => 64,
-								'additionalProperties' => array(
-									'type'    => 'integer',
-									'minimum' => 1,
-									'maximum' => \EXTRACHILL_EXPERIMENT_MAX_VARIANT_WEIGHT,
+								'required'             => array( 'key', 'registered', 'orphaned', 'definition_version', 'assignment_policy', 'default_state', 'state', 'default_variant', 'control_variant', 'variants', 'surfaces' ),
+								'additionalProperties' => false,
+								'properties'           => array(
+									'key'                => $this->identifier_schema(),
+									'registered'         => array( 'type' => 'boolean' ),
+									'orphaned'           => array( 'type' => 'boolean' ),
+									'definition_version' => array(
+										'type'    => 'integer',
+										'minimum' => 0,
+										'maximum' => \EXTRACHILL_EXPERIMENT_MAX_DEFINITION_VERSION,
+									),
+									'assignment_policy'  => array(
+										'type' => 'string',
+										'enum' => array( '', \EXTRACHILL_EXPERIMENT_ASSIGNMENT_POLICY ),
+									),
+									'default_state'      => array(
+										'type' => 'string',
+										'enum' => \EXTRACHILL_EXPERIMENT_STATES,
+									),
+									'state'              => array(
+										'type' => 'string',
+										'enum' => \EXTRACHILL_EXPERIMENT_STATES,
+									),
+									'default_variant'    => array(
+										'type'      => 'string',
+										'maxLength' => 64,
+									),
+									'control_variant'    => array(
+										'type'      => 'string',
+										'maxLength' => 64,
+									),
+									'variants'           => array(
+										'type'          => 'object',
+										'maxProperties' => \EXTRACHILL_EXPERIMENT_MAX_VARIANTS,
+										'additionalProperties' => array(
+											'type'    => 'integer',
+											'minimum' => 1,
+											'maximum' => \EXTRACHILL_EXPERIMENT_MAX_VARIANT_WEIGHT,
+										),
+									),
+									'surfaces'           => array(
+										'type'        => 'array',
+										'maxItems'    => \EXTRACHILL_EXPERIMENT_MAX_SURFACES,
+										'uniqueItems' => true,
+										'items'       => $this->identifier_schema(),
+									),
 								),
 							),
-							'surfaces'           => array(
-								'type'        => 'array',
-								'maxItems'    => 64,
-								'uniqueItems' => true,
-								'items'       => $this->identifier_schema(),
-							),
 						),
+						'registered_count'         => array(
+							'type'    => 'integer',
+							'minimum' => 0,
+							'maximum' => \EXTRACHILL_EXPERIMENT_MAX_DEFINITIONS,
+						),
+						'orphan_count'             => array(
+							'type'    => 'integer',
+							'minimum' => 0,
+							'maximum' => \EXTRACHILL_EXPERIMENT_MAX_REPORTED_ORPHANS,
+						),
+						'orphan_samples_truncated' => array( 'type' => 'boolean' ),
+						'lifecycle_over_bound'     => array( 'type' => 'boolean' ),
 					),
 				),
 				'execute_callback'    => array( $this, 'execute_list' ),
@@ -348,13 +368,13 @@ class ExperimentAssignmentAbility {
 	 * the Ability permission callback runs.
 	 */
 	public function check_admin_permission(): bool {
-		return current_user_can( 'manage_network_options' );
+		return extrachill_experiment_admin_permission();
 	}
 
 	/**
 	 * List audit-safe definitions and effective states.
 	 *
-	 * @return array<int, array<string, mixed>>
+	 * @return array<string, mixed>
 	 */
 	public function execute_list(): array {
 		return extrachill_list_experiments();

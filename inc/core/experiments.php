@@ -50,6 +50,30 @@ const EXTRACHILL_EXPERIMENT_ASSIGNMENT_POLICY = 'weighted_random';
 /** Maximum code definition version accepted across Network and Analytics. */
 const EXTRACHILL_EXPERIMENT_MAX_DEFINITION_VERSION = 1000000;
 
+/** Maximum code-owned experiment definitions accepted at once. */
+const EXTRACHILL_EXPERIMENT_MAX_DEFINITIONS = 64;
+
+/** Maximum variants accepted in one definition and admin item. */
+const EXTRACHILL_EXPERIMENT_MAX_VARIANTS = 64;
+
+/** Maximum surfaces accepted in one definition and admin item. */
+const EXTRACHILL_EXPERIMENT_MAX_SURFACES = 64;
+
+/** Lifecycle option size after which recovery is reported as over-bound. */
+const EXTRACHILL_EXPERIMENT_MAX_LIFECYCLE_RECORDS = 128;
+
+/** Maximum orphan records normalized for admin inspection. */
+const EXTRACHILL_EXPERIMENT_MAX_ORPHAN_SAMPLES = 64;
+
+/** Bounded orphan count; max + 1 is the over-bound sentinel. */
+const EXTRACHILL_EXPERIMENT_MAX_REPORTED_ORPHANS = 129;
+
+/** Maximum normalized registered plus orphan sample items. */
+const EXTRACHILL_EXPERIMENT_MAX_LIST_ITEMS = 128;
+
+/** Advisory lock wait; lifecycle writes never block request workers. */
+const EXTRACHILL_EXPERIMENT_LOCK_WAIT_SECONDS = 0;
+
 /** Bounded lifecycle states. */
 const EXTRACHILL_EXPERIMENT_STATES = array( 'inactive', 'active', 'paused', 'completed' );
 
@@ -62,6 +86,22 @@ function extrachill_register_experiment_cache_group() {
 	}
 }
 add_action( 'init', 'extrachill_register_experiment_cache_group', 0 );
+
+/**
+ * Whether the current operator may administer experiment lifecycle state.
+ *
+ * Local WP-CLI is a trusted shell operator surface and commonly runs as user
+ * zero. REST and web execution always require the network options capability.
+ *
+ * @return bool Whether experiment administration is allowed.
+ */
+function extrachill_experiment_admin_permission() {
+	if ( defined( 'WP_CLI' ) && WP_CLI ) {
+		return true;
+	}
+
+	return function_exists( 'current_user_can' ) && current_user_can( 'manage_network_options' );
+}
 
 /**
  * Return registered experiment definitions.
@@ -142,7 +182,9 @@ function extrachill_normalize_experiment_definition( $definition, $registered_ke
 		|| '' === $default
 		|| $default !== $control
 		|| count( $variants ) < 2
+		|| count( $variants ) > EXTRACHILL_EXPERIMENT_MAX_VARIANTS
 		|| ! isset( $variants[ $default ] )
+		|| ( isset( $definition['surfaces'] ) && is_array( $definition['surfaces'] ) && count( $definition['surfaces'] ) > EXTRACHILL_EXPERIMENT_MAX_SURFACES )
 		|| empty( $surfaces )
 		|| empty( $definition['eligibility_callback'] )
 		|| ! is_callable( $definition['eligibility_callback'] )
@@ -199,8 +241,13 @@ function extrachill_normalize_experiment_definition( $definition, $registered_ke
  * @return array<string, array<string, mixed>>
  */
 function extrachill_get_normalized_experiment_definitions() {
+	$definitions = extrachill_get_experiment_definitions();
+	if ( count( $definitions ) > EXTRACHILL_EXPERIMENT_MAX_DEFINITIONS ) {
+		return array();
+	}
+
 	$normalized = array();
-	foreach ( extrachill_get_experiment_definitions() as $key => $definition ) {
+	foreach ( $definitions as $key => $definition ) {
 		if ( ! is_string( $key ) || 1 !== preg_match( '/^[a-z0-9][a-z0-9_-]{0,63}$/', $key ) ) {
 			continue;
 		}
@@ -216,42 +263,53 @@ function extrachill_get_normalized_experiment_definitions() {
 /**
  * Read and validate the bounded live-state option.
  *
- * @return array{valid: bool, states: array<string, array{definition_version: int, state: string}>, orphaned: array<int, array{key: string, definition_version: int, state: string}>, invalid_keys: array<string, bool>}
+ * Registered records are resolved by direct bounded key lookup, so arbitrarily
+ * many orphaned option keys cannot hide or disable valid registered state.
+ * Orphan normalization stops after the hard sample cap; the exact count comes
+ * from option size minus the bounded registered-key intersection.
+ *
+ * @param array<int, string>|null $registered_keys Optional pre-resolved bounded keys.
+ * @return array{valid: bool, states: array<string, array{definition_version: int, state: string}>, orphaned: array<int, array{key: string, definition_version: int, state: string}>, orphan_count: int, orphan_samples_truncated: bool, over_bound: bool, invalid_keys: array<string, bool>}
  */
-function extrachill_get_experiment_lifecycle_option() {
+function extrachill_get_experiment_lifecycle_option( $registered_keys = null ) {
 	$value = get_site_option( EXTRACHILL_EXPERIMENT_LIFECYCLE_OPTION, false );
 	if ( false === $value ) {
 		return array(
-			'valid'        => true,
-			'states'       => array(),
-			'orphaned'     => array(),
-			'invalid_keys' => array(),
+			'valid'                    => true,
+			'states'                   => array(),
+			'orphaned'                 => array(),
+			'orphan_count'             => 0,
+			'orphan_samples_truncated' => false,
+			'over_bound'               => false,
+			'invalid_keys'             => array(),
 		);
 	}
 	if ( ! is_array( $value ) ) {
 		return array(
-			'valid'        => false,
-			'states'       => array(),
-			'orphaned'     => array(),
-			'invalid_keys' => array(),
+			'valid'                    => false,
+			'states'                   => array(),
+			'orphaned'                 => array(),
+			'orphan_count'             => 0,
+			'orphan_samples_truncated' => false,
+			'over_bound'               => false,
+			'invalid_keys'             => array(),
 		);
 	}
 
-	$states          = array();
-	$orphaned        = array();
-	$invalid_keys    = array();
-	$registered_keys = array_keys( extrachill_get_normalized_experiment_definitions() );
-	foreach ( $value as $key => $record ) {
-		$key_is_valid = is_string( $key ) && 1 === preg_match( '/^[a-z0-9][a-z0-9_-]{0,63}$/', $key );
-		if ( ! $key_is_valid || ! in_array( $key, $registered_keys, true ) ) {
-			$orphaned[] = array(
-				'key'                => $key_is_valid ? $key : 'invalid-' . substr( hash( 'sha256', (string) $key ), 0, 16 ),
-				'definition_version' => is_array( $record ) && isset( $record['definition_version'] ) && is_int( $record['definition_version'] ) && $record['definition_version'] > 0 && $record['definition_version'] <= EXTRACHILL_EXPERIMENT_MAX_DEFINITION_VERSION ? $record['definition_version'] : 0,
-				'state'              => is_array( $record ) && isset( $record['state'] ) && is_string( $record['state'] ) && in_array( $record['state'], EXTRACHILL_EXPERIMENT_STATES, true ) ? $record['state'] : 'inactive',
-			);
+	$states             = array();
+	$orphaned           = array();
+	$invalid_keys       = array();
+	$registered_present = 0;
+	$registered_keys    = is_array( $registered_keys ) ? $registered_keys : array_keys( extrachill_get_normalized_experiment_definitions() );
+	if ( count( $registered_keys ) > EXTRACHILL_EXPERIMENT_MAX_DEFINITIONS ) {
+		$registered_keys = array();
+	}
+	foreach ( $registered_keys as $key ) {
+		if ( ! array_key_exists( $key, $value ) ) {
 			continue;
 		}
-
+		++$registered_present;
+		$record = $value[ $key ];
 		if (
 			! is_array( $record )
 			|| array( 'definition_version', 'state' ) !== array_keys( $record )
@@ -267,11 +325,31 @@ function extrachill_get_experiment_lifecycle_option() {
 		$states[ $key ] = $record;
 	}
 
+	$actual_orphan_count = count( $value ) - $registered_present;
+	$orphan_count        = min( $actual_orphan_count, EXTRACHILL_EXPERIMENT_MAX_REPORTED_ORPHANS );
+	foreach ( $value as $key => $record ) {
+		if ( is_string( $key ) && in_array( $key, $registered_keys, true ) ) {
+			continue;
+		}
+		if ( count( $orphaned ) >= EXTRACHILL_EXPERIMENT_MAX_ORPHAN_SAMPLES ) {
+			break;
+		}
+		$key_is_valid = is_string( $key ) && 1 === preg_match( '/^[a-z0-9][a-z0-9_-]{0,63}$/', $key );
+		$orphaned[]   = array(
+			'key'                => $key_is_valid ? $key : 'invalid-' . substr( hash( 'sha256', (string) $key ), 0, 16 ),
+			'definition_version' => is_array( $record ) && isset( $record['definition_version'] ) && is_int( $record['definition_version'] ) && $record['definition_version'] > 0 && $record['definition_version'] <= EXTRACHILL_EXPERIMENT_MAX_DEFINITION_VERSION ? $record['definition_version'] : 0,
+			'state'              => is_array( $record ) && isset( $record['state'] ) && is_string( $record['state'] ) && in_array( $record['state'], EXTRACHILL_EXPERIMENT_STATES, true ) ? $record['state'] : 'inactive',
+		);
+	}
+
 	return array(
-		'valid'        => true,
-		'states'       => $states,
-		'orphaned'     => $orphaned,
-		'invalid_keys' => $invalid_keys,
+		'valid'                    => true,
+		'states'                   => $states,
+		'orphaned'                 => $orphaned,
+		'orphan_count'             => $orphan_count,
+		'orphan_samples_truncated' => $actual_orphan_count > count( $orphaned ),
+		'over_bound'               => count( $value ) > EXTRACHILL_EXPERIMENT_MAX_LIFECYCLE_RECORDS,
+		'invalid_keys'             => $invalid_keys,
 	);
 }
 
@@ -341,12 +419,13 @@ function extrachill_experiment_is_active( $experiment_key, $surface = '', array 
 /**
  * Return audit-safe definitions and effective live states.
  *
- * @return array<int, array<string, mixed>>
+ * @return array<string, mixed>
  */
 function extrachill_list_experiments() {
-	$lifecycle = extrachill_get_experiment_lifecycle_option();
-	$output    = array();
-	foreach ( extrachill_get_normalized_experiment_definitions() as $definition ) {
+	$definitions = extrachill_get_normalized_experiment_definitions();
+	$lifecycle   = extrachill_get_experiment_lifecycle_option( array_keys( $definitions ) );
+	$output      = array();
+	foreach ( $definitions as $definition ) {
 		$output[] = array(
 			'key'                => $definition['key'],
 			'registered'         => true,
@@ -377,18 +456,85 @@ function extrachill_list_experiments() {
 		);
 	}
 
-	return $output;
+	return array(
+		'items'                    => $output,
+		'registered_count'         => count( $definitions ),
+		'orphan_count'             => $lifecycle['orphan_count'],
+		'orphan_samples_truncated' => $lifecycle['orphan_samples_truncated'],
+		'lifecycle_over_bound'     => $lifecycle['over_bound'],
+	);
 }
 
 /**
- * Transition one registered experiment's current code version.
+ * Return the network-scoped MySQL advisory lock name.
+ *
+ * @return string Bounded connection lock name.
+ */
+function extrachill_experiment_lifecycle_lock_name() {
+	$network_id = function_exists( 'get_current_network_id' ) ? (int) get_current_network_id() : 1;
+
+	return 'extrachill_exp_lifecycle_' . max( 1, $network_id );
+}
+
+/**
+ * Acquire the lifecycle write lock without waiting.
+ *
+ * @return true|\WP_Error True when held, otherwise a fail-closed error.
+ */
+function extrachill_acquire_experiment_lifecycle_lock() {
+	global $wpdb;
+	if ( ! isset( $wpdb ) || ! is_object( $wpdb ) || ! method_exists( $wpdb, 'prepare' ) || ! method_exists( $wpdb, 'get_var' ) ) {
+		return new \WP_Error( 'experiment_lifecycle_lock_unavailable', __( 'Experiment lifecycle lock is unavailable.', 'extrachill-network' ), array( 'status' => 503 ) );
+	}
+
+	try {
+		$query  = $wpdb->prepare(
+			'SELECT GET_LOCK( %s, %d )',
+			extrachill_experiment_lifecycle_lock_name(),
+			EXTRACHILL_EXPERIMENT_LOCK_WAIT_SECONDS
+		);
+		$locked = $wpdb->get_var( $query ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- MySQL advisory locks require a direct uncached connection query.
+	} catch ( \Throwable $error ) {
+		return new \WP_Error( 'experiment_lifecycle_lock_failed', __( 'Experiment lifecycle lock could not be acquired.', 'extrachill-network' ), array( 'status' => 503 ) );
+	}
+
+	return '1' === (string) $locked
+		? true
+		: new \WP_Error( 'experiment_lifecycle_lock_failed', __( 'Experiment lifecycle lock could not be acquired.', 'extrachill-network' ), array( 'status' => 503 ) );
+}
+
+/**
+ * Release the lifecycle advisory lock held by this database connection.
+ *
+ * @return true|\WP_Error True when released, otherwise a fail-closed error.
+ */
+function extrachill_release_experiment_lifecycle_lock() {
+	global $wpdb;
+	if ( ! isset( $wpdb ) || ! is_object( $wpdb ) || ! method_exists( $wpdb, 'prepare' ) || ! method_exists( $wpdb, 'get_var' ) ) {
+		return new \WP_Error( 'experiment_lifecycle_lock_release_failed', __( 'Experiment lifecycle lock could not be released.', 'extrachill-network' ), array( 'status' => 500 ) );
+	}
+
+	try {
+		$query    = $wpdb->prepare( 'SELECT RELEASE_LOCK( %s )', extrachill_experiment_lifecycle_lock_name() );
+		$released = $wpdb->get_var( $query ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- MySQL advisory locks require a direct uncached connection query.
+	} catch ( \Throwable $error ) {
+		return new \WP_Error( 'experiment_lifecycle_lock_release_failed', __( 'Experiment lifecycle lock could not be released.', 'extrachill-network' ), array( 'status' => 500 ) );
+	}
+
+	return '1' === (string) $released
+		? true
+		: new \WP_Error( 'experiment_lifecycle_lock_release_failed', __( 'Experiment lifecycle lock could not be released.', 'extrachill-network' ), array( 'status' => 500 ) );
+}
+
+/**
+ * Transition one registered experiment while the advisory lock is held.
  *
  * @param string $experiment_key Stable experiment key.
  * @param int    $definition_version Expected current code version.
  * @param string $new_state Requested state.
  * @return array<string, mixed>|\WP_Error Normalized changed state.
  */
-function extrachill_transition_experiment_state( $experiment_key, $definition_version, $new_state ) {
+function extrachill_transition_experiment_state_locked( $experiment_key, $definition_version, $new_state ) {
 	$definitions = extrachill_get_normalized_experiment_definitions();
 	$definition  = isset( $definitions[ $experiment_key ] ) ? $definitions[ $experiment_key ] : null;
 	if ( null === $definition ) {
@@ -439,9 +585,44 @@ function extrachill_transition_experiment_state( $experiment_key, $definition_ve
 		return new \WP_Error( 'experiment_state_update_failed', __( 'Experiment lifecycle state could not be saved.', 'extrachill-network' ), array( 'status' => 500 ) );
 	}
 
-	if ( $old_state !== $new_state ) {
+	return $result;
+}
+
+/**
+ * Atomically transition one registered experiment's current code version.
+ *
+ * The network-scoped MySQL advisory lock serializes the complete option
+ * read/modify/write. Acquisition never waits, and release is always attempted
+ * in `finally`. Lock acquisition, callback, and release errors all fail closed.
+ *
+ * @param string $experiment_key Stable experiment key.
+ * @param int    $definition_version Expected current code version.
+ * @param string $new_state Requested state.
+ * @return array<string, mixed>|\WP_Error Normalized changed state.
+ */
+function extrachill_transition_experiment_state( $experiment_key, $definition_version, $new_state ) {
+	$locked = extrachill_acquire_experiment_lifecycle_lock();
+	if ( $locked instanceof \WP_Error ) {
+		return $locked;
+	}
+
+	$result  = null;
+	$release = null;
+	try {
+		$result = extrachill_transition_experiment_state_locked( $experiment_key, $definition_version, $new_state );
+	} catch ( \Throwable $error ) {
+		$result = new \WP_Error( 'experiment_lifecycle_transition_failed', __( 'Experiment lifecycle transition failed.', 'extrachill-network' ), array( 'status' => 500 ) );
+	} finally {
+		$release = extrachill_release_experiment_lifecycle_lock();
+	}
+
+	if ( $release instanceof \WP_Error ) {
+		return $release;
+	}
+	if ( is_array( $result ) && $result['previous_state'] !== $result['state'] ) {
 		do_action( 'extrachill_experiment_state_changed', $result );
 	}
+
 	return $result;
 }
 
