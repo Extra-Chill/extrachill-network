@@ -42,7 +42,7 @@ function extrachill_network_delete_artist_term_profile_binding( $term_id, $taxon
 		$profile_ids = get_posts(
 			array(
 				'post_type'      => 'artist_profile',
-				'post_status'    => 'any',
+				'post_status'    => array( 'publish', 'future', 'draft', 'pending', 'private', 'trash', 'auto-draft' ),
 				'posts_per_page' => 2,
 				'fields'         => 'ids',
 				'no_found_rows'  => true,

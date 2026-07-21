@@ -68,6 +68,12 @@ function get_posts( array $args ): array {
 		if ( $args['post_type'] !== $post->post_type ) {
 			continue;
 		}
+		if ( 'any' === $args['post_status'] && in_array( $post->post_status, array( 'trash', 'auto-draft' ), true ) ) {
+			continue;
+		}
+		if ( is_array( $args['post_status'] ) && ! in_array( $post->post_status, $args['post_status'], true ) ) {
+			continue;
+		}
 
 		$value = get_post_meta( $post_id, $args['meta_key'], true );
 		if ( (string) $value === (string) $args['meta_value'] ) {
@@ -101,10 +107,11 @@ function ec_test_reset( int $current_blog_id = 1 ): void {
 	);
 }
 
-function ec_test_add_profile( int $profile_id, int $term_id = 0 ): void {
+function ec_test_add_profile( int $profile_id, int $term_id = 0, string $post_status = 'publish' ): void {
 	$GLOBALS['ec_test']['blogs'][4]['posts'][ $profile_id ] = (object) array(
-		'ID'        => $profile_id,
-		'post_type' => 'artist_profile',
+		'ID'          => $profile_id,
+		'post_type'   => 'artist_profile',
+		'post_status' => $post_status,
 	);
 	if ( $term_id > 0 ) {
 		$GLOBALS['ec_test']['blogs'][4]['post_meta'][ $profile_id ]['_artist_term_id'] = $term_id;
@@ -146,6 +153,20 @@ ec_test_assert( 4 === $GLOBALS['ec_test']['queries'][0][0], 'The inverse lookup 
 ec_test_assert( 2 === $GLOBALS['ec_test']['queries'][0][1]['posts_per_page'], 'The inverse lookup must detect ambiguity.' );
 
 ec_test_reset();
+ec_test_add_profile( 25, 101, 'trash' );
+extrachill_network_delete_artist_term_profile_binding( 101, 'artist' );
+ec_test_assert( '' === ec_test_profile_term_id( 25 ), 'A trashed profile must not retain a stale term binding.' );
+ec_test_assert( in_array( 'trash', $GLOBALS['ec_test']['queries'][0][1]['post_status'], true ), 'The inverse query must explicitly include trash.' );
+ec_test_assert( 1 === get_current_blog_id(), 'Trashed-profile cleanup must restore the main blog.' );
+
+ec_test_reset();
+ec_test_add_profile( 25, 101, 'auto-draft' );
+extrachill_network_delete_artist_term_profile_binding( 101, 'artist' );
+ec_test_assert( '' === ec_test_profile_term_id( 25 ), 'An auto-draft profile must not retain a stale term binding.' );
+ec_test_assert( in_array( 'auto-draft', $GLOBALS['ec_test']['queries'][0][1]['post_status'], true ), 'The inverse query must explicitly include auto-draft.' );
+ec_test_assert( 1 === get_current_blog_id(), 'Auto-draft cleanup must restore the main blog.' );
+
+ec_test_reset();
 ec_test_add_profile( 25, 202 );
 $GLOBALS['ec_test']['blogs'][1]['term_meta'][101]['_artist_profile_id'] = 25;
 extrachill_network_delete_artist_term_profile_binding( 101, 'artist' );
@@ -181,8 +202,9 @@ ec_test_assert( 101 === ec_test_profile_term_id( 26 ), 'A conflicting one-sided 
 ec_test_reset();
 ec_test_add_profile( 25, 101 );
 $GLOBALS['ec_test']['blogs'][1]['posts'][25] = (object) array(
-	'ID'        => 25,
-	'post_type' => 'post',
+	'ID'          => 25,
+	'post_type'   => 'post',
+	'post_status' => 'publish',
 );
 extrachill_network_delete_artist_term_profile_binding( 101, 'artist' );
 ec_test_assert( '' === ec_test_profile_term_id( 25 ), 'A colliding main-blog post ID must not prevent Artist-side cleanup.' );
