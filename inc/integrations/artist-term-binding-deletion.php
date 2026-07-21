@@ -34,9 +34,8 @@ function extrachill_network_delete_artist_term_profile_binding( $term_id, $taxon
 			$profile = get_post( $profile_id );
 			if ( $profile && 'artist_profile' === $profile->post_type && (int) get_post_meta( $profile_id, '_artist_term_id', true ) === $term_id ) {
 				delete_post_meta( $profile_id, '_artist_term_id', $term_id );
+				return;
 			}
-
-			return;
 		}
 
 		$profile_ids = get_posts(
