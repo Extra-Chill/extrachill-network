@@ -89,6 +89,7 @@ function extrachill_network_init() {
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/integrations/ad-delivery.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/integrations/member-ad-benefit.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/integrations/artist-profile-discussions.php';
+	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/integrations/artist-term-binding-deletion.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/cross-site-links/cross-site-links.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/cross-site-links/network-bridge.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/theme/footer-main-menu.php';
