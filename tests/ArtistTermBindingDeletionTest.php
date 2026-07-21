@@ -118,6 +118,14 @@ function ec_test_add_profile( int $profile_id, int $term_id = 0, string $post_st
 	}
 }
 
+function ec_test_add_artist_post( int $post_id, string $post_type, string $post_status = 'publish' ): void {
+	$GLOBALS['ec_test']['blogs'][4]['posts'][ $post_id ] = (object) array(
+		'ID'          => $post_id,
+		'post_type'   => $post_type,
+		'post_status' => $post_status,
+	);
+}
+
 function ec_test_profile_term_id( int $profile_id ) {
 	return $GLOBALS['ec_test']['blogs'][4]['post_meta'][ $profile_id ]['_artist_term_id'] ?? '';
 }
@@ -143,6 +151,7 @@ ec_test_add_profile( 25, 101 );
 $GLOBALS['ec_test']['blogs'][1]['term_meta'][101]['_artist_profile_id'] = 25;
 extrachill_network_delete_artist_term_profile_binding( 101, 'artist' );
 ec_test_assert( '' === ec_test_profile_term_id( 25 ), 'A reciprocal profile binding must be removed.' );
+ec_test_assert( array() === $GLOBALS['ec_test']['queries'], 'A reciprocal profile binding must use the fast path.' );
 ec_test_assert( 1 === get_current_blog_id(), 'Reciprocal cleanup must restore the main blog.' );
 
 ec_test_reset();
@@ -171,6 +180,16 @@ ec_test_add_profile( 25, 202 );
 $GLOBALS['ec_test']['blogs'][1]['term_meta'][101]['_artist_profile_id'] = 25;
 extrachill_network_delete_artist_term_profile_binding( 101, 'artist' );
 ec_test_assert( 202 === ec_test_profile_term_id( 25 ), 'A conflicting reciprocal reference must fail closed.' );
+ec_test_assert( 1 === get_current_blog_id(), 'Non-reciprocal cleanup must restore the main blog.' );
+
+ec_test_reset();
+ec_test_add_profile( 25, 202 );
+ec_test_add_profile( 26, 101 );
+$GLOBALS['ec_test']['blogs'][1]['term_meta'][101]['_artist_profile_id'] = 25;
+extrachill_network_delete_artist_term_profile_binding( 101, 'artist' );
+ec_test_assert( 202 === ec_test_profile_term_id( 25 ), 'A non-reciprocal referenced profile must remain untouched.' );
+ec_test_assert( '' === ec_test_profile_term_id( 26 ), 'A unique inverse must be removed when the populated reference is non-reciprocal.' );
+ec_test_assert( 1 === get_current_blog_id(), 'Unique inverse cleanup must restore the main blog.' );
 
 ec_test_reset();
 ec_test_add_profile( 25 );
@@ -185,11 +204,45 @@ ec_test_assert( array() === $GLOBALS['ec_test']['deletions'], 'A deleted profile
 ec_test_assert( 1 === get_current_blog_id(), 'Deleted-profile cleanup must restore the main blog.' );
 
 ec_test_reset();
+ec_test_add_profile( 26, 101 );
+$GLOBALS['ec_test']['blogs'][1]['term_meta'][101]['_artist_profile_id'] = 25;
+extrachill_network_delete_artist_term_profile_binding( 101, 'artist' );
+ec_test_assert( '' === ec_test_profile_term_id( 26 ), 'A unique inverse must be removed when the populated reference is missing.' );
+ec_test_assert( 1 === get_current_blog_id(), 'Missing-reference inverse cleanup must restore the main blog.' );
+
+ec_test_reset();
+ec_test_add_artist_post( 25, 'post' );
+ec_test_add_profile( 26, 101 );
+$GLOBALS['ec_test']['blogs'][1]['posts'][25] = (object) array(
+	'ID'          => 25,
+	'post_type'   => 'artist_profile',
+	'post_status' => 'publish',
+);
+$GLOBALS['ec_test']['blogs'][1]['post_meta'][25]['_artist_term_id']       = 101;
+$GLOBALS['ec_test']['blogs'][1]['term_meta'][101]['_artist_profile_id'] = 25;
+extrachill_network_delete_artist_term_profile_binding( 101, 'artist' );
+ec_test_assert( '' === ec_test_profile_term_id( 26 ), 'A unique inverse must be removed when the referenced Artist-blog post has the wrong type.' );
+ec_test_assert( 101 === $GLOBALS['ec_test']['blogs'][1]['post_meta'][25]['_artist_term_id'], 'A colliding main-blog post ID must not be mutated.' );
+ec_test_assert( 1 === get_current_blog_id(), 'Wrong-type cleanup must restore the main blog.' );
+
+ec_test_reset();
 ec_test_add_profile( 25, 101 );
 ec_test_add_profile( 26, 101 );
 extrachill_network_delete_artist_term_profile_binding( 101, 'artist' );
 ec_test_assert( 101 === ec_test_profile_term_id( 25 ), 'Ambiguous profile-only bindings must remain untouched.' );
 ec_test_assert( 101 === ec_test_profile_term_id( 26 ), 'Every conflicting profile binding must remain untouched.' );
+
+ec_test_reset();
+ec_test_add_profile( 25, 202 );
+ec_test_add_profile( 26, 101 );
+ec_test_add_profile( 27, 101 );
+$GLOBALS['ec_test']['blogs'][1]['term_meta'][101]['_artist_profile_id'] = 25;
+extrachill_network_delete_artist_term_profile_binding( 101, 'artist' );
+ec_test_assert( 202 === ec_test_profile_term_id( 25 ), 'An unrelated referenced profile must remain untouched during ambiguous cleanup.' );
+ec_test_assert( 101 === ec_test_profile_term_id( 26 ), 'The first ambiguous inverse must remain untouched.' );
+ec_test_assert( 101 === ec_test_profile_term_id( 27 ), 'The second ambiguous inverse must remain untouched.' );
+ec_test_assert( array() === $GLOBALS['ec_test']['deletions'], 'A stale populated reference with ambiguous inverses must fail closed.' );
+ec_test_assert( 1 === get_current_blog_id(), 'Ambiguous inverse cleanup must restore the main blog.' );
 
 ec_test_reset();
 ec_test_add_profile( 25, 101 );
