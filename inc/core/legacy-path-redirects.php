@@ -36,12 +36,24 @@ function ec_handle_legacy_path_redirects() {
 		return;
 	}
 
-	if ( ! preg_match( '#^/festival-wire(?:/|$)#', $path ) ) {
+	$wire_url = function_exists( 'ec_get_site_url' ) ? ec_get_site_url( 'wire' ) : null;
+	if ( ! $wire_url ) {
 		return;
 	}
 
-	$wire_url = function_exists( 'ec_get_site_url' ) ? ec_get_site_url( 'wire' ) : null;
-	if ( ! $wire_url ) {
+	// Legacy festival_wire sitemap URLs. The festival_wire CPT is registered by
+	// extrachill-news-wire, which is per-site active only on the wire subsite, so
+	// the main blog has zero festival_wire posts and never registers the CPT.
+	// Google retains these sitemap URLs from a legacy era when Festival Wire lived
+	// on the main blog, so they return a hard 404 here. Forward them to the wire
+	// subsite where they resolve. The page number ($1) is passed through so this
+	// works for any page count as wire grows. See extrachill-seo#29.
+	if ( preg_match( '#^/wp-sitemap-posts-festival_wire-(\d+)\.xml$#', $path, $matches ) ) {
+		wp_safe_redirect( $wire_url . '/wp-sitemap-posts-festival_wire-' . $matches[1] . '.xml', 301 );
+		exit;
+	}
+
+	if ( ! preg_match( '#^/festival-wire(?:/|$)#', $path ) ) {
 		return;
 	}
 
