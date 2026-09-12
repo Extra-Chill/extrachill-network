@@ -24,6 +24,8 @@ jobs:
         with:
           extension: wordpress
           commands: review lint,review test
-          scope: full
+          scope: auto
+          differential-gating: 'true'
+          baseline-commands: auto
           pr-comment: 'false'
           auto-issue: 'false'
