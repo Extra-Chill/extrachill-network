@@ -25,6 +25,7 @@ function extrachill_network_boot_foundation() {
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/mail.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/service-assertions.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/cross-site-rest.php';
+	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/ability-site-affinity.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/frontend-path-resolver.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/extrachill-turnstile.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/oauth-helpers.php';

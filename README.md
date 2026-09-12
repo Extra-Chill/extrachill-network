@@ -26,6 +26,7 @@ This plugin maintains focused responsibility for network administration infrastr
 - **Network Activated** - Single plugin serving all sites in the multisite network
 - **Cross-Site Data Access** - Uses `switch_to_blog()` / `restore_current_blog()` for cross-site operations
 - **Performance Optimized** - Central blog ID + domain map helpers for fast cross-site resolution
+- **Cross-Site Routing** - Route and ability ownership resolution, plus the in-process/HTTP-loopback dispatcher — see [`docs/cross-site-routing.md`](docs/cross-site-routing.md) for the full model
 - **Centralized Configuration** - Network-wide settings stored via `get_site_option()` accessible from all sites
 - **Modular Organization** - Core functionality in `inc/core/`, site-specific features in dedicated directories, admin interface in `admin/`
 - **Security First** - Comprehensive admin access control, Cloudflare Turnstile integration, and capability checks
