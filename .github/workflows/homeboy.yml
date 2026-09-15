@@ -24,7 +24,13 @@ jobs:
         with:
           extension: wordpress
           commands: review lint,review test
-          scope: auto
+          # Full scope, not auto. Changed-scope selects zero tests when only
+          # the workflow changes, and the runner correctly refuses to certify
+          # a harness change that never exercised the harness
+          # (changed_scope_zero_tests_for_harness_change). Full scope keeps the
+          # suite running on every PR; differential gating is what stops the
+          # pre-existing lint/static baseline from blocking unrelated work.
+          scope: full
           differential-gating: 'true'
           baseline-commands: auto
           pr-comment: 'false'
