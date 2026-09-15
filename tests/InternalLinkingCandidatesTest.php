@@ -50,7 +50,10 @@ class InternalLinkingCandidatesTest extends WP_UnitTestCase {
 		$current_site_key = function_exists( 'extrachill_get_current_site_key' )
 			? extrachill_get_current_site_key()
 			: null;
-		$cache_key        = 'links_' . $term->taxonomy . '_' . (int) $term->term_id . '_' . (string) $current_site_key;
+		$bare_key         = 'links_' . $term->taxonomy . '_' . (int) $term->term_id . '_' . (string) $current_site_key;
+		$cache_key        = function_exists( 'extrachill_cross_site_links_cache_key' )
+			? extrachill_cross_site_links_cache_key( $bare_key )
+			: $bare_key;
 		wp_cache_set( $cache_key, $links, EXTRACHILL_CROSS_SITE_LINKS_CACHE_GROUP, HOUR_IN_SECONDS );
 	}
 
