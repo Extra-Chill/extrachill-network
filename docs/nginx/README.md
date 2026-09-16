@@ -20,7 +20,7 @@ That config previously lived only on the VPS (and as scribbles in agent memory f
 | File | Scope | Purpose |
 |------|-------|---------|
 | `bot-blocking.conf` | nginx `http { }` | UA / IP / URI block maps + `wpjson` and `wp_login` rate-limit zones. Install in `/etc/nginx/conf.d/`. |
-| `server-snippet.conf` | nginx `server { }` | The `if`-guards that turn the maps into actual returns, the author-enumeration guard, and the location blocks for `/wp-json/`, `/wp-login.php`, and `/login/`. Paste into the site server block. |
+| `server-snippet.conf` | nginx `server { }` | The `if`-guards that turn the maps into actual returns, the author-enumeration guard, the location blocks for `/wp-json/`, `/wp-login.php`, and `/login/`, and the `/.well-known/` allow exception that carves the RFC 8615 public path out of the site's dotfile-deny rule. Paste into the site server block. |
 | `cloudflare-waf-rules.md` | Cloudflare dashboard | Canonical reference for the 7 Cloudflare WAF rules (Custom Rules + Rate Limiting). The dashboard is the live truth; this file is the version-controlled reference. |
 
 `wp-login-ratelimit.conf` previously held the `/wp-login.php` rate limit as a separate file. It was deleted on 2026-05-18 in favor of consolidation — the `wp_login` zone now lives in `bot-blocking.conf` and the location blocks live in `server-snippet.conf`. One file per scope, no orphan files.
