@@ -1,0 +1,133 @@
+# Extra Chill - WordPress Multisite (subdomain)
+
+# HTTP → HTTPS redirect
+server {
+    listen 80;
+    listen [::]:80;
+    server_name extrachill.com *.extrachill.com extrachill.link www.extrachill.link;
+    return 301 https://$host$request_uri;
+}
+
+# HTTPS
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name extrachill.com *.extrachill.com extrachill.link www.extrachill.link;
+
+    ssl_certificate /etc/letsencrypt/live/extrachill.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/extrachill.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    root /var/www/extrachill.com;
+    index index.php index.html;
+
+    # 404 cleanup rules
+    include snippets/extrachill-404-fixes.conf;
+
+    client_max_body_size 256M;
+
+    # ---- Abuse mitigation (added 2026-05-10) ----
+    # Block bad bots, bad IPs, and credential-probe URIs at the edge
+    # before they hit PHP-FPM. See /etc/nginx/conf.d/bot-blocking.conf.
+    if ($bad_bot)    { return 429; }
+    if ($blocked_ip) { return 444; }
+    if ($bad_uri)    { return 444; }
+    # ---------------------------------------------
+
+    # Matrix .well-known delegation (tells clients and servers where the homeserver is)
+    location = /.well-known/matrix/server {
+        default_type application/json;
+        return 200 '{"m.server":"matrix.extrachill.com:443"}';
+    }
+
+    location = /.well-known/matrix/client {
+        default_type application/json;
+        add_header Access-Control-Allow-Origin *;
+        return 200 '{"m.homeserver":{"base_url":"https://matrix.extrachill.com"}}';
+    }
+
+    # ---- .well-known/ allow (added 2026-09-16 per extrachill-network#203) ----
+    # /.well-known/ is an IANA-registered public path (RFC 8615), not a hidden
+    # file -- but the "Deny access to hidden files" regex below
+    # (location ~ /\.) matches any path segment starting with a dot and was
+    # 403ing all of it: oauth-authorization-server, oauth-protected-resource,
+    # security.txt, apple-app-site-association.
+    #
+    # The two exact-match matrix locations above are unaffected: `=` is
+    # checked before `^~` and before regex. `^~` makes this the
+    # longest-prefix winner for everything else under /.well-known/ and tells
+    # nginx to skip regex matching once selected, so the dotfile-deny rule
+    # never runs for this prefix regardless of file order. try_files serves a
+    # static file if one exists on disk and otherwise falls through to
+    # WordPress, so a template_redirect router can claim a path here. A
+    # WordPress 404 for a path nothing has registered yet is the expected
+    # result, not a regression.
+    location ^~ /.well-known/ {
+        try_files $uri $uri/ /index.php?$args;
+    }
+    # -------------------------------------------------------------------
+
+    # WordPress multisite subdomain rewrite
+    location / {
+        try_files $uri $uri/ /index.php?$args;
+    }
+
+    # Rate-limit /wp-json/ per IP (5 req/s, burst 10) — protects FPM
+    # from any single client (legit or bot) grabbing all the workers.
+    location /wp-json/ {
+        limit_req zone=wpjson burst=10 nodelay;
+        try_files $uri $uri/ /index.php?$args;
+    }
+
+    # PHP handling
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php8.4-fpm.sock;
+        fastcgi_read_timeout 120s;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    # Bridge PKCE callback proxy (mautrix-datamachine)
+    # Bridge PKCE callback + webhook proxy (mautrix-datamachine)
+    location /bridge/ {
+        proxy_pass http://127.0.0.1:29340/bridge/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Deny access to hidden files
+    location ~ /\. {
+        deny all;
+    }
+
+    # Multisite uploads rewrite
+    location ~ ^/files/(.*)$ {
+        try_files /wp-includes/ms-files.php?file=$1 =404;
+        access_log off;
+        log_not_found off;
+        expires max;
+    }
+
+    # Static file caching
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+        add_header Access-Control-Allow-Origin "*";
+        access_log off;
+    }
+
+    # Deny access to sensitive files
+    location ~* /(wp-config\.php|readme\.html|license\.txt) {
+        deny all;
+    }
+
+    # xmlrpc protection
+    location = /xmlrpc.php {
+        deny all;
+    }
+}

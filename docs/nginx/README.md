@@ -27,15 +27,19 @@ That config previously lived only on the VPS (and as scribbles in agent memory f
 
 ## Relationship to live config
 
-This directory is a **canonical reference**, not an auto-deployed artifact. The operator copies these files to the production VPS by hand and reloads nginx; the operator recreates the WAF rules in the Cloudflare dashboard by hand using `cloudflare-waf-rules.md` as the source.
+This directory is a **canonical reference** — snippets and the reasoning behind them. It explains *why* the edge is shaped the way it is.
 
-Live install paths on the production VPS (do not edit from automation):
+The site server block is no longer deployed from here. `deploy/nginx/sites-enabled/extrachill` is now the whole-file source of truth for it: byte-for-byte what is live, applied by `homeboy-edge-apply` from a merged commit. See [`deploy/nginx/README.md`](../../deploy/nginx/README.md).
+
+Live install paths on the production VPS:
 
 ```
-/etc/nginx/conf.d/bot-blocking.conf        ← copy from docs/nginx/bot-blocking.conf
+/etc/nginx/conf.d/bot-blocking.conf        ← copy from docs/nginx/bot-blocking.conf (by hand)
 /etc/nginx/conf.d/cloudflare-real-ip.conf  ← real-IP recovery (already deployed, separate scope)
-/etc/nginx/sites-enabled/extrachill        ← paste from docs/nginx/server-snippet.conf
+/etc/nginx/sites-enabled/extrachill        ← applied from deploy/nginx/sites-enabled/extrachill
 ```
+
+Note that `server-snippet.conf` describes more than is currently live: the author-enumeration guard and the `/wp-login.php` + `/login/` rate-limit locations are documented here but are **not** present in the live server block. Reconciling that is tracked separately; now that the live file is committed under `deploy/`, the difference is a readable diff rather than an SSH session.
 
 If the live config drifts (someone hand-edits the VPS or the CF dashboard), the right reconciliation is to update this directory to match the live state, then commit. Never let the live state run ahead of the docs silently.
 
