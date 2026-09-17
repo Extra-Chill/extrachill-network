@@ -11,12 +11,11 @@
       "composer lint:php"
     ],
     "test": [
-      "php tests/FrontendPathResolverTest.php",
-      "php tests/FrontendPathResolverRuntimeTest.php",
-      "php tests/AdPolicyTest.php",
-      "php tests/NetworkTermClassificationTest.php",
-      "php tests/ExperimentAssignmentTest.php",
-      "php tests/ServiceAssertionTest.php",
+      "php tests/frontend-path-resolver-smoke.php",
+      "php tests/ad-policy-smoke.php",
+      "php tests/network-term-classification-smoke.php",
+      "php tests/experiment-assignment-smoke.php",
+      "php tests/service-assertion-smoke.php",
       "node tests/ExperimentAssignmentJsTest.js"
     ]
   },
