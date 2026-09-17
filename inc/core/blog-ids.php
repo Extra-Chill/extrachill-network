@@ -40,6 +40,9 @@ if ( ! defined( 'EC_BLOG_ID_STUDIO' ) ) {
 if ( ! defined( 'EC_BLOG_ID_LINK_PAGES' ) ) {
 	define( 'EC_BLOG_ID_LINK_PAGES', 13 );
 }
+if ( ! defined( 'EC_BLOG_ID_AUTH' ) ) {
+	define( 'EC_BLOG_ID_AUTH', 14 );
+}
 
 // Platform Artist ID (Extra Chill artist profile on artist.extrachill.com).
 // Dynamic lookup from network option with production fallback.
@@ -65,6 +68,7 @@ function ec_get_blog_ids() {
 		'wire'       => EC_BLOG_ID_WIRE,
 		'studio'     => EC_BLOG_ID_STUDIO,
 		'link_pages' => EC_BLOG_ID_LINK_PAGES,
+		'auth'       => EC_BLOG_ID_AUTH,
 	);
 }
 
@@ -101,6 +105,7 @@ function ec_get_domain_map() {
 		'studio.extrachill.com'     => EC_BLOG_ID_STUDIO,
 		'extrachill.link'           => EC_BLOG_ID_LINK_PAGES,
 		'www.extrachill.link'       => EC_BLOG_ID_LINK_PAGES,
+		'auth.extrachill.com'       => EC_BLOG_ID_AUTH,
 	);
 }
 
