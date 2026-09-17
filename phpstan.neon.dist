@@ -2,5 +2,10 @@
 # See homeboy-extensions/wordpress/phpstan.neon.dist for level, rules and
 # the upstream WordPress stub registration.
 parameters:
+    # Scanned so the real signatures enter the symbol graph, but excluded from
+    # analysis — a stub declares a contract, it is not code under test.
     scanFiles:
         - stubs/abilities-api.php
+    excludePaths:
+        analyse:
+            - stubs/*

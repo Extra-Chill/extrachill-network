@@ -2,7 +2,7 @@
 /**
  * Signature stubs for WordPress core's Abilities API (WP 6.9+ / 7.1).
  *
- * `php-stubs/wordpress-stubs` — pulled in by the Homeboy wordpress extension —
+ * The `php-stubs/wordpress-stubs` package — pulled in by the Homeboy WordPress extension —
  * does not yet carry the current signature, so PHPStan reports
  * `wp_get_abilities invoked with 1 parameter, 0 required`. The call is correct;
  * the stub is stale. Core's real declaration, wp-includes/abilities-api.php:498:
