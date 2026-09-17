@@ -143,6 +143,7 @@ function ec_get_network_abilities(): array {
 	 *
 	 * @param array<string,string> $overrides Ability name => preferred site key.
 	 */
+	/** @var mixed $overrides Filter output is caller-supplied; any type is possible. */
 	$overrides = apply_filters( 'ec_ability_site_affinity_overrides', array() );
 	if ( ! is_array( $overrides ) ) {
 		$overrides = array();
@@ -151,12 +152,17 @@ function ec_get_network_abilities(): array {
 	$resolved = array();
 
 	foreach ( $owners as $name => $site_keys ) {
-		if ( isset( $overrides[ $name ] ) && is_string( $overrides[ $name ] ) && '' !== $overrides[ $name ] ) {
-			$resolved[ $name ] = $overrides[ $name ];
+		/** @var mixed $override */
+		$override = $overrides[ $name ] ?? null;
+		if ( is_string( $override ) && '' !== $override ) {
+			$resolved[ $name ] = $override;
 			continue;
 		}
 
-		if ( is_array( $site_keys ) && 1 === count( $site_keys ) ) {
+		// $owners is built internally and validated at the cache boundary in
+		// ec_get_network_ability_owner_index(), so the shape is already known
+		// here — unlike the filter output above, which is caller-supplied.
+		if ( 1 === count( $site_keys ) ) {
 			$resolved[ $name ] = array_key_first( $site_keys );
 		}
 
