@@ -101,9 +101,28 @@ class QRCodeAbilityTest extends WP_UnitTestCase {
 		$this->assertFalse( $this->ability->check_permission() );
 
 		$administrator = self::factory()->user->create( array( 'role' => 'administrator' ) );
-		grant_super_admin( $administrator );
+		$user          = get_userdata( $administrator );
+
+		/*
+		 * Establish super-admin status through $GLOBALS['super_admins'] rather
+		 * than grant_super_admin().
+		 *
+		 * grant_super_admin() persists to the `site_admins` site option, which
+		 * the sandbox exposes as a string rather than an array. is_super_admin()
+		 * then hands that string to in_array() and WordPress core fatals:
+		 *
+		 *   TypeError: in_array(): Argument #2 ($haystack) must be of type
+		 *   array, string given (wp-includes/capabilities.php)
+		 *
+		 * The global is the documented test-suite override and is checked before
+		 * the option, so this asserts the same network-admin gate without
+		 * depending on how the sandbox seeds that option.
+		 */
+		$GLOBALS['super_admins'] = array( $user->user_login );
 		wp_set_current_user( $administrator );
 
 		$this->assertTrue( $this->ability->check_permission() );
+
+		unset( $GLOBALS['super_admins'] );
 	}
 }
