@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.11.0] - 2026-09-17
+
+### Added
+- register auth.extrachill.com as a network site key
+- track the live nginx server block as a deployable artifact
+- add ability-to-site affinity index and routing docs
+
+### Fixed
+- make the QRCode permission test runnable in the sandbox
+- migrate standalone core-stubbing tests to the smoke-file convention
+- exclude stub files from PHPStan analysis
+- clear the lint findings the release gate caught in ability-site-affinity
+- allow /.well-known/ through the dotfile-deny nginx rule
+
 ## [2.10.0] - 2026-09-08
 
 ### Added
