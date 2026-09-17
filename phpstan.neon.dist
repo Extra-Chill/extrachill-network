@@ -1,0 +1,6 @@
+# Merged with the Homeboy wordpress extension's default PHPStan config.
+# See homeboy-extensions/wordpress/phpstan.neon.dist for level, rules and
+# the upstream WordPress stub registration.
+parameters:
+    scanFiles:
+        - stubs/abilities-api.php
