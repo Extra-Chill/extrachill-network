@@ -43,12 +43,12 @@ class Permissions {
 			? $args['save_guard']
 			: null;
 
-		$can_save = $object_id > 0 && $edit_cap !== '' && current_user_can( $edit_cap, $object_id );
+		$can_save = 0 < $object_id && '' !== $edit_cap && current_user_can( $edit_cap, $object_id );
 		if ( $can_save && $save_guard ) {
 			$can_save = (bool) call_user_func( $save_guard, $object_id );
 		}
 
-		$can_delete = $object_id > 0 && $delete_cap !== '' && current_user_can( $delete_cap, $object_id );
+		$can_delete = 0 < $object_id && '' !== $delete_cap && current_user_can( $delete_cap, $object_id );
 
 		return array(
 			'canSave'        => (bool) $can_save,

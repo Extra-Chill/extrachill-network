@@ -70,27 +70,28 @@ function extrachill_render_cross_site_user_links( $user_id ) {
  * Builds descriptive labels: "{Term Name} {Content Type} ({Count})"
  * Example: "Charleston Blog Posts (5)" instead of "Blog (5)"
  *
- * @param array  $link  Link data with 'url', 'label', optional 'term_name', and optional 'count'.
- * @param string $class Additional CSS class.
+ * @param array  $link        Link data with 'url', 'label', optional 'term_name', and optional 'count'.
+ * @param string $extra_class Additional CSS class.
  */
-function extrachill_cross_site_link_button( $link, $class = '' ) {
+function extrachill_cross_site_link_button( $link, $extra_class = '' ) {
 	if ( empty( $link['url'] ) || empty( $link['label'] ) ) {
 		return;
 	}
 
 	$button_class = 'button-3 button-small ec-cross-site-link';
-	if ( ! empty( $class ) ) {
-		$button_class .= ' ' . esc_attr( $class );
+	if ( ! empty( $extra_class ) ) {
+		$button_class .= ' ' . esc_attr( $extra_class );
 	}
 
 	// Build descriptive label: "{Term Name} {Content Type} ({Count})".
+	// Kept raw here; escaped once at output.
 	$label_parts = array();
 
 	if ( ! empty( $link['term_name'] ) ) {
-		$label_parts[] = esc_html( $link['term_name'] );
+		$label_parts[] = $link['term_name'];
 	}
 
-	$label_parts[] = esc_html( $link['label'] );
+	$label_parts[] = $link['label'];
 
 	$label = implode( ' ', $label_parts );
 
@@ -104,6 +105,6 @@ function extrachill_cross_site_link_button( $link, $class = '' ) {
 		'<a href="%s" class="%s">%s</a>',
 		esc_url( $link['url'] ),
 		esc_attr( $button_class ),
-		$label
+		esc_html( $label )
 	);
 }

@@ -131,7 +131,7 @@ add_filter(
  */
 add_action(
 	'save_post',
-	function ( $post_id, $post, $update ): void {
+	function ( $post_id, $post, $update ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- save_post hook contract; third arg unused.
 		if ( wp_is_post_autosave( $post_id ) || wp_is_post_revision( $post_id ) ) {
 			return;
 		}

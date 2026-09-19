@@ -248,8 +248,6 @@ class TaxonomyCountAbilities {
 
 		global $wpdb;
 
-		$type_placeholders = implode( ',', array_fill( 0, count( $post_types ), '%s' ) );
-
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
@@ -259,7 +257,7 @@ class TaxonomyCountAbilities {
 				INNER JOIN {$wpdb->terms} t ON tt.term_id = t.term_id
 				INNER JOIN {$wpdb->posts} p ON tr.object_id = p.ID
 				WHERE tt.taxonomy = %s
-				AND p.post_type IN ({$type_placeholders})
+				AND p.post_type IN (" . implode( ',', array_fill( 0, count( $post_types ), '%s' ) ) . ")
 				AND p.post_status = 'publish'
 				GROUP BY t.term_id
 				ORDER BY post_count DESC",
