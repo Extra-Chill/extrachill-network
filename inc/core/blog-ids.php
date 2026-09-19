@@ -110,6 +110,66 @@ function ec_get_domain_map() {
 }
 
 /**
+ * Domains whose live routing currently serves a different blog than the
+ * canonical mapping in ec_get_domain_map().
+ *
+ * MUST mirror wp-content/sunrise.php until network#174 cuts extrachill.link
+ * over to the dedicated Link Pages site (blog 13). Remove an entry as soon as
+ * its sunrise mapping moves or disappears; do not add entries for domains the
+ * registry already routes correctly.
+ *
+ * @return array Domain => blog ID that live routing serves.
+ */
+function ec_get_domain_overrides() {
+	$overrides = array(
+		'extrachill.link'     => EC_BLOG_ID_ARTIST,
+		'www.extrachill.link' => EC_BLOG_ID_ARTIST,
+	);
+
+	/**
+	 * Filters the live-routing domain overrides.
+	 *
+	 * @param array $overrides Domain => served blog ID.
+	 */
+	return apply_filters( 'ec_domain_overrides', $overrides );
+}
+
+/**
+ * Return the blog that live routing serves for a registry site's canonical domain.
+ *
+ * Answers "which blog actually answers this site's host right now" from the
+ * override registry. Returns null when the site's canonical domain routes to
+ * the registry's own blog (or the site or host is unknown), so target
+ * enumerators can skip shadowed sites and diagnostics can explain a target
+ * mismatch with one primitive.
+ *
+ * @param string $site_key Logical site key.
+ * @return int|null Served blog ID when live routing disagrees with the registry, null otherwise.
+ */
+function ec_get_shadowing_blog_id( string $site_key ): ?int {
+	$site_url = ec_get_site_url( $site_key );
+	if ( ! is_string( $site_url ) || '' === $site_url ) {
+		return null;
+	}
+
+	$host = wp_parse_url( $site_url, PHP_URL_HOST );
+	if ( ! is_string( $host ) || '' === $host ) {
+		return null;
+	}
+
+	$overrides = ec_get_domain_overrides();
+	$host      = strtolower( $host );
+	if ( ! isset( $overrides[ $host ] ) ) {
+		return null;
+	}
+
+	$served = (int) $overrides[ $host ];
+	$own    = ec_get_blog_id( $site_key );
+
+	return null !== $own && $served !== $own ? $served : null;
+}
+
+/**
  * Configure the canonical Link Pages storage site for the standalone runtime.
  *
  * @param int $blog_id Existing configured blog ID.

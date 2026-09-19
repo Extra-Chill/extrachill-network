@@ -42,6 +42,19 @@ function ec_cross_site_rest_request_http( string $site_key, string $method, stri
 	$GLOBALS['ec_test_calls'][] = array( 'site_key' => $site_key, 'method' => $method, 'path' => $path, 'args' => $args );
 	return $GLOBALS['ec_test_responses'][ $site_key ];
 }
+function ec_get_blog_slug_by_id( int $blog_id ): ?string {
+	return array_flip( ec_get_blog_ids() )[ $blog_id ] ?? null;
+}
+function ec_get_shadowing_blog_id( string $site_key ): ?int {
+	return $GLOBALS['ec_test_shadowing'][ $site_key ] ?? null;
+}
+class WP_REST_Request {
+	public function __construct( private array $json_params ) {}
+	public function get_json_params(): array { return $this->json_params; }
+}
+class WP_REST_Response {
+	public function __construct( public array $data, public int $status = 200 ) {}
+}
 
 require_once dirname( __DIR__ ) . '/inc/core/frontend-path-resolver.php';
 
@@ -89,6 +102,7 @@ ec_test_assert( 'complete' === $batch['scan']['status'], 'Complete target scan e
 ec_test_assert( 3 === count( $GLOBALS['ec_test_calls'] ), 'One target request per site expected.' );
 ec_test_assert( 'POST' === $GLOBALS['ec_test_calls'][0]['method'], 'Target probes must use POST.' );
 ec_test_assert( array( '/main/', '/events/sample/' ) === $GLOBALS['ec_test_calls'][0]['args']['body']['paths'], 'Normalized paths must be deduplicated in each target request body.' );
+ec_test_assert( 1 === $GLOBALS['ec_test_calls'][0]['args']['body']['blog_id'], 'Target probes must declare the intended target blog ID.' );
 ec_test_assert( 15 === $GLOBALS['ec_test_calls'][0]['args']['timeout'], 'Batch probes must allow the transport default needed by maximum-size scans.' );
 ec_test_assert( 'resolved' === $batch['results'][0]['status'] && 1 === $batch['results'][0]['candidate']['blog_id'], 'Main path should resolve.' );
 ec_test_assert( 'resolved' === $batch['results'][1]['status'] && 7 === $batch['results'][1]['candidate']['blog_id'], 'Events path should resolve.' );
@@ -113,6 +127,45 @@ ec_test_assert( 'target_down' === $partial['results'][0]['failures'][0]['code'],
 $GLOBALS['ec_test_responses']['wire'] = array( 'status' => 'complete', 'results' => array() );
 $malformed = ec_resolve_frontend_paths( array( '/main/' ) );
 ec_test_assert( 'incomplete' === $malformed['results'][0]['status'] && 'malformed_response' === $malformed['scan']['failures'][0]['code'], 'Malformed target responses must be incomplete.' );
+
+$GLOBALS['ec_test_calls']     = array();
+$GLOBALS['ec_test_shadowing'] = array( 'events' => 4 );
+$GLOBALS['ec_test_responses'] = array(
+	'main' => ec_test_response( 1, array( '/main/' ), array( '/main/' => ec_test_candidate( 1, 10, 'post', '/main/' ) ) ),
+	'wire' => ec_test_response( 11, array( '/main/' ) ),
+);
+$shadowed = ec_resolve_frontend_paths( array( '/main/' ) );
+ec_test_assert( 'complete' === $shadowed['scan']['status'], 'A scan with a shadowed target must still complete.' );
+ec_test_assert( 2 === count( $GLOBALS['ec_test_calls'] ), 'Shadowed targets must be excluded from enumeration.' );
+ec_test_assert( array( 'main', 'wire' ) === array_column( $GLOBALS['ec_test_calls'], 'site_key' ), 'The shadowed site must not receive a probe.' );
+$GLOBALS['ec_test_shadowing'] = array();
+
+$GLOBALS['ec_test_responses'] = array(
+	'main'   => ec_test_response( 1, array( '/login/' ) ),
+	'events' => ec_test_response( 7, array( '/login/' ) ),
+	'wire'   => ec_test_response(
+		11,
+		array( '/login/' ),
+		array(
+			'/login/' => array(
+				'blog_id'        => 4,
+				'post_id'        => 13389,
+				'post_type'      => 'post',
+				'canonical_url'  => 'https://artist.extrachill.com/login/',
+				'canonical_path' => '/login/',
+			),
+		)
+	),
+);
+$mismatch = ec_resolve_frontend_paths( array( '/login/' ) );
+ec_test_assert( 'incomplete' === $mismatch['results'][0]['status'], 'A candidate served by another blog must never claim a match.' );
+ec_test_assert( 'target_mismatch' === $mismatch['scan']['failures'][0]['code'], 'Candidate blog mismatch must be classified as target_mismatch, not malformed_response.' );
+ec_test_assert( 'Target wire (blog 11) was served by blog 4; check sunrise/domain mapping.' === $mismatch['scan']['failures'][0]['message'], 'Target mismatch evidence must name the intended and served blogs.' );
+
+$GLOBALS['ec_test_responses']['wire'] = new WP_Error( 'target_mismatch', 'Cross-site request failed' );
+$mismatch_error = ec_resolve_frontend_paths( array( '/login/' ) );
+ec_test_assert( 'target_mismatch' === $mismatch_error['scan']['failures'][0]['code'], 'Structured target mismatch errors must keep their dedicated code.' );
+ec_test_assert( 'Target wire (blog 11) was served by a different blog; check sunrise/domain mapping.' === $mismatch_error['scan']['failures'][0]['message'], 'Target mismatch errors must name the intended blog and admit the unknown serving blog.' );
 
 $GLOBALS['ec_test_responses']['wire'] = ec_test_response( 11, array( '/shared/' ), array( '/shared/' => ec_test_candidate( 11, 30, 'festival_wire', '/shared/' ) ) );
 $GLOBALS['ec_test_responses']['main'] = ec_test_response( 1, array( '/shared/' ), array( '/shared/' => ec_test_candidate( 1, 10, 'post', '/shared/' ) ) );
@@ -181,5 +234,16 @@ function url_to_postid( string $url ): int { return 1; }
 ec_test_assert( 'unresolved' === ec_frontend_path_resolve_local( '/draft/' )['status'], 'Drafts must not resolve.' );
 $GLOBALS['ec_test_posts'][1] = new WP_Post( 1, 'publish', 'post', 'https://example.test/canonical/' );
 ec_test_assert( 'unresolved' === ec_frontend_path_resolve_local( '/wrong/' )['status'], 'Canonical mismatches must not resolve.' );
+
+$mismatch_response = ec_frontend_path_resolver_rest_callback( new WP_REST_Request( array( 'paths' => array( '/draft/' ), 'blog_id' => 13 ) ) );
+ec_test_assert( 400 === $mismatch_response->status, 'A probe intended for another blog must be rejected.' );
+ec_test_assert( 'target_mismatch' === $mismatch_response->data['code'] && 'target_mismatch' === $mismatch_response->data['status'], 'The mismatch response must carry the dedicated code in both envelopes.' );
+ec_test_assert( 13 === $mismatch_response->data['requested_blog_id'] && 1 === $mismatch_response->data['served_blog_id'], 'The mismatch response must name the requested and served blogs.' );
+
+$matching_response = ec_frontend_path_resolver_rest_callback( new WP_REST_Request( array( 'paths' => array( '/draft/' ), 'blog_id' => 1 ) ) );
+ec_test_assert( 'complete' === $matching_response->data['status'] && 'unresolved' === $matching_response->data['results']['/draft/']['status'], 'A probe for the serving blog resolves locally as before.' );
+
+$legacy_response = ec_frontend_path_resolver_rest_callback( new WP_REST_Request( array( 'paths' => array( '/draft/' ) ) ) );
+ec_test_assert( 'complete' === $legacy_response->data['status'], 'Probes without a declared blog ID stay backward compatible.' );
 
 fwrite( STDOUT, "FrontendPathResolverTest passed.\n" );
