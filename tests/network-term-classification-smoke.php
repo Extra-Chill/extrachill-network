@@ -458,6 +458,27 @@ namespace {
 	ntc_assert_same( 0, count( \DataMachine\Engine\Tasks\TaskScheduler::$jobs ), 'Classifier-originated writes cannot loop.' );
 	$GLOBALS['extrachill_network_term_classifier_writing'] = false;
 
+	// A site can veto automatic classification for content it knows nobody
+	// will browse — the events site skipping past shows, for instance.
+	ntc_reset_scheduler();
+	$GLOBALS['ntc_filters']['extrachill_network_should_classify_post'][] = static fn( $should, $post, $site ) => false;
+	extrachill_network_maybe_schedule_term_classification( 'publish', 'draft', $GLOBALS['ntc_posts'][2][50] );
+	ntc_assert_same( 0, count( \DataMachine\Engine\Tasks\TaskScheduler::$jobs ), 'A vetoed post does not schedule automatically.' );
+
+	// The veto must not reach explicit requests: a human asking for the work
+	// is not what it protects against.
+	$forced = extrachill_network_classify_post_terms(
+		array( 'site' => 'community', 'post_id' => 50, 'force' => true, 'dry_run' => true ),
+		static fn(): array => array()
+	);
+	ntc_assert( ! is_wp_error( $forced ), 'An explicit classification request bypasses the veto.' );
+	$GLOBALS['ntc_filters']['extrachill_network_should_classify_post'] = array();
+
+	ntc_reset_scheduler();
+	extrachill_network_maybe_schedule_term_classification( 'publish', 'draft', $GLOBALS['ntc_posts'][2][50] );
+	ntc_assert_same( 1, count( \DataMachine\Engine\Tasks\TaskScheduler::$jobs ), 'Removing the veto restores automatic scheduling.' );
+	ntc_reset_scheduler();
+
 	$unsupported = new WP_Post( 99, 'page', 'publish', 'Long enough unsupported title', 'Long enough unsupported content for policy exclusion.' );
 	extrachill_network_maybe_schedule_term_classification( 'publish', 'draft', $unsupported );
 	ntc_assert_same( 0, count( \DataMachine\Engine\Tasks\TaskScheduler::$jobs ), 'Unsupported post types do not schedule.' );

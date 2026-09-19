@@ -194,6 +194,33 @@ function extrachill_network_maybe_schedule_term_classification( $new_status, $ol
 		return;
 	}
 
+	/**
+	 * Whether a post is worth classifying automatically.
+	 *
+	 * Classification costs an inference call per post, so a site that knows
+	 * some of its content will never be browsed should be able to say so.
+	 * The canonical case is the events site: terms exist to make upcoming
+	 * shows discoverable, and 74% of its 131,008 published events are already
+	 * in the past, where no amount of classification changes what anyone
+	 * finds.
+	 *
+	 * This deliberately guards only the automatic path. An explicit call to
+	 * extrachill_network_schedule_term_classification(), including a forced
+	 * reclassification from the CLI or an ability, still runs — a human
+	 * asking for the work is not the case this is protecting against.
+	 *
+	 * Whether a given post matters is domain knowledge owned by the plugin
+	 * that defines the post type, not by this one, which is why it is a seam
+	 * rather than a condition here.
+	 *
+	 * @param bool    $should_classify Default true.
+	 * @param WP_Post $post            Post being considered.
+	 * @param string  $site_key        Network site key.
+	 */
+	if ( ! apply_filters( 'extrachill_network_should_classify_post', true, $post, $site_key ) ) {
+		return;
+	}
+
 	extrachill_network_schedule_term_classification(
 		array(
 			'site'       => $site_key,
