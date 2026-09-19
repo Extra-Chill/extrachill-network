@@ -1,0 +1,69 @@
+{
+  "domain": "extrachill.com",
+  "server_id": "hetzner",
+  "base_path": "/var/www/extrachill.com",
+  "path_roots": {
+    "wp_content": "wp-content"
+  },
+  "remote_files": {
+    "pinned_files": []
+  },
+  "remote_logs": {
+    "pinned_logs": [
+      {
+        "path": "wp-content/debug.log",
+        "label": "WordPress Debug Log",
+        "tail_lines": 100
+      },
+      {
+        "path": "/var/log/nginx/access.log",
+        "label": "Nginx Access Log",
+        "tail_lines": 200
+      },
+      {
+        "path": "/var/log/nginx/error.log",
+        "label": "Nginx Error Log",
+        "tail_lines": 200
+      },
+      {
+        "path": "/var/log/php8.4-fpm.log",
+        "label": "PHP-FPM Log",
+        "tail_lines": 100
+      },
+      {
+        "path": "/var/log/syslog",
+        "label": "System Log",
+        "tail_lines": 100
+      },
+      {
+        "path": "/var/log/mariadb/error.log",
+        "label": "MariaDB Error Log",
+        "tail_lines": 100
+      },
+      {
+        "path": "/var/log/mysql/slow.log",
+        "label": "MariaDB Slow Query Log",
+        "tail_lines": 200
+      },
+      {
+        "path": "/root/.kimaki/kimaki.log",
+        "label": "Kimaki Bot Log",
+        "tail_lines": 200
+      }
+    ]
+  },
+  "database": {
+    "host": "localhost",
+    "port": 3306,
+    "name": "",
+    "user": "",
+    "use_ssh_tunnel": true
+  },
+  "api": {
+    "enabled": false,
+    "base_url": ""
+  },
+  "sub_targets": [],
+  "shared_tables": [],
+  "components": []
+}
