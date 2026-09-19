@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.13.0] - 2026-09-19
+
+### Added
+- let sites veto automatic term classification
+
 ## [2.12.0] - 2026-09-19
 
 ### Added
