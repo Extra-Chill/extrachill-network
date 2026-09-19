@@ -44,9 +44,13 @@ function ec_normalize_frontend_path( string $path ): ?string {
  * Resolve frontend paths against every authoritative network site in one scan.
  *
  * Each target receives the whole deduplicated path set in one HTTP loopback and
- * resolves it after its own plugins and rewrite registrations have booted. A
- * result is never unique, unresolved, or ambiguous until every target response
- * has passed the response contract. Failures make valid inputs incomplete.
+ * resolves it after its own plugins and rewrite registrations have booted. The
+ * probe body declares the intended target blog ID so a target served by a
+ * different blog (domain-routing drift) reports `target_mismatch` instead of
+ * malformed-looking evidence. Targets whose canonical host live-routes to a
+ * different blog are skipped entirely. A result is never unique, unresolved, or
+ * ambiguous until every target response has passed the response contract.
+ * Failures make valid inputs incomplete.
  *
  * @param string[] $paths Host-relative frontend paths.
  * @param array    $args  Optional `timeout` in seconds (1-15, default 15).
@@ -109,12 +113,21 @@ function ec_resolve_frontend_paths( array $paths, array $args = array() ): array
 	$failures = array();
 	$targets  = array();
 	foreach ( ec_get_blog_ids() as $site_key => $blog_id ) {
+		// A target whose canonical host live-routes to a different blog cannot
+		// answer its own probe (sunrise mapping ahead of the registry); skip it
+		// until the domain layer and this registry agree again.
+		if ( null !== ec_get_shadowing_blog_id( $site_key ) ) {
+			continue;
+		}
 		$response = ec_cross_site_rest_request_http(
 			$site_key,
 			'POST',
 			'/extrachill-network/v1/frontend-path-resolution',
 			array(
-				'body'    => array( 'paths' => $normalized_paths ),
+				'body'    => array(
+					'paths'   => $normalized_paths,
+					'blog_id' => (int) $blog_id,
+				),
 				'timeout' => $timeout,
 			)
 		);
@@ -124,11 +137,17 @@ function ec_resolve_frontend_paths( array $paths, array $args = array() ): array
 			'blog_id'  => (int) $blog_id,
 		);
 		if ( is_wp_error( $response ) ) {
+			$code       = $response->get_error_code();
 			$failures[] = array_merge(
 				$target,
 				array(
-					'code'    => $response->get_error_code(),
-					'message' => $response->get_error_message(),
+					'code'    => $code,
+					// A probed target was not registry-shadowed (those are
+					// skipped before fanout), so drift reaching this branch is
+					// by definition not yet named by the override registry.
+					'message' => 'target_mismatch' === $code
+						? ec_frontend_path_resolver_mismatch_message( (int) $blog_id, null )
+						: $response->get_error_message(),
 				)
 			);
 			continue;
@@ -145,7 +164,8 @@ function ec_resolve_frontend_paths( array $paths, array $args = array() ): array
 			continue;
 		}
 
-		$malformed = false;
+		$malformed               = false;
+		$mismatch_served_blog_id = null;
 		foreach ( $normalized_paths as $path ) {
 			$local = $response['results'][ $path ] ?? null;
 			if ( ! is_array( $local ) || ! in_array( $local['status'] ?? null, array( 'resolved', 'unresolved' ), true ) ) {
@@ -154,12 +174,28 @@ function ec_resolve_frontend_paths( array $paths, array $args = array() ): array
 			}
 			if ( 'resolved' === $local['status'] ) {
 				$candidate = $local['candidate'] ?? null;
+				$served    = is_array( $candidate ) && isset( $candidate['blog_id'] ) ? (int) $candidate['blog_id'] : null;
+				if ( null !== $served && $served !== (int) $blog_id ) {
+					$mismatch_served_blog_id = $served;
+					break;
+				}
 				if ( ! ec_frontend_path_resolver_valid_candidate( $candidate, $path, $site_key, (int) $blog_id ) ) {
 					$malformed = true;
 					break;
 				}
 				$matches[ $path ][ (int) $candidate['blog_id'] . ':' . (int) $candidate['post_id'] ] = $candidate;
 			}
+		}
+
+		if ( null !== $mismatch_served_blog_id ) {
+			$failures[] = array_merge(
+				$target,
+				array(
+					'code'    => 'target_mismatch',
+					'message' => ec_frontend_path_resolver_mismatch_message( (int) $blog_id, $mismatch_served_blog_id ),
+				)
+			);
+			continue;
 		}
 
 		if ( $malformed ) {
@@ -300,6 +336,21 @@ function ec_frontend_path_resolver_valid_candidate( $candidate, string $path, st
 	return ec_normalize_frontend_path( $canonical_path ) === $path && ec_normalize_frontend_path( $url_parts['path'] ) === $path;
 }
 
+/**
+ * Explain a target probe that a different blog answered.
+ *
+ * @param int      $blog_id        Intended target blog ID.
+ * @param int|null $served_blog_id Blog that answered, when known from response evidence or the domain override registry.
+ * @return string
+ */
+function ec_frontend_path_resolver_mismatch_message( int $blog_id, ?int $served_blog_id ): string {
+	$slug   = ec_get_blog_slug_by_id( $blog_id );
+	$target = null !== $slug ? sprintf( '%1$s (blog %2$d)', $slug, $blog_id ) : sprintf( 'blog %1$d', $blog_id );
+	$served = null !== $served_blog_id && 0 < $served_blog_id ? sprintf( 'blog %1$d', $served_blog_id ) : 'a different blog';
+
+	return sprintf( 'Target %1$s was served by %2$s; check sunrise/domain mapping.', $target, $served );
+}
+
 /** Register the target-local batch probe. */
 function ec_register_frontend_path_resolver_route(): void {
 	register_rest_route(
@@ -317,13 +368,37 @@ add_action( 'rest_api_init', 'ec_register_frontend_path_resolver_route' );
 /**
  * Resolve all normalized paths inside the currently booted target site.
  *
- * @param WP_REST_Request $request Request containing `paths`.
+ * When the request declares the caller's intended target blog and this site is
+ * not that blog, the response names the mismatch with both blog IDs so
+ * domain-routing drift (e.g. a sunrise mapping ahead of the registry) surfaces
+ * as `target_mismatch` instead of malformed-looking target evidence.
+ *
+ * @param WP_REST_Request $request Request containing `paths` and optional `blog_id`.
  * @return WP_REST_Response
  */
 function ec_frontend_path_resolver_rest_callback( WP_REST_Request $request ): WP_REST_Response {
-	$paths = $request->get_json_params()['paths'] ?? null;
+	$json  = $request->get_json_params();
+	$paths = is_array( $json ) ? ( $json['paths'] ?? null ) : null;
 	if ( ! is_array( $paths ) || count( $paths ) > EC_FRONTEND_PATH_RESOLVER_MAX_PATHS || ! ec_frontend_path_resolver_paths_within_byte_limit( $paths ) ) {
 		return new WP_REST_Response( array( 'status' => 'invalid_request' ), 400 );
+	}
+
+	$requested_blog_id = is_array( $json ) && isset( $json['blog_id'] ) ? (int) $json['blog_id'] : null;
+	$served_blog_id    = get_current_blog_id();
+	if ( null !== $requested_blog_id && $served_blog_id !== $requested_blog_id ) {
+		// `code` follows the WP error envelope so the cross-site transport
+		// preserves the failure code; `status` and the blog IDs are the
+		// resolver contract's structured evidence for direct consumers.
+		return new WP_REST_Response(
+			array(
+				'code'              => 'target_mismatch',
+				'status'            => 'target_mismatch',
+				'requested_blog_id' => $requested_blog_id,
+				'served_blog_id'    => $served_blog_id,
+				'data'              => array( 'status' => 400 ),
+			),
+			400
+		);
 	}
 
 	$results = array();
