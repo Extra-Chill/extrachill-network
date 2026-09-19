@@ -340,6 +340,45 @@ function extrachill_network_term_classification_fingerprint( $post ) {
 }
 
 /**
+ * Whether this exact text has already been sent for classification.
+ *
+ * extrachill_network_term_classification_is_current() only recognises
+ * fingerprints that *succeeded*, which is the right test before doing the
+ * work again on demand. It is the wrong test for deciding whether routine
+ * post churn should pay for a new job: a post whose classification failed,
+ * or never wrote provenance, looks unclassified forever and reschedules on
+ * every single touch.
+ *
+ * Measured on the events site: 86% of 131,293 published events carry no
+ * classifier provenance, so a metadata-only pass over them scheduled a paid
+ * job each, every day, with no way to converge.
+ *
+ * This checks attempts rather than successes, so unchanged text is only ever
+ * sent once per lane. Changed text still classifies.
+ *
+ * @param int    $post_id     Post ID.
+ * @param string $fingerprint Current text fingerprint.
+ * @return bool True when this text was already scheduled at least once.
+ */
+function extrachill_network_term_classification_already_attempted( $post_id, $fingerprint ) {
+	$job_states = get_post_meta( $post_id, EXTRACHILL_NETWORK_TERM_CLASSIFICATION_JOBS_META, true );
+	if ( ! is_array( $job_states ) ) {
+		return false;
+	}
+
+	foreach ( $job_states as $state ) {
+		if ( ! is_array( $state ) || ! isset( $state['fingerprint'] ) ) {
+			continue;
+		}
+		if ( hash_equals( (string) $state['fingerprint'], (string) $fingerprint ) ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/**
  * Whether all requested taxonomies succeeded for this fingerprint.
  *
  * @param int      $post_id    Post ID.

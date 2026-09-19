@@ -158,6 +158,28 @@ function extrachill_network_maybe_schedule_term_classification( $new_status, $ol
 		return;
 	}
 
+	/*
+	 * publish -> publish is an update, not a publication.
+	 *
+	 * The pending branch above already excludes no-op transitions; this one
+	 * did not, so every save of an already-published post scheduled a paid
+	 * classification. That is fine for an editor changing the body text and
+	 * wrong for metadata churn: an importer refreshing post_date on 10,146
+	 * unchanged events in one evening scheduled a job for each.
+	 *
+	 * The downstream identical-fingerprint check cannot absorb this, because
+	 * it only recognises classifications that succeeded — and 86% of events
+	 * on this network have no provenance, so they never look done and never
+	 * converge. Compare against what was already attempted instead.
+	 */
+	$is_noop_transition = $old_status === $new_status;
+	if ( $is_noop_transition && ! empty( $post->ID ) ) {
+		$fingerprint = extrachill_network_term_classification_fingerprint( $post );
+		if ( extrachill_network_term_classification_already_attempted( $post->ID, $fingerprint ) ) {
+			return;
+		}
+	}
+
 	$site_key = function_exists( 'extrachill_get_current_site_key' ) ? extrachill_get_current_site_key() : null;
 	if ( ! $site_key ) {
 		return;

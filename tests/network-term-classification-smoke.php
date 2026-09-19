@@ -414,6 +414,29 @@ namespace {
 	ntc_assert( ! is_wp_error( $closed_result ), 'Closed topics remain eligible for manual classification.' );
 	$GLOBALS['ntc_posts'][2][50]->post_status = 'publish';
 
+	// Metadata churn on an already-published post must not buy a second job.
+	//
+	// The prior job is marked final so duplicate-active-job suppression cannot
+	// account for the result: without the no-op guard this post has no
+	// provenance, so it would look unclassified and schedule again on every
+	// touch. That is what a bulk post_date rewrite across 10,146 unchanged
+	// events cost in one evening.
+	ntc_reset_scheduler();
+	extrachill_network_maybe_schedule_term_classification( 'publish', 'publish', $GLOBALS['ntc_posts'][2][50] );
+	ntc_assert_same( 1, count( \DataMachine\Engine\Tasks\TaskScheduler::$jobs ), 'First touch of unseen text schedules.' );
+	foreach ( \DataMachine\Engine\Tasks\TaskScheduler::$jobs as $id => $job ) {
+		\DataMachine\Engine\Tasks\TaskScheduler::$jobs[ $id ]['status'] = 'completed';
+	}
+	extrachill_network_maybe_schedule_term_classification( 'publish', 'publish', $GLOBALS['ntc_posts'][2][50] );
+	ntc_assert_same( 1, count( \DataMachine\Engine\Tasks\TaskScheduler::$jobs ), 'Unchanged text does not reschedule on repeat publish->publish touches.' );
+
+	// A real edit still classifies — the guard keys on text, not on frequency.
+	$original_content                            = $GLOBALS['ntc_posts'][2][50]->post_content;
+	$GLOBALS['ntc_posts'][2][50]->post_content .= ' An edit that genuinely changes the classified text of this topic.';
+	extrachill_network_maybe_schedule_term_classification( 'publish', 'publish', $GLOBALS['ntc_posts'][2][50] );
+	ntc_assert_same( 2, count( \DataMachine\Engine\Tasks\TaskScheduler::$jobs ), 'Changed text still schedules on publish->publish.' );
+	$GLOBALS['ntc_posts'][2][50]->post_content = $original_content;
+
 	foreach ( array( array( 'draft', 'draft' ), array( 'trash', 'publish' ), array( 'auto-draft', 'draft' ) ) as $transition ) {
 		ntc_reset_scheduler();
 		extrachill_network_maybe_schedule_term_classification( $transition[0], $transition[1], $GLOBALS['ntc_posts'][2][50] );
