@@ -362,12 +362,13 @@ class NetworkMediaAbilities {
 			return null;
 		}
 
-		$blog_id    = get_current_blog_id();
-		$mime_type  = (string) get_post_mime_type( $attachment );
-		$media_type = strtok( $mime_type, '/' ) ?: '';
-		$full_url   = (string) wp_get_attachment_url( $attachment_id );
-		$preview    = wp_get_attachment_image_src( $attachment_id, 'medium' );
-		$metadata   = wp_get_attachment_metadata( $attachment_id );
+		$blog_id       = get_current_blog_id();
+		$mime_type     = (string) get_post_mime_type( $attachment );
+		$mime_segments = explode( '/', $mime_type, 2 );
+		$media_type    = $mime_segments[0];
+		$full_url      = (string) wp_get_attachment_url( $attachment_id );
+		$preview       = wp_get_attachment_image_src( $attachment_id, 'medium' );
+		$metadata      = wp_get_attachment_metadata( $attachment_id );
 
 		return array(
 			'id'         => $attachment_id,

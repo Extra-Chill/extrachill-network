@@ -41,13 +41,13 @@ add_action( 'network_admin_edit_extrachill_integrations', 'ec_handle_network_int
 function ec_network_integrations(): array {
 	return array(
 		array(
-			'id'             => 'mediavine',
-			'title'          => __( 'Mediavine', 'extrachill-network' ),
-			'description'    => __( 'Mediavine publisher dashboard credentials for revenue reports.', 'extrachill-network' ),
-			'option_name'    => 'datamachine_mediavine_config',
-			'required_keys'  => array( 'email', 'password' ),
-			'optional_keys'  => array( 'site_id' ),
-			'fields'         => array(
+			'id'            => 'mediavine',
+			'title'         => __( 'Mediavine', 'extrachill-network' ),
+			'description'   => __( 'Mediavine publisher dashboard credentials for revenue reports.', 'extrachill-network' ),
+			'option_name'   => 'datamachine_mediavine_config',
+			'required_keys' => array( 'email', 'password' ),
+			'optional_keys' => array( 'site_id' ),
+			'fields'        => array(
 				array(
 					'key'         => 'email',
 					'label'       => __( 'Email', 'extrachill-network' ),
@@ -72,13 +72,13 @@ function ec_network_integrations(): array {
 			),
 		),
 		array(
-			'id'             => 'google_analytics',
-			'title'          => __( 'Google Analytics', 'extrachill-network' ),
-			'description'    => __( 'GA4 service account JSON and property ID.', 'extrachill-network' ),
-			'option_name'    => 'datamachine_ga_config',
-			'required_keys'  => array( 'service_account_json', 'property_id' ),
-			'optional_keys'  => array(),
-			'fields'         => array(
+			'id'            => 'google_analytics',
+			'title'         => __( 'Google Analytics', 'extrachill-network' ),
+			'description'   => __( 'GA4 service account JSON and property ID.', 'extrachill-network' ),
+			'option_name'   => 'datamachine_ga_config',
+			'required_keys' => array( 'service_account_json', 'property_id' ),
+			'optional_keys' => array(),
+			'fields'        => array(
 				array(
 					'key'         => 'service_account_json',
 					'label'       => __( 'Service Account JSON', 'extrachill-network' ),
@@ -96,13 +96,13 @@ function ec_network_integrations(): array {
 			),
 		),
 		array(
-			'id'             => 'google_search_console',
-			'title'          => __( 'Google Search Console', 'extrachill-network' ),
-			'description'    => __( 'GSC service account JSON and verified site URL.', 'extrachill-network' ),
-			'option_name'    => 'datamachine_gsc_config',
-			'required_keys'  => array( 'service_account_json' ),
-			'optional_keys'  => array( 'site_url' ),
-			'fields'         => array(
+			'id'            => 'google_search_console',
+			'title'         => __( 'Google Search Console', 'extrachill-network' ),
+			'description'   => __( 'GSC service account JSON and verified site URL.', 'extrachill-network' ),
+			'option_name'   => 'datamachine_gsc_config',
+			'required_keys' => array( 'service_account_json' ),
+			'optional_keys' => array( 'site_url' ),
+			'fields'        => array(
 				array(
 					'key'         => 'service_account_json',
 					'label'       => __( 'Service Account JSON', 'extrachill-network' ),
@@ -120,13 +120,13 @@ function ec_network_integrations(): array {
 			),
 		),
 		array(
-			'id'             => 'bing_webmaster',
-			'title'          => __( 'Bing Webmaster Tools', 'extrachill-network' ),
-			'description'    => __( 'Bing Webmaster Tools API key and site URL.', 'extrachill-network' ),
-			'option_name'    => 'datamachine_bing_webmaster_config',
-			'required_keys'  => array( 'api_key' ),
-			'optional_keys'  => array( 'site_url' ),
-			'fields'         => array(
+			'id'            => 'bing_webmaster',
+			'title'         => __( 'Bing Webmaster Tools', 'extrachill-network' ),
+			'description'   => __( 'Bing Webmaster Tools API key and site URL.', 'extrachill-network' ),
+			'option_name'   => 'datamachine_bing_webmaster_config',
+			'required_keys' => array( 'api_key' ),
+			'optional_keys' => array( 'site_url' ),
+			'fields'        => array(
 				array(
 					'key'         => 'api_key',
 					'label'       => __( 'API Key', 'extrachill-network' ),
@@ -214,14 +214,12 @@ function ec_handle_network_integrations_save() {
 				} else {
 					$value = sanitize_text_field( $raw );
 				}
-			} else {
-				if ( 'email' === $field['type'] ) {
+			} elseif ( 'email' === $field['type'] ) {
 					$value = sanitize_email( $raw );
-				} elseif ( 'textarea' === $field['type'] ) {
-					$value = sanitize_textarea_field( $raw );
-				} else {
-					$value = sanitize_text_field( $raw );
-				}
+			} elseif ( 'textarea' === $field['type'] ) {
+				$value = sanitize_textarea_field( $raw );
+			} else {
+				$value = sanitize_text_field( $raw );
 			}
 
 			$updated[ $field['key'] ] = $value;
@@ -259,7 +257,7 @@ function ec_handle_network_integrations_save() {
  * Render the Integrations settings page.
  */
 function ec_render_network_integrations_page() {
-	$integrations = ec_network_integrations();
+	$integrations  = ec_network_integrations();
 	$is_dmb_active = ec_is_data_machine_business_active();
 	?>
 	<div class="wrap">
@@ -315,9 +313,9 @@ function ec_render_network_integrations_page() {
  * @param array<string, mixed> $integration Integration spec.
  */
 function ec_render_integration_section( array $integration ) {
-	$config      = get_site_option( $integration['option_name'], array() );
-	$is_set      = ec_is_integration_configured( $integration );
-	$section_id  = 'ec-integration-' . esc_attr( $integration['id'] );
+	$config     = get_site_option( $integration['option_name'], array() );
+	$is_set     = ec_is_integration_configured( $integration );
+	$section_id = 'ec-integration-' . esc_attr( $integration['id'] );
 	?>
 	<tr class="extrachill-integration-section" id="<?php echo esc_attr( $section_id ); ?>">
 		<th colspan="2">

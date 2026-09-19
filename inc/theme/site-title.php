@@ -13,6 +13,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 add_filter( 'extrachill_site_title', 'extrachill_network_site_title' );
 
-function extrachill_network_site_title( $title ) {
+function extrachill_network_site_title( $title ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- filter contract; the incoming value is intentionally overridden.
 	return 'Extra Chill';
 }

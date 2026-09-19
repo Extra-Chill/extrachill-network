@@ -152,6 +152,7 @@ if ( ! function_exists( 'extrachill_render_community_activity' ) ) {
 
 				$counter   = $index + 1 + (int) $args['counter_offset'];
 				$time_text = sprintf(
+					/* translators: %s: human-readable time difference */
 					esc_html__( '%s ago', 'extrachill-network' ),
 					human_time_diff( strtotime( $activity['date_time'] ) )
 				);
@@ -195,7 +196,7 @@ if ( ! function_exists( 'extrachill_render_community_activity' ) ) {
 				printf(
 					'<div class="%1$s">%2$s - %3$s</div>',
 					esc_attr( $item_class ),
-					$content,
+					wp_kses_post( $content ),
 					esc_html( $time_text )
 				);
 			}
@@ -204,7 +205,7 @@ if ( ! function_exists( 'extrachill_render_community_activity' ) ) {
 				printf( '</%s>', esc_attr( $args['wrapper_tag'] ) );
 			}
 		} else {
-			$empty_message = esc_html__( 'No recent activity.', 'extrachill-network' );
+			$empty_message = __( 'No recent activity.', 'extrachill-network' );
 
 			if ( $args['render_wrapper'] ) {
 				printf( '<%1$s class="%2$s">', esc_attr( $args['wrapper_tag'] ), esc_attr( $args['wrapper_class'] ) );
@@ -213,7 +214,7 @@ if ( ! function_exists( 'extrachill_render_community_activity' ) ) {
 			printf(
 				'<div class="%1$s">%2$s</div>',
 				esc_attr( $empty_class ),
-				$empty_message
+				esc_html( $empty_message )
 			);
 
 			if ( $args['render_wrapper'] ) {

@@ -105,7 +105,7 @@ abstract class CommunityStatsProvider extends AbstractMetricProvider {
 		// log-noise. Uses the canonical ec_get_blog_id('community') idiom
 		// established elsewhere in this plugin.
 		$community_blog_id = function_exists( 'ec_get_blog_id' ) ? ec_get_blog_id( 'community' ) : null;
-		if ( $community_blog_id && (int) $community_blog_id === (int) get_current_blog_id() && function_exists( 'wp_get_ability' ) ) {
+		if ( $community_blog_id && (int) get_current_blog_id() === (int) $community_blog_id && function_exists( 'wp_get_ability' ) ) {
 			$ability = wp_get_ability( 'extrachill/community-get-stats' );
 			if ( $ability ) {
 				$result = $ability->execute( array() );

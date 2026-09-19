@@ -79,7 +79,7 @@ function site_label(): string {
  * @param mixed  $context     Optional context (typically a WP_Post).
  * @return array
  */
-function provide_tokens( array $tokens, string $template_id = '', $context = null ): array {
+function provide_tokens( array $tokens, string $template_id = '', $context = null ): array { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- filter callback contract; trailing args are part of the Data Machine filter signature.
 	$colors = array(
 		// Mirrors the EC light-mode palette from root.css.
 		'background'      => '#ffffff',
@@ -137,7 +137,7 @@ function badge_token_map(): array {
 		return $cache;
 	}
 
-	$raw = file_get_contents( $path );
+	$raw = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- local filesystem read of a trusted plugin asset.
 	if ( ! $raw ) {
 		$cache = array();
 		return $cache;

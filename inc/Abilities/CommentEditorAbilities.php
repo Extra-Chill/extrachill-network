@@ -180,7 +180,7 @@ class CommentEditorAbilities {
 				if ( ! $comment ) {
 					return false;
 				}
-				if ( (int) $comment->user_id > 0 && (int) $comment->user_id === get_current_user_id() ) {
+				if ( 0 < (int) $comment->user_id && get_current_user_id() === (int) $comment->user_id ) {
 					return true;
 				}
 				return current_user_can( 'edit_comment', $comment_id );
