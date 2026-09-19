@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.12.0] - 2026-09-19
+
+### Added
+- add an ability-permission audit tool that does not run under WP-CLI
+
+### Fixed
+- stop paying for classification on no-op publish transitions
+
 ## [2.11.0] - 2026-09-17
 
 ### Added
