@@ -22,7 +22,8 @@
       "php tests/network-term-classification-smoke.php",
       "php tests/experiment-assignment-smoke.php",
       "php tests/service-assertion-smoke.php",
-      "node tests/ExperimentAssignmentJsTest.js"
+      "node tests/ExperimentAssignmentJsTest.js",
+      "php tests/deploy-workflow-smoke.php"
     ]
   },
   "version_targets": [
