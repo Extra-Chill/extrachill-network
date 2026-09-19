@@ -13,6 +13,21 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
+ * Style dependencies that cascade after the theme's root design tokens.
+ *
+ * The `extrachill-root` handle is registered by the Extra Chill theme. This
+ * plugin is network-activated and also runs on sites using other themes
+ * (e.g. extrachill.link on Twenty Twenty-Five), where the handle is never
+ * registered — declaring it anyway makes WordPress drop the stylesheet and
+ * log a `_doing_it_wrong` notice.
+ *
+ * @return string[] Style dependencies.
+ */
+function extrachill_network_root_style_deps() {
+	return wp_style_is( 'extrachill-root', 'registered' ) ? array( 'extrachill-root' ) : array();
+}
+
+/**
  * Enqueue 404 error page styles.
  */
 function extrachill_network_enqueue_404_styles() {
@@ -25,7 +40,7 @@ function extrachill_network_enqueue_404_styles() {
 		wp_enqueue_style(
 			'extrachill-network-404',
 			EXTRACHILL_NETWORK_PLUGIN_URL . 'assets/css/404.css',
-			array( 'extrachill-root' ),
+			extrachill_network_root_style_deps(),
 			filemtime( $css_path )
 		);
 	}
@@ -48,7 +63,7 @@ function extrachill_network_enqueue_community_activity_styles() {
 		wp_enqueue_style(
 			'extrachill-network-community-activity',
 			EXTRACHILL_NETWORK_PLUGIN_URL . 'assets/css/community-activity.css',
-			array( 'extrachill-root' ),
+			extrachill_network_root_style_deps(),
 			filemtime( $css_path )
 		);
 	}
