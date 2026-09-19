@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.14.0] - 2026-09-19
+
+### Added
+- gate the extrachill.link Link Pages site cutover behind a network option
+
+### Fixed
+- guard extrachill-root style dependency for non-EC themes
+
 ## [2.13.0] - 2026-09-19
 
 ### Added
