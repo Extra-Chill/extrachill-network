@@ -1,0 +1,212 @@
+# Push-based network deploy for extrachill.com.
+#
+# This is the ONLY workflow in the Extra-Chill org that holds SSH access to
+# production. Component repos release through
+# Extra-Chill/homeboy-action/.github/workflows/release.yml@v2 and notify this
+# workflow with a repository_dispatch (homeboy-action#476). This workflow
+# deploys that one component at that one version from its GitHub Release
+# asset. Production never builds, packages, or polls.
+#
+# Homeboy requires a checkout containing the component's homeboy.json to
+# resolve a project component at all (homeboy-core project/component
+# resolution: discover_from_portable(attachment.local_path)), even when the
+# deploy itself reuses the release asset and never reads the tree. So each
+# run shallow-clones the dispatched component at its tag, attaches it to the
+# checked-in project, then deploys. See extrachill-network#229 for the
+# upstream gap: asset-based deploy should not need a source checkout.
+#
+# Triggers:
+#   repository_dispatch component-released  → deploy payload.component @ payload.version
+#   workflow_dispatch                        → manual deploy / rollback / dry run
+#   schedule                                 → reserved for --outdated catch-up once
+#                                              Homeboy can compare versions without a
+#                                              checkout per component (#229)
+
+name: Deploy
+
+on:
+  repository_dispatch:
+    types: [component-released]
+  workflow_dispatch:
+    inputs:
+      component:
+        description: 'Homeboy component id (e.g. data-machine)'
+        type: string
+        required: true
+      repository:
+        description: 'owner/repo of the component (e.g. Extra-Chill/data-machine)'
+        type: string
+        required: true
+      version:
+        description: 'Release version to deploy (e.g. 0.176.17). Ignored when ref is set.'
+        type: string
+        default: ''
+      ref:
+        description: 'Rollback: exact git ref or SHA to deploy instead of a release.'
+        type: string
+        default: ''
+      dry_run:
+        description: 'Plan only; do not touch the server.'
+        type: boolean
+        default: true
+  schedule:
+    - cron: '*/30 * * * *'
+
+permissions:
+  contents: read
+
+# Deploys queue; they never race each other on the same server.
+concurrency:
+  group: deploy-extrachill-site
+  cancel-in-progress: false
+
+env:
+  HOMEBOY_OUTPUT_DIR: ${{ runner.temp }}/homeboy-output
+
+jobs:
+  deploy:
+    name: Deploy to extrachill.com
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      # Homeboy resolves its config root as $HOME/.config/homeboy (homeboy-paths
+      # resolved_home_root); it does not honor XDG_CONFIG_HOME. Copy the
+      # checked-in tree into the runner's real config root. Nothing else lives
+      # there on a fresh runner; homeboy-action installs the extension into the
+      # same root later.
+      # TODO(homeboy-action#475): replace with the config-dir input once released.
+      - name: Materialize Homeboy config
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${HOME}/.config"
+          rm -rf "${HOME}/.config/homeboy"
+          cp -r "${GITHUB_WORKSPACE}/deploy/homeboy" "${HOME}/.config/homeboy"
+          ls "${HOME}/.config/homeboy/projects" "${HOME}/.config/homeboy/servers"
+
+      - name: Plan
+        id: plan
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          D_COMPONENT: ${{ github.event.client_payload.component }}
+          D_REPOSITORY: ${{ github.event.client_payload.repository }}
+          D_VERSION: ${{ github.event.client_payload.version }}
+          D_TAG: ${{ github.event.client_payload.tag }}
+          M_COMPONENT: ${{ inputs.component }}
+          M_REPOSITORY: ${{ inputs.repository }}
+          M_VERSION: ${{ inputs.version }}
+          M_REF: ${{ inputs.ref }}
+          M_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          case "${EVENT}" in
+            repository_dispatch)
+              component="${D_COMPONENT}"; repository="${D_REPOSITORY}"
+              version="${D_VERSION}"; ref=""; clone_ref="${D_TAG:-v${D_VERSION}}"; dry_run="false"
+              ;;
+            workflow_dispatch)
+              component="${M_COMPONENT}"; repository="${M_REPOSITORY}"
+              version="${M_VERSION}"; ref="${M_REF}"; dry_run="${M_DRY_RUN}"
+              clone_ref="${ref:-v${version}}"
+              ;;
+            schedule)
+              echo "::notice::Scheduled --outdated catch-up is not enabled yet (extrachill-network#229: needs Homeboy version comparison without a checkout per component)."
+              echo "run=false" >> "${GITHUB_OUTPUT}"
+              exit 0
+              ;;
+            *) echo "::error::Unsupported event ${EVENT}"; exit 1 ;;
+          esac
+
+          [[ "${component}" =~ ^[a-z0-9][a-z0-9-]*$ ]] || { echo "::error::invalid component id '${component}'"; exit 1; }
+          [[ "${repository}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo "::error::invalid repository '${repository}'"; exit 1; }
+          if [ -z "${ref}" ] && [ -z "${version}" ]; then
+            echo "::error::either version or ref is required"; exit 1
+          fi
+
+          if [ -n "${ref}" ]; then
+            command="deploy extrachill-site ${component} --ref ${ref} --confirm-dangerous"
+          else
+            command="deploy extrachill-site ${component} --version ${version}"
+          fi
+          if [ "${dry_run}" = "true" ]; then
+            command="${command} --dry-run"
+          fi
+
+          {
+            echo "run=true"
+            echo "component=${component}"
+            echo "repository=${repository}"
+            echo "clone_ref=${clone_ref}"
+            echo "command=${command}"
+            echo "dry_run=${dry_run}"
+          } >> "${GITHUB_OUTPUT}"
+          echo "Plan: homeboy ${command}"
+
+      - name: Check out component at release
+        if: steps.plan.outputs.run == 'true'
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ steps.plan.outputs.repository }}
+          ref: ${{ steps.plan.outputs.clone_ref }}
+          path: components/${{ steps.plan.outputs.component }}
+          fetch-depth: 1
+
+      - name: Attach component to project
+        if: steps.plan.outputs.run == 'true'
+        shell: bash
+        env:
+          COMPONENT: ${{ steps.plan.outputs.component }}
+          COMPONENT_PATH: ${{ github.workspace }}/components/${{ steps.plan.outputs.component }}
+        run: |
+          set -euo pipefail
+          test -f "${COMPONENT_PATH}/homeboy.json" || { echo "::error::${COMPONENT_PATH}/homeboy.json not found"; exit 1; }
+          portable_id="$(jq -r '.id // empty' "${COMPONENT_PATH}/homeboy.json")"
+          [ "${portable_id}" = "${COMPONENT}" ] || { echo "::error::homeboy.json id '${portable_id}' != dispatched component '${COMPONENT}'"; exit 1; }
+          # The checked-in project ships with no attachments; attach exactly the
+          # dispatched component for this run. remote_path comes from its homeboy.json.
+          # Written directly into the runner-local config tree — never into a real
+          # ~/.config — and never committed.
+          project_file="${HOME}/.config/homeboy/projects/extrachill-site/extrachill-site.json"
+          jq --arg id "${COMPONENT}" --arg path "${COMPONENT_PATH}" \
+            '.components = [{"id":$id,"local_path":$path}]' "${project_file}" > "${project_file}.tmp"
+          mv "${project_file}.tmp" "${project_file}"
+          jq '.components' "${project_file}"
+
+      # GATE(extrachill-network#223): boot the network rig with this component at
+      # this version and require zero fatals / console errors before deploying.
+      # - name: Network rig gate
+      #   uses: Extra-Chill/homeboy-action@v2
+      #   with:
+      #     commands: rig up extrachill-network
+      #     ...
+
+      - name: Deploy
+        if: steps.plan.outputs.run == 'true'
+        id: deploy
+        uses: Extra-Chill/homeboy-action@v2
+        with:
+          commands: ${{ steps.plan.outputs.command }}
+          ssh-key: ${{ secrets.EXTRACHILL_DEPLOY_SSH_KEY }}
+          ssh-known-hosts: ${{ secrets.EXTRACHILL_DEPLOY_KNOWN_HOSTS }}
+          auto-issue: 'false'
+
+      - name: Verify
+        if: steps.plan.outputs.run == 'true' && steps.plan.outputs.dry_run != 'true'
+        uses: Extra-Chill/homeboy-action@v2
+        with:
+          commands: deploy extrachill-site ${{ steps.plan.outputs.component }} --check
+          ssh-key: ${{ secrets.EXTRACHILL_DEPLOY_SSH_KEY }}
+          ssh-known-hosts: ${{ secrets.EXTRACHILL_DEPLOY_KNOWN_HOSTS }}
+          auto-issue: 'false'
+
+      - name: Upload deploy evidence
+        if: always() && steps.plan.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-evidence-${{ github.run_id }}
+          path: ${{ runner.temp }}/homeboy-output
+          if-no-files-found: warn
+          retention-days: 30
