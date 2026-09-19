@@ -37,7 +37,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * Registered (not enqueued) here; the render function enqueues it only when a
  * bridge actually has cards to show, so no CSS loads on posts without
- * cross-site matches. Depends on `extrachill-root` for the design tokens.
+ * cross-site matches. Depends on `extrachill-root` for the design tokens when
+ * that handle is registered — see extrachill_network_root_style_deps().
  *
  * Centralized in extrachill-network so the three consuming plugins no longer
  * each ship an identical copy of network-bridge.css.
@@ -53,11 +54,15 @@ function extrachill_network_bridge_register_style() {
 	wp_register_style(
 		'extrachill-network-bridge',
 		EXTRACHILL_NETWORK_PLUGIN_URL . 'assets/css/network-bridge.css',
-		array( 'extrachill-root' ),
+		extrachill_network_root_style_deps(),
 		(string) filemtime( $css_path )
 	);
 }
-add_action( 'wp_enqueue_scripts', 'extrachill_network_bridge_register_style', 5 );
+// Priority 9: the Extra Chill theme registers `extrachill-root` on
+// wp_enqueue_scripts at priority 5, and this plugin's callbacks were added
+// first, so checking the handle at priority 5 would miss it even on
+// Extra Chill-themed sites and silently drop the cascade dependency.
+add_action( 'wp_enqueue_scripts', 'extrachill_network_bridge_register_style', 9 );
 
 /**
  * Render the "From Around the Extra Chill Network" section for a single post.
