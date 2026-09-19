@@ -12,5 +12,4 @@ package-lock.json
 *.log
 .DS_Store
 .claude/
-CLAUDE.md
 /README.md
