@@ -100,6 +100,9 @@ foreach ( glob( $registry_dir . '/*.json' ) ?: array() as $f ) {
 }
 dws_assert( empty( $bad_reg ), 'every registry entry has a GitHub remote_url, matching id, and no local_path' );
 dws_assert( ( $s['id'] ?? null ) === 'hetzner' && array_key_exists( 'identity_file', $s ) && null === $s['identity_file'], 'server has null identity_file (key comes from ssh-key)' );
+// CI must connect as the restricted deploy account, never as an operator
+// account with broader reach than wp-content/{plugins,themes,mu-plugins}.
+dws_assert( ( $s['user'] ?? null ) === 'deploy', 'server targets the restricted deploy user' );
 dws_assert( '' === ( $p['database']['name'] ?? 'x' ) && '' === ( $p['database']['user'] ?? 'x' ), 'no database credentials committed' );
 dws_assert( false === ( $p['api']['enabled'] ?? true ), 'project api disabled' );
 
