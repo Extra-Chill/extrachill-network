@@ -43,13 +43,15 @@ A Homeboy config root, selected with `HOMEBOY_CONFIG_ROOT` (homeboy#14783):
 
 | Path | Contents |
 |---|---|
-| `projects/extrachill-site/extrachill-site.json` | server id, base path, path roots, remote logs, and the 37 deployable attachments (`id` + `remote_path`, `local_path` empty) |
+| `projects/extrachill-site/extrachill-site.json` | server id, base path, path roots, remote logs, and the 34 deployable attachments (`id` + `remote_path`, `local_path` empty) |
 | `servers/hetzner.json` | host, user, port; `identity_file` is `null` |
 | `components/<id>.json` | standalone registry: `remote_url` (GitHub) + `remote_path`. The GitHub `remote_url` is what makes checkout-less resolution apply. |
 
 Nothing here is secret. `database.name`/`user` are empty and `api.enabled` is false.
 
 Adding a deployable = one attachment line in the project + one registry file. `tests/deploy-workflow-smoke.php` checks they agree.
+
+**A component is only deployable here if its repository cuts GitHub Releases.** Three site components are deliberately absent for that reason: `chubes-gallery-lightbox` and `intelligence` have no releases at all, and `wp-native-auth` lives in the `chubes4/wp-native` monorepo, where `homeboy.json` is not at the repository root (homeboy#14813). Add them once they release from their own root.
 
 ## Secrets (org-level, repository access restricted to `extrachill-network`)
 
@@ -78,6 +80,12 @@ Actions → Deploy → Run workflow:
 **Rollback** = deploy the previous version: `component` + the prior `version`. There is no separate rollback mode; Homeboy's `--allow-downgrade` guard applies, so a downgrade prompts for `--allow-downgrade` — add it to the plan step if you need it routinely.
 
 Every run uploads `deploy-evidence-<run_id>` with Homeboy's structured JSON for the deploy and the post-deploy `--check`.
+
+## Blocked: homeboy#14813
+
+The poll cannot function yet. On Homeboy v0.378.0 only `deploy <project> <component> --version <v>` resolves a checkout-less component. `--check` skips every one of them, and `--outdated` therefore reports **"No outdated components found"** — a silent false negative, not a clean bill of health.
+
+That is the worst failure mode for an unattended loop: it would report nothing-to-do forever while the server drifted. `DEPLOY_AUTOMATION` must stay unset until homeboy#14813 ships, and the workflow fails loudly if a poll resolves nothing (see the plan step) rather than trusting that message.
 
 ## Not yet enabled
 

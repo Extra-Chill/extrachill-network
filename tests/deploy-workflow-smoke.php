@@ -58,6 +58,10 @@ dws_assert( ! preg_match( '/\$\{\{\s*runner\./', $job_env[1] ?? '' ), 'job-level
 $clone_steps = array_filter( $lines, static fn( $l ) => preg_match( '/^\s*repository:\s*\$\{\{/', $l ) === 1 );
 dws_assert( empty( $clone_steps ), 'workflow never clones a component (checkout-less deploy, homeboy#14782)' );
 dws_assert( str_contains( $yaml, 'deploy extrachill-site --outdated' ), 'scheduled --outdated poll is enabled' );
+// homeboy#14813: an all-skipped poll reports "No outdated components found",
+// which reads like success. A silent no-op loop is worse than a loud failure.
+dws_assert( str_contains( $yaml, 'Reject a poll that resolved nothing' ), 'an all-skipped poll is rejected rather than reported as up to date' );
+dws_assert( str_contains( $yaml, 'homeboy#14813' ), 'the guard cites the upstream issue it compensates for' );
 // Unattended runs must be gated behind an explicit repository variable so the
 // schedule cannot start mutating the server the moment it is merged.
 dws_assert( str_contains( $yaml, 'AUTOMATION: ${{ vars.DEPLOY_AUTOMATION }}' ), 'unattended deploys are gated on the DEPLOY_AUTOMATION repository variable' );
@@ -76,6 +80,9 @@ dws_assert( ( $p['server_id'] ?? null ) === 'hetzner', 'project targets server h
 dws_assert( ( $p['base_path'] ?? null ) === '/var/www/extrachill.com', 'project base_path is the site root' );
 $attachments = $p['components'] ?? null;
 dws_assert( is_array( $attachments ) && count( $attachments ) >= 30, 'project attaches the deployable component set' );
+// Only components whose repositories cut GitHub Releases can be polled.
+$not_releasing = array_filter( (array) $attachments, static fn( $c ) => in_array( $c['id'], array( 'chubes-gallery-lightbox', 'intelligence', 'wp-native-auth' ), true ) );
+dws_assert( empty( $not_releasing ), 'components without usable GitHub Releases are not attached (homeboy#14813)' );
 // local_path must be empty: the runner has no checkouts and Homeboy resolves
 // each component from its GitHub Release (homeboy#14782). The key is still
 // present as "" until homeboy#14795 ships serde(default).

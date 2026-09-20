@@ -165,6 +165,27 @@ jobs:
           ssh-known-hosts: ${{ secrets.EXTRACHILL_DEPLOY_KNOWN_HOSTS }}
           auto-issue: 'false'
 
+      # homeboy#14813: a project-wide run that resolves nothing reports
+      # "No outdated components found", which is indistinguishable from a
+      # healthy no-op. Until that ships, refuse to treat an all-skipped poll
+      # as success — an unattended loop that silently does nothing while the
+      # server drifts is worse than one that fails.
+      - name: Reject a poll that resolved nothing
+        if: always() && steps.plan.outputs.scope == '--outdated'
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$(ls -1 "${HOMEBOY_OUTPUT_DIR}"/operations-*.json 2>/dev/null | head -1 || true)"
+          [ -n "${out}" ] || { echo "::warning::no Homeboy output to inspect"; exit 0; }
+          skipped="$(jq '[.data.results[]? | select(.status == "skipped")] | length' "${out}")"
+          total="$(jq '[.data.results[]?] | length' "${out}")"
+          echo "resolved ${total} component(s), ${skipped} skipped"
+          if [ "${total}" -gt 0 ] && [ "${skipped}" -eq "${total}" ]; then
+            echo "::error::Every component was skipped — the poll resolved nothing. This is homeboy#14813, not an up-to-date network."
+            jq -r '.data.results[]?.warnings[]?' "${out}" | head -5
+            exit 1
+          fi
+
       - name: Upload deploy evidence
         if: always()
         uses: actions/upload-artifact@v4
