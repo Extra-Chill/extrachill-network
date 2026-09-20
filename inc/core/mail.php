@@ -236,6 +236,15 @@ function ec_mail_site_id() {
  * when `mail_site_id` is provided — callers must NOT wrap this in their
  * own `switch_to_blog()`.
  *
+ * Principal-less calls (no logged-in user, no agent context, no `auth_ref`)
+ * are declared as system sends by setting `system => true` on the ability
+ * input (the flag introduced by data-machine#3534) — the site itself is the
+ * sender for transactional mail like contact notifications and registration
+ * notices. Until the released direct ability honours that flag, a refused
+ * principal-less send falls back to {@see ec_send_email_queued()}, which
+ * already accepts user-0 sends: its envelope is returned with an added
+ * `delivery => 'queued_fallback'` key.
+ *
  * @see datamachine/send-email
  *
  * @param array $args Arguments forwarded to the ability. Required keys
@@ -268,7 +277,49 @@ function ec_send_email( array $args ) {
 		);
 	}
 
-	return $ability->execute( $args );
+	// A principal-less call (no logged-in user, no agent context, no explicit
+	// mailbox ref) is a platform/transactional send — the site itself is the
+	// sender. Declare it as a system send so the ability's mailbox gate
+	// treats it accordingly (flag introduced by data-machine#3534). WP-CLI is
+	// excluded: it already passes the legacy-sender check through the CLI
+	// permission bypass.
+	$principal_less = ! ( defined( 'WP_CLI' ) && WP_CLI )
+		&& empty( $args['auth_ref'] )
+		&& class_exists( '\DataMachine\Abilities\PermissionHelper' )
+		&& \DataMachine\Abilities\PermissionHelper::acting_user_id() <= 0
+		&& ! \DataMachine\Abilities\PermissionHelper::in_agent_context();
+
+	if ( $principal_less ) {
+		$args['system'] = true;
+	}
+
+	$result = $ability->execute( $args );
+
+	// Interim fallback for data-machine#3534 — remove this entire guarded
+	// block once #3534 is released and the direct ability honours the
+	// `system` flag (Extra-Chill/extrachill-network#235). Until then, a
+	// refused principal-less send is retried through the queued path, which
+	// already accepts user-0 sends, so the mail is never silently dropped.
+	$fallback_code = '';
+	if ( is_wp_error( $result ) ) {
+		$fallback_code = $result->get_error_code();
+	} elseif ( is_array( $result ) && isset( $result['code'] ) && is_string( $result['code'] ) ) {
+		$fallback_code = $result['code'];
+	}
+
+	if ( $principal_less && in_array( $fallback_code, array( 'email_auth_ref_required', 'email_mailbox_forbidden' ), true ) ) {
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- deliberate server-side diagnostics so a refused send is never silent.
+		error_log( sprintf( 'ExtraChill mail: ec_send_email() direct send refused for a principal-less call (code: %s) — retrying through ec_send_email_queued() (interim fallback for data-machine#3534, see Extra-Chill/extrachill-network#235).', $fallback_code ) );
+		unset( $args['system'] );
+		$queued = ec_send_email_queued( $args );
+		if ( is_array( $queued ) ) {
+			$queued['delivery'] = 'queued_fallback';
+		}
+		return $queued;
+	}
+	// End interim fallback for data-machine#3534.
+
+	return $result;
 }
 
 /**
