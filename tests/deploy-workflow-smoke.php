@@ -81,8 +81,8 @@ dws_assert( ( $p['base_path'] ?? null ) === '/var/www/extrachill.com', 'project 
 $attachments = $p['components'] ?? null;
 dws_assert( is_array( $attachments ) && count( $attachments ) >= 30, 'project attaches the deployable component set' );
 // Only components whose repositories cut GitHub Releases can be polled.
-$not_releasing = array_filter( (array) $attachments, static fn( $c ) => in_array( $c['id'], array( 'chubes-gallery-lightbox', 'intelligence', 'wp-native-auth' ), true ) );
-dws_assert( empty( $not_releasing ), 'components without usable GitHub Releases are not attached (homeboy#14813)' );
+$not_releasing = array_filter( (array) $attachments, static fn( $c ) => in_array( $c['id'], array( 'chubes-gallery-lightbox', 'wp-native-auth' ), true ) );
+dws_assert( empty( $not_releasing ), 'components without a usable GitHub Release are not attached (homeboy#14813)' );
 // local_path must be empty: the runner has no checkouts and Homeboy resolves
 // each component from its GitHub Release (homeboy#14782). The key is still
 // present as "" until homeboy#14795 ships serde(default).

@@ -51,7 +51,12 @@ Nothing here is secret. `database.name`/`user` are empty and `api.enabled` is fa
 
 Adding a deployable = one attachment line in the project + one registry file. `tests/deploy-workflow-smoke.php` checks they agree.
 
-**A component is only deployable here if its repository cuts GitHub Releases.** Three site components are deliberately absent for that reason: `chubes-gallery-lightbox` and `intelligence` have no releases at all, and `wp-native-auth` lives in the `chubes4/wp-native` monorepo, where `homeboy.json` is not at the repository root (homeboy#14813). Add them once they release from their own root.
+**A component is only deployable here if Homeboy can resolve a GitHub Release for it.** Two site components are deliberately absent:
+
+- `chubes-gallery-lightbox` (`chubes4/chubes-gallery-lightbox`) has one tag and no GitHub Release. It joins once its repo gets a `release.yml`.
+- `wp-native-auth` lives in the `chubes4/wp-native` monorepo. It *does* release (`wp-native-auth-v0.4.1`), but its `homeboy.json` is at `plugins/wp-native-auth/`, not the repository root, so checkout-less resolution 404s and the zipball fallback returns HTTP 415. Both gaps are tracked in homeboy#14813; the prefixed tag also needs `tag_prefix`.
+
+Every other attached component resolves from its own repository's latest release. `intelligence` is `Automattic/intelligence`, not an Extra-Chill repo — derive `remote_url` from `git remote get-url origin`, never by guessing the org.
 
 ## Secrets (org-level, repository access restricted to `extrachill-network`)
 

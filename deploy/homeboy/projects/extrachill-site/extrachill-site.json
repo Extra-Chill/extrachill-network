@@ -232,6 +232,11 @@
       "local_path": ""
     },
     {
+      "id": "intelligence",
+      "remote_path": "wp-content/plugins/intelligence",
+      "local_path": ""
+    },
+    {
       "id": "wp-codebox",
       "remote_path": "wp-content/plugins/wp-codebox",
       "local_path": ""
