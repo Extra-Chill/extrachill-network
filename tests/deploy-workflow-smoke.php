@@ -57,7 +57,12 @@ preg_match( '/^    env:\s*\n((?:\s{6,}\S.*\n)+)/m', $yaml, $job_env );
 dws_assert( ! preg_match( '/\$\{\{\s*runner\./', $job_env[1] ?? '' ), 'job-level env does not use the step-scoped runner context' );
 $clone_steps = array_filter( $lines, static fn( $l ) => preg_match( '/^\s*repository:\s*\$\{\{/', $l ) === 1 );
 dws_assert( empty( $clone_steps ), 'workflow never clones a component (checkout-less deploy, homeboy#14782)' );
-dws_assert( str_contains( $yaml, 'deploy extrachill-site --outdated' ), 'scheduled --outdated catch-up is enabled' );
+dws_assert( str_contains( $yaml, 'deploy extrachill-site --outdated' ), 'scheduled --outdated poll is enabled' );
+// Unattended runs must be gated behind an explicit repository variable so the
+// schedule cannot start mutating the server the moment it is merged.
+dws_assert( str_contains( $yaml, 'AUTOMATION: ${{ vars.DEPLOY_AUTOMATION }}' ), 'unattended deploys are gated on the DEPLOY_AUTOMATION repository variable' );
+dws_assert( str_contains( $yaml, 'if [ "${AUTOMATION:-}" != "enabled" ]' ), 'anything other than "enabled" keeps unattended runs in plan-only mode' );
+dws_assert( (bool) preg_match( '/workflow_dispatch\)\s*\n\s+component="\$\{M_COMPONENT\}"; version="\$\{M_VERSION\}"; dry_run="\$\{M_DRY_RUN\}"/', $yaml ), 'manual dispatch is never gated by DEPLOY_AUTOMATION' );
 dws_assert( (bool) preg_match( '/name:\s*deploy-evidence-\$\{\{ github\.run_id \}\}/', $yaml ), 'evidence artifact uploaded' );
 dws_assert( str_contains( $yaml, 'GATE(extrachill-network#223)' ), 'rig gate placeholder present' );
 

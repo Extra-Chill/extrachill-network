@@ -1,41 +1,51 @@
-# Push-based network deploy for extrachill.com.
+# Network deploy for extrachill.com.
 #
 # This is the ONLY workflow in the Extra-Chill org that holds SSH access to
-# production. Component repos release through
-# Extra-Chill/homeboy-action/.github/workflows/release.yml@v2 and notify this
-# workflow with a repository_dispatch (homeboy-action#476). This workflow
-# deploys that one component at that one version from its GitHub Release
-# asset. Production never builds, packages, or polls; this runner never
-# clones a component — Homeboy resolves each one from its GitHub repository
-# (homeboy#14782) using the checked-in config under deploy/homeboy/.
+# production. It polls: every 30 minutes it asks Homeboy which components on
+# the server are behind their latest GitHub Release, and deploys those from
+# the release asset. Nothing in a component repository has to know this
+# workflow exists — a repo's only obligation is to cut GitHub Releases
+# (`release.yml@v2`), which every Extra Chill component does on merge.
+#
+# Production never builds, packages, or polls, and this runner never clones a
+# component: Homeboy resolves each one from its GitHub repository
+# (homeboy#14782, #14796) using the checked-in config under deploy/homeboy/.
+# One API call per component, no checkouts.
+#
+# Why polling rather than a dispatch from each repo: a dropped dispatch is
+# invisible and needs a cross-repo token in every repository, while a missed
+# poll self-heals on the next tick and costs nothing per repo. It also works
+# identically for components whose repositories are outside this org. The
+# repository_dispatch trigger remains for the rare case where one component
+# should ship immediately instead of within the half hour
+# (homeboy-action#476 `dispatch-repo`, off by default).
 #
 # Triggers:
-#   repository_dispatch component-released  → deploy payload.component @ payload.version
-#   workflow_dispatch                        → manual deploy / rollback / dry run
-#   schedule                                 → --outdated catch-up: anything on the
-#                                              server behind its latest GitHub Release
+#   schedule                                 → deploy everything behind its latest release
+#   workflow_dispatch                        → manual deploy / one component / dry run
+#   repository_dispatch component-released   → optional fast path for one component
 
 name: Deploy
 
 on:
-  repository_dispatch:
-    types: [component-released]
+  schedule:
+    - cron: '*/30 * * * *'
   workflow_dispatch:
     inputs:
       component:
-        description: 'Homeboy component id (e.g. data-machine). Empty = --outdated catch-up for every component.'
+        description: 'Homeboy component id (e.g. data-machine). Empty = deploy everything that is behind.'
         type: string
         default: ''
       version:
-        description: 'Release version to deploy (e.g. 0.176.17). Empty = latest GitHub Release.'
+        description: 'Release version to deploy (e.g. 0.176.17). Empty = latest GitHub Release. Ignored unless component is set.'
         type: string
         default: ''
       dry_run:
         description: 'Plan only; do not touch the server.'
         type: boolean
         default: true
-  schedule:
-    - cron: '*/30 * * * *'
+  repository_dispatch:
+    types: [component-released]
 
 permissions:
   contents: read
@@ -76,18 +86,30 @@ jobs:
           M_COMPONENT: ${{ inputs.component }}
           M_VERSION: ${{ inputs.version }}
           M_DRY_RUN: ${{ inputs.dry_run }}
+          # Repository variable DEPLOY_AUTOMATION. Unattended events (schedule,
+          # repository_dispatch) only mutate the server when it is exactly
+          # "enabled"; otherwise they plan and report. A manual
+          # workflow_dispatch is an explicit human decision and is never gated
+          # by it, so an operator can always deploy or verify on demand.
+          AUTOMATION: ${{ vars.DEPLOY_AUTOMATION }}
         run: |
           set -euo pipefail
+          unattended_dry_run="false"
+          if [ "${AUTOMATION:-}" != "enabled" ]; then
+            unattended_dry_run="true"
+            echo "::notice::DEPLOY_AUTOMATION is not 'enabled' — unattended runs plan only. Set the repository variable to enable live deploys."
+          fi
+
           case "${EVENT}" in
             repository_dispatch)
-              component="${D_COMPONENT}"; version="${D_VERSION}"; dry_run="false"
+              component="${D_COMPONENT}"; version="${D_VERSION}"; dry_run="${unattended_dry_run}"
               [ -n "${component}" ] && [ -n "${version}" ] || { echo "::error::dispatch payload needs component and version"; exit 1; }
               ;;
             workflow_dispatch)
               component="${M_COMPONENT}"; version="${M_VERSION}"; dry_run="${M_DRY_RUN}"
               ;;
             schedule)
-              component=""; version=""; dry_run="false"
+              component=""; version=""; dry_run="${unattended_dry_run}"
               ;;
             *) echo "::error::Unsupported event ${EVENT}"; exit 1 ;;
           esac
