@@ -40,6 +40,9 @@
     "tests/frontend-path-resolver-runtime-smoke.php": {
       "environment": "standalone-php"
     },
+    "tests/mail-system-send-smoke.php": {
+      "environment": "standalone-php"
+    },
     "tests/genre-vocabulary-smoke.php": {
       "environment": "standalone-php"
     },
