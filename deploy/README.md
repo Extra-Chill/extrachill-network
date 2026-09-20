@@ -1,27 +1,34 @@
 # Network deploy
 
-`.github/workflows/deploy.yml` is the **only** workflow in the Extra-Chill org with SSH access to production. It deploys one released component at one version to extrachill.com from that component's GitHub Release asset. Production never builds, packages, or polls.
+`.github/workflows/deploy.yml` is the **only** workflow in the Extra-Chill org with SSH access to production. It deploys released components to extrachill.com from their GitHub Release assets. Production never builds, packages, or polls; the runner never clones a component.
 
 ```
 component repo: merge to main
   └─ release.yml@v2 → tag + GitHub Release + ZIP
        └─ repository_dispatch: component-released  (homeboy-action#476)
             └─ extrachill-network / deploy.yml
-                 1. shallow-clone the component at its tag (Homeboy needs its homeboy.json)
-                 2. attach it to the checked-in project config in deploy/homeboy/
-                 3. [gate, once #223 lands] homeboy rig up extrachill-network
-                 4. homeboy deploy extrachill-site <component> --version <v>
-                 5. homeboy deploy extrachill-site <component> --check → evidence artifact
+                 1. [gate, once #223 lands] homeboy rig up extrachill-network
+                 2. homeboy deploy extrachill-site <component> --version <v>
+                      resolves homeboy.json from the repo at the tag, downloads the
+                      release ZIP, scp, extract — no source checkout (homeboy#14782)
+                 3. homeboy deploy extrachill-site --check → evidence artifact
 ```
 
-## Checked-in config
+Every 30 minutes the same workflow runs `homeboy deploy extrachill-site --outdated`: any component whose installed version is behind its latest GitHub Release is deployed. This is the catch-up path if a dispatch was ever missed.
 
-`deploy/homeboy/` is a Homeboy config tree. Homeboy reads `$HOME/.config/homeboy` and does not honor `XDG_CONFIG_HOME`, so the workflow copies this tree there on each run:
+## Checked-in config: `deploy/homeboy/`
 
-- `projects/extrachill-site/extrachill-site.json` — server id, base path, path roots, remote logs. Ships with **no component attachments**; the workflow attaches exactly the dispatched component per run.
-- `servers/hetzner.json` — host, user, port. `identity_file` is `null`; the key arrives via `ssh-key`.
+A Homeboy config root, selected with `HOMEBOY_CONFIG_ROOT` (homeboy#14783):
 
-Nothing in here is secret. `database.name`/`user` are empty and `api.enabled` is false.
+| Path | Contents |
+|---|---|
+| `projects/extrachill-site/extrachill-site.json` | server id, base path, path roots, remote logs, and the 37 deployable attachments (`id` + `remote_path`, `local_path` empty) |
+| `servers/hetzner.json` | host, user, port; `identity_file` is `null` |
+| `components/<id>.json` | standalone registry: `remote_url` (GitHub) + `remote_path`. The GitHub `remote_url` is what makes checkout-less resolution apply. |
+
+Nothing here is secret. `database.name`/`user` are empty and `api.enabled` is false.
+
+Adding a deployable = one attachment line in the project + one registry file. `tests/deploy-workflow-smoke.php` checks they agree.
 
 ## Secrets (org-level, repository access restricted to `extrachill-network`)
 
@@ -30,29 +37,36 @@ Nothing in here is secret. `database.name`/`user` are empty and `api.enabled` is
 | `EXTRACHILL_DEPLOY_SSH_KEY` | Private key for the dedicated `deploy` user on the VPS |
 | `EXTRACHILL_DEPLOY_KNOWN_HOSTS` | `known_hosts` line(s) for the server (`ssh-keyscan -H <host>`) |
 
+Homeboy also needs a GitHub token to read `homeboy.json` and release metadata from each component repository; the runner's `GITHUB_TOKEN` covers public and org repos.
+
 ## VPS side
 
 A dedicated `deploy` user, **not** `opencode`, with write access limited to `wp-content/plugins`, `wp-content/themes`, and `wp-content/mu-plugins` under `/var/www/extrachill.com`. No sudo. `servers/hetzner.json` `user` must match.
 
-## Manual deploy, rollback, dry run
+## Manual runs
 
 Actions → Deploy → Run workflow:
 
-- **Dry run** (default): `component`, `repository`, `version`, `dry_run: true` — plans, no server contact.
-- **Deploy**: same with `dry_run: false`.
-- **Rollback**: set `ref` to the prior tag or SHA; `version` is ignored. Runs `--ref <ref> --confirm-dangerous`.
+| Inputs | Effect |
+|---|---|
+| `component` + `version`, `dry_run: true` (default) | plan one component at one version, no server contact |
+| `component` + `version`, `dry_run: false` | deploy it |
+| `component` only | deploy its latest GitHub Release |
+| nothing | `--outdated` catch-up across every component |
 
-Every run uploads `deploy-evidence-<run_id>` containing Homeboy's structured JSON for the deploy and the post-deploy `--check`.
+**Rollback** = deploy the previous version: `component` + the prior `version`. There is no separate rollback mode; Homeboy's `--allow-downgrade` guard applies, so a downgrade prompts for `--allow-downgrade` — add it to the plan step if you need it routinely.
+
+Every run uploads `deploy-evidence-<run_id>` with Homeboy's structured JSON for the deploy and the post-deploy `--check`.
 
 ## Not yet enabled
 
-- **Scheduled `--outdated` catch-up.** The cron trigger exists but exits early. Homeboy compares local `version_targets` against the remote, which needs a checkout per component — 48 clones per tick. Tracked in #229; needs an upstream Homeboy path that compares remote version to the latest GitHub Release without a checkout.
 - **Network rig gate** (#223). Placeholder step is in the workflow, commented out.
+- **`--outdated` across the project** depends on homeboy#14795 (readiness still blocks on empty `local_path` project-wide; single-component deploys already work). Until it ships, the scheduled run will fail fast at plan time with that message — harmless, and it goes green on the next Homeboy release.
 
 ## First run
 
 1. Create the two secrets and the `deploy` user.
-2. Run workflow with `dry_run: true` for one small component (e.g. `extrachill-cache`).
-3. Run again with `dry_run: false`. Confirm `--check` in the evidence artifact and zero new fatals in `wp-content/debug.log`.
-4. Rollback drill: run with `ref` = the previous tag.
-5. Land homeboy-action#476 in a component's `release.yml` caller with `dispatch-repo: Extra-Chill/extrachill-network`.
+2. Run workflow: `component=extrachill-cache`, `version=<latest>`, `dry_run: true`.
+3. Same with `dry_run: false`. Confirm `--check` in the evidence artifact and zero new fatals in `wp-content/debug.log`.
+4. Rollback drill: previous version.
+5. Add `dispatch-repo: Extra-Chill/extrachill-network` to a component's `release.yml` caller (homeboy-action#476).

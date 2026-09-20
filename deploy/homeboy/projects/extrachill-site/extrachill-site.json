@@ -65,5 +65,191 @@
   },
   "sub_targets": [],
   "shared_tables": [],
-  "components": []
+  "components": [
+    {
+      "id": "blocks-everywhere",
+      "remote_path": "wp-content/plugins/blocks-everywhere",
+      "local_path": ""
+    },
+    {
+      "id": "chubes-gallery-lightbox",
+      "remote_path": "wp-content/plugins/chubes-gallery-lightbox",
+      "local_path": ""
+    },
+    {
+      "id": "data-machine",
+      "remote_path": "wp-content/plugins/data-machine",
+      "local_path": ""
+    },
+    {
+      "id": "data-machine-business",
+      "remote_path": "wp-content/plugins/data-machine-business",
+      "local_path": ""
+    },
+    {
+      "id": "data-machine-chat-bridge",
+      "remote_path": "wp-content/plugins/data-machine-chat-bridge",
+      "local_path": ""
+    },
+    {
+      "id": "data-machine-editor",
+      "remote_path": "wp-content/plugins/data-machine-editor",
+      "local_path": ""
+    },
+    {
+      "id": "data-machine-events",
+      "remote_path": "wp-content/plugins/data-machine-events",
+      "local_path": ""
+    },
+    {
+      "id": "data-machine-socials",
+      "remote_path": "wp-content/plugins/data-machine-socials",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill",
+      "remote_path": "wp-content/themes/extrachill",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill-admin-tools",
+      "remote_path": "wp-content/plugins/extrachill-admin-tools",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill-ai-adventure",
+      "remote_path": "wp-content/plugins/extrachill-ai-adventure",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill-analytics",
+      "remote_path": "wp-content/plugins/extrachill-analytics",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill-api",
+      "remote_path": "wp-content/plugins/extrachill-api",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill-artist-platform",
+      "remote_path": "wp-content/plugins/extrachill-artist-platform",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill-blog",
+      "remote_path": "wp-content/plugins/extrachill-blog",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill-cache",
+      "remote_path": "wp-content/plugins/extrachill-cache",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill-cli",
+      "remote_path": "wp-content/plugins/extrachill-cli",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill-community",
+      "remote_path": "wp-content/plugins/extrachill-community",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill-contact",
+      "remote_path": "wp-content/plugins/extrachill-contact",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill-content-blocks",
+      "remote_path": "wp-content/plugins/extrachill-content-blocks",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill-docs",
+      "remote_path": "wp-content/plugins/extrachill-docs",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill-events",
+      "remote_path": "wp-content/plugins/extrachill-events",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill-link-pages",
+      "remote_path": "wp-content/plugins/extrachill-link-pages",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill-mcp",
+      "remote_path": "wp-content/plugins/extrachill-mcp",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill-network",
+      "remote_path": "wp-content/plugins/extrachill-network",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill-news-wire",
+      "remote_path": "wp-content/plugins/extrachill-news-wire",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill-newsletter",
+      "remote_path": "wp-content/plugins/extrachill-newsletter",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill-roadie",
+      "remote_path": "wp-content/plugins/extrachill-roadie",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill-search",
+      "remote_path": "wp-content/plugins/extrachill-search",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill-seo",
+      "remote_path": "wp-content/plugins/extrachill-seo",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill-shop",
+      "remote_path": "wp-content/plugins/extrachill-shop",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill-studio",
+      "remote_path": "wp-content/plugins/extrachill-studio",
+      "local_path": ""
+    },
+    {
+      "id": "extrachill-users",
+      "remote_path": "wp-content/plugins/extrachill-users",
+      "local_path": ""
+    },
+    {
+      "id": "frontend-agent-chat",
+      "remote_path": "wp-content/plugins/frontend-agent-chat",
+      "local_path": ""
+    },
+    {
+      "id": "intelligence",
+      "remote_path": "wp-content/plugins/intelligence",
+      "local_path": ""
+    },
+    {
+      "id": "wp-codebox",
+      "remote_path": "wp-content/plugins/wp-codebox",
+      "local_path": ""
+    },
+    {
+      "id": "wp-native-auth",
+      "remote_path": "wp-content/plugins/wp-native-auth",
+      "local_path": ""
+    }
+  ]
 }

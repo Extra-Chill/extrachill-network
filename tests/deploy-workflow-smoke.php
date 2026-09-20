@@ -47,10 +47,10 @@ $missing_ssh  = array_filter( $action_steps, static fn( $s ) => ! str_contains( 
 dws_assert( count( $action_steps ) >= 2, 'at least deploy and verify homeboy-action steps' );
 dws_assert( empty( $missing_ssh ), 'every homeboy-action step passes ssh-key and ssh-known-hosts' );
 
-dws_assert( str_contains( $yaml, 'cp -r "${GITHUB_WORKSPACE}/deploy/homeboy" "${HOME}/.config/homeboy"' ), 'checked-in config is materialized into $HOME/.config/homeboy (Homeboy ignores XDG_CONFIG_HOME)' );
-$xdg_use = array_filter( $lines, static fn( $l ) => str_contains( $l, 'XDG_CONFIG_HOME' ) && ! str_starts_with( ltrim( $l ), '#' ) );
-dws_assert( empty( $xdg_use ), 'workflow does not rely on XDG_CONFIG_HOME' );
-dws_assert( str_contains( $yaml, '--confirm-dangerous' ), 'rollback path uses --confirm-dangerous with --ref' );
+dws_assert( str_contains( $yaml, 'HOMEBOY_CONFIG_ROOT: ${{ github.workspace }}/deploy/homeboy' ), 'HOMEBOY_CONFIG_ROOT points at the checked-in config (homeboy#14783)' );
+$clone_steps = array_filter( $lines, static fn( $l ) => preg_match( '/^\s*repository:\s*\$\{\{/', $l ) === 1 );
+dws_assert( empty( $clone_steps ), 'workflow never clones a component (checkout-less deploy, homeboy#14782)' );
+dws_assert( str_contains( $yaml, 'deploy extrachill-site --outdated' ), 'scheduled --outdated catch-up is enabled' );
 dws_assert( (bool) preg_match( '/name:\s*deploy-evidence-\$\{\{ github\.run_id \}\}/', $yaml ), 'evidence artifact uploaded' );
 dws_assert( str_contains( $yaml, 'GATE(extrachill-network#223)' ), 'rig gate placeholder present' );
 
@@ -62,7 +62,24 @@ $s = json_decode( (string) file_get_contents( $server ), true );
 dws_assert( is_array( $p ) && is_array( $s ), 'project and server configs parse as JSON' );
 dws_assert( ( $p['server_id'] ?? null ) === 'hetzner', 'project targets server hetzner' );
 dws_assert( ( $p['base_path'] ?? null ) === '/var/www/extrachill.com', 'project base_path is the site root' );
-dws_assert( ( $p['components'] ?? null ) === array(), 'project ships with no component attachments' );
+$attachments = $p['components'] ?? null;
+dws_assert( is_array( $attachments ) && count( $attachments ) >= 30, 'project attaches the deployable component set' );
+// local_path must be empty: the runner has no checkouts and Homeboy resolves
+// each component from its GitHub Release (homeboy#14782). The key is still
+// present as "" until homeboy#14795 ships serde(default).
+$bad_attach = array_filter( (array) $attachments, static fn( $c ) => ! isset( $c['id'], $c['remote_path'] ) || '' !== ( $c['local_path'] ?? '' ) || ! preg_match( '#^wp-content/(plugins|themes|mu-plugins)/[a-z0-9-]+$#', $c['remote_path'] ) );
+dws_assert( empty( $bad_attach ), 'every attachment has id + wp-content remote_path and an empty local_path' );
+$registry_dir = $root . '/deploy/homeboy/components';
+$missing_reg  = array_filter( (array) $attachments, static fn( $c ) => ! is_file( $registry_dir . '/' . $c['id'] . '.json' ) );
+dws_assert( empty( $missing_reg ), 'every attachment has a standalone registry entry' );
+$bad_reg = array();
+foreach ( glob( $registry_dir . '/*.json' ) ?: array() as $f ) {
+	$r = json_decode( (string) file_get_contents( $f ), true );
+	if ( ! is_array( $r ) || ( $r['id'] ?? null ) !== basename( $f, '.json' ) || ! preg_match( '#^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$#', (string) ( $r['remote_url'] ?? '' ) ) || isset( $r['local_path'] ) ) {
+		$bad_reg[] = basename( $f );
+	}
+}
+dws_assert( empty( $bad_reg ), 'every registry entry has a GitHub remote_url, matching id, and no local_path' );
 dws_assert( ( $s['id'] ?? null ) === 'hetzner' && array_key_exists( 'identity_file', $s ) && null === $s['identity_file'], 'server has null identity_file (key comes from ssh-key)' );
 dws_assert( '' === ( $p['database']['name'] ?? 'x' ) && '' === ( $p['database']['user'] ?? 'x' ), 'no database credentials committed' );
 dws_assert( false === ( $p['api']['enabled'] ?? true ), 'project api disabled' );
