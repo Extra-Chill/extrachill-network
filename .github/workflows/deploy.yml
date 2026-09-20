@@ -45,17 +45,18 @@ concurrency:
   group: deploy-extrachill-site
   cancel-in-progress: false
 
-env:
-  # Checked-in Homeboy config root (projects/, servers/, components/).
-  # homeboy#14783: HOMEBOY_CONFIG_ROOT is the explicit, tier-1 lever.
-  HOMEBOY_CONFIG_ROOT: ${{ github.workspace }}/deploy/homeboy
-  HOMEBOY_OUTPUT_DIR: ${{ runner.temp }}/homeboy-output
-
 jobs:
   deploy:
     name: Deploy to extrachill.com
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # The runner and github.workspace contexts are only available inside a
+    # job, so these live here rather than at workflow level.
+    env:
+      # Checked-in Homeboy config root (projects/, servers/, components/).
+      # homeboy#14783: HOMEBOY_CONFIG_ROOT is the explicit, tier-1 lever.
+      HOMEBOY_CONFIG_ROOT: ${{ github.workspace }}/deploy/homeboy
+      HOMEBOY_OUTPUT_DIR: ${{ runner.temp }}/homeboy-output
     steps:
       - uses: actions/checkout@v6
 
