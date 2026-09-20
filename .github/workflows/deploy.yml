@@ -1,0 +1,146 @@
+# Push-based network deploy for extrachill.com.
+#
+# This is the ONLY workflow in the Extra-Chill org that holds SSH access to
+# production. Component repos release through
+# Extra-Chill/homeboy-action/.github/workflows/release.yml@v2 and notify this
+# workflow with a repository_dispatch (homeboy-action#476). This workflow
+# deploys that one component at that one version from its GitHub Release
+# asset. Production never builds, packages, or polls; this runner never
+# clones a component — Homeboy resolves each one from its GitHub repository
+# (homeboy#14782) using the checked-in config under deploy/homeboy/.
+#
+# Triggers:
+#   repository_dispatch component-released  → deploy payload.component @ payload.version
+#   workflow_dispatch                        → manual deploy / rollback / dry run
+#   schedule                                 → --outdated catch-up: anything on the
+#                                              server behind its latest GitHub Release
+
+name: Deploy
+
+on:
+  repository_dispatch:
+    types: [component-released]
+  workflow_dispatch:
+    inputs:
+      component:
+        description: 'Homeboy component id (e.g. data-machine). Empty = --outdated catch-up for every component.'
+        type: string
+        default: ''
+      version:
+        description: 'Release version to deploy (e.g. 0.176.17). Empty = latest GitHub Release.'
+        type: string
+        default: ''
+      dry_run:
+        description: 'Plan only; do not touch the server.'
+        type: boolean
+        default: true
+  schedule:
+    - cron: '*/30 * * * *'
+
+permissions:
+  contents: read
+
+# Deploys queue; they never race each other on the same server.
+concurrency:
+  group: deploy-extrachill-site
+  cancel-in-progress: false
+
+env:
+  # Checked-in Homeboy config root (projects/, servers/, components/).
+  # homeboy#14783: HOMEBOY_CONFIG_ROOT is the explicit, tier-1 lever.
+  HOMEBOY_CONFIG_ROOT: ${{ github.workspace }}/deploy/homeboy
+  HOMEBOY_OUTPUT_DIR: ${{ runner.temp }}/homeboy-output
+
+jobs:
+  deploy:
+    name: Deploy to extrachill.com
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Plan
+        id: plan
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          D_COMPONENT: ${{ github.event.client_payload.component }}
+          D_VERSION: ${{ github.event.client_payload.version }}
+          M_COMPONENT: ${{ inputs.component }}
+          M_VERSION: ${{ inputs.version }}
+          M_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          case "${EVENT}" in
+            repository_dispatch)
+              component="${D_COMPONENT}"; version="${D_VERSION}"; dry_run="false"
+              [ -n "${component}" ] && [ -n "${version}" ] || { echo "::error::dispatch payload needs component and version"; exit 1; }
+              ;;
+            workflow_dispatch)
+              component="${M_COMPONENT}"; version="${M_VERSION}"; dry_run="${M_DRY_RUN}"
+              ;;
+            schedule)
+              component=""; version=""; dry_run="false"
+              ;;
+            *) echo "::error::Unsupported event ${EVENT}"; exit 1 ;;
+          esac
+
+          if [ -n "${component}" ]; then
+            [[ "${component}" =~ ^[a-z0-9][a-z0-9-]*$ ]] || { echo "::error::invalid component id '${component}'"; exit 1; }
+            test -f "deploy/homeboy/components/${component}.json" || { echo "::error::'${component}' is not a registered deployable (deploy/homeboy/components/)"; exit 1; }
+            if [ -n "${version}" ]; then
+              [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.]+)?$ ]] || { echo "::error::invalid version '${version}'"; exit 1; }
+              command="deploy extrachill-site ${component} --version ${version}"
+            else
+              command="deploy extrachill-site ${component}"
+            fi
+            scope="${component}"
+          else
+            command="deploy extrachill-site --outdated"
+            scope="--outdated"
+          fi
+          if [ "${dry_run}" = "true" ]; then
+            command="${command} --dry-run"
+          fi
+
+          {
+            echo "command=${command}"
+            echo "scope=${scope}"
+            echo "dry_run=${dry_run}"
+          } >> "${GITHUB_OUTPUT}"
+          echo "Plan: homeboy ${command}"
+
+      # GATE(extrachill-network#223): boot the network rig with this component at
+      # this version and require zero fatals / console errors before deploying.
+      # - name: Network rig gate
+      #   uses: Extra-Chill/homeboy-action@v2
+      #   with:
+      #     commands: rig up extrachill-network
+      #     ...
+
+      - name: Deploy
+        id: deploy
+        uses: Extra-Chill/homeboy-action@v2
+        with:
+          commands: ${{ steps.plan.outputs.command }}
+          ssh-key: ${{ secrets.EXTRACHILL_DEPLOY_SSH_KEY }}
+          ssh-known-hosts: ${{ secrets.EXTRACHILL_DEPLOY_KNOWN_HOSTS }}
+          auto-issue: 'false'
+
+      - name: Verify
+        if: steps.plan.outputs.dry_run != 'true'
+        uses: Extra-Chill/homeboy-action@v2
+        with:
+          commands: deploy extrachill-site --check
+          ssh-key: ${{ secrets.EXTRACHILL_DEPLOY_SSH_KEY }}
+          ssh-known-hosts: ${{ secrets.EXTRACHILL_DEPLOY_KNOWN_HOSTS }}
+          auto-issue: 'false'
+
+      - name: Upload deploy evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-evidence-${{ github.run_id }}
+          path: ${{ runner.temp }}/homeboy-output
+          if-no-files-found: warn
+          retention-days: 30
