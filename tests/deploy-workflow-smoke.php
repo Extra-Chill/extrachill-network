@@ -52,6 +52,9 @@ dws_assert( str_contains( $yaml, 'HOMEBOY_CONFIG_ROOT: ${{ github.workspace }}/d
 // referencing them makes GitHub reject the whole file (zero-job failed run).
 preg_match( '/^env:\s*\n((?:\s{2,}\S.*\n)+)/m', $yaml, $top_env );
 dws_assert( ! preg_match( '/\$\{\{\s*(runner\.|github\.workspace)/', $top_env[1] ?? '' ), 'workflow-level env does not use job-scoped contexts (runner.*, github.workspace)' );
+// runner.* is step-scoped only: not valid in workflow- or job-level env.
+preg_match( '/^    env:\s*\n((?:\s{6,}\S.*\n)+)/m', $yaml, $job_env );
+dws_assert( ! preg_match( '/\$\{\{\s*runner\./', $job_env[1] ?? '' ), 'job-level env does not use the step-scoped runner context' );
 $clone_steps = array_filter( $lines, static fn( $l ) => preg_match( '/^\s*repository:\s*\$\{\{/', $l ) === 1 );
 dws_assert( empty( $clone_steps ), 'workflow never clones a component (checkout-less deploy, homeboy#14782)' );
 dws_assert( str_contains( $yaml, 'deploy extrachill-site --outdated' ), 'scheduled --outdated catch-up is enabled' );

@@ -50,15 +50,21 @@ jobs:
     name: Deploy to extrachill.com
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # The runner and github.workspace contexts are only available inside a
-    # job, so these live here rather than at workflow level.
     env:
       # Checked-in Homeboy config root (projects/, servers/, components/).
       # homeboy#14783: HOMEBOY_CONFIG_ROOT is the explicit, tier-1 lever.
+      # github.workspace is job-scoped; runner.* is step-scoped only, so
+      # HOMEBOY_OUTPUT_DIR is set in a step below.
       HOMEBOY_CONFIG_ROOT: ${{ github.workspace }}/deploy/homeboy
-      HOMEBOY_OUTPUT_DIR: ${{ runner.temp }}/homeboy-output
     steps:
       - uses: actions/checkout@v6
+
+      - name: Prepare evidence directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/homeboy-output"
+          echo "HOMEBOY_OUTPUT_DIR=${RUNNER_TEMP}/homeboy-output" >> "${GITHUB_ENV}"
 
       - name: Plan
         id: plan
@@ -142,6 +148,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: deploy-evidence-${{ github.run_id }}
-          path: ${{ runner.temp }}/homeboy-output
+          path: ${{ env.HOMEBOY_OUTPUT_DIR }}
           if-no-files-found: warn
           retention-days: 30
