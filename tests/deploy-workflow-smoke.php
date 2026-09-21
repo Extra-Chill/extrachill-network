@@ -46,6 +46,11 @@ $action_steps = array_filter( $action_steps, static fn( $s ) => preg_match( '/^\
 $missing_ssh  = array_filter( $action_steps, static fn( $s ) => ! str_contains( $s, 'ssh-key: ${{ secrets.EXTRACHILL_DEPLOY_SSH_KEY }}' ) || ! str_contains( $s, 'ssh-known-hosts: ${{ secrets.EXTRACHILL_DEPLOY_KNOWN_HOSTS }}' ) );
 dws_assert( count( $action_steps ) >= 2, 'at least deploy and verify homeboy-action steps' );
 dws_assert( empty( $missing_ssh ), 'every homeboy-action step passes ssh-key and ssh-known-hosts' );
+// Checkout-less resolution reads release metadata from each component's own
+// repository; with no github.com token Homeboy resolves zero components and
+// the run fails closed (homeboy#14813).
+$missing_token = array_filter( $action_steps, static fn( $s ) => ! str_contains( $s, 'GH_TOKEN: ${{ github.token }}' ) );
+dws_assert( empty( $missing_token ), 'every homeboy-action step exports a github.com token for checkout-less resolution' );
 
 dws_assert( str_contains( $yaml, 'HOMEBOY_CONFIG_ROOT: ${{ github.workspace }}/deploy/homeboy' ), 'HOMEBOY_CONFIG_ROOT points at the checked-in config (homeboy#14783)' );
 // runner.* and github.workspace are job-scoped contexts; a workflow-level env

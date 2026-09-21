@@ -147,8 +147,19 @@ jobs:
       #     commands: rig up extrachill-network
       #     ...
 
+      # Checkout-less resolution reads each component's homeboy.json and release
+      # metadata from its own GitHub repository (homeboy#14782), so Homeboy needs
+      # a token for github.com. Without one it cannot resolve a single component
+      # and the run fails closed with "nothing was compared" (homeboy#14813).
+      # Every deployable is a public repository, so the job's own GITHUB_TOKEN
+      # is sufficient; it needs no permission beyond the contents: read declared
+      # above, because it is reading public release metadata rather than this
+      # repository.
       - name: Deploy
         id: deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
         uses: Extra-Chill/homeboy-action@v2
         with:
           commands: ${{ steps.plan.outputs.command }}
@@ -158,6 +169,9 @@ jobs:
 
       - name: Verify
         if: steps.plan.outputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
         uses: Extra-Chill/homeboy-action@v2
         with:
           commands: deploy extrachill-site --check
