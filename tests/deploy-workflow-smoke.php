@@ -85,23 +85,30 @@ dws_assert( str_contains( $yaml, 'Deploy OK, workflow failed' ), 'a workflow fai
 // A skipped component never deployed. Leaving that out of the report is the
 // same class of defect as a poll that never runs: absence indistinguishable
 // from health (#244).
-dws_assert( str_contains( $yaml, 'these did NOT deploy' ), 'skipped components are named in the notification' );
-dws_assert( str_contains( $yaml, 'Nothing deployed - ${skipped} component(s) skipped' ), 'a run that only skipped is reported, not silenced' );
+dws_assert( str_contains( $yaml, 'deploy config needs fixing' ), 'skipped components are named in the notification' );
+dws_assert( str_contains( $yaml, 'Nothing deployed - ${skipped} component(s) misconfigured' ), 'a run that only skipped is reported, not silenced' );
 dws_assert(
 	str_contains( $yaml, '[ "${skipped}" -eq 0 ]' ),
 	'the silent no-op path requires zero skips as well as zero deploys'
 );
 dws_assert( str_contains( $yaml, 'missing extension|invalid_argument|local_path' ), 'structural skips are detected by reason' );
 dws_assert(
-	str_contains( $yaml, 'Components cannot deploy at all and will drift until fixed' ),
+	str_contains( $yaml, 'Deploy configuration is incomplete for these components' ),
 	'a structural skip fails the run rather than warning inside a green one'
 );
 dws_assert( str_contains( $yaml, 'sort -u' ), 'skips reported by both invocations are deduplicated' );
+// A component that was not attempted is a configuration fault, not a property
+// of the component. Wording that blames the component sends the reader to the
+// wrong repository.
+dws_assert(
+	! str_contains( $yaml, 'cannot deploy at all' ) && ! str_contains( $yaml, 'component(s) cannot deploy' ),
+	'reports do not describe components as inherently undeployable'
+);
 // A red run caused by undeployable components must not be described as a CI
 // plumbing failure. The amber "investigate the run, not the deploy" wording is
 // correct only when nothing was skipped.
 dws_assert(
-	str_contains( $yaml, '${skipped} component(s) cannot deploy' ),
+	str_contains( $yaml, '${skipped} component(s) misconfigured for deploy' ),
 	'a run failed by structural skips names that as the cause'
 );
 dws_assert(

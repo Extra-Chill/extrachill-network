@@ -221,7 +221,7 @@ jobs:
           ' "${out}")"
 
           if [ -n "${structural}" ]; then
-            echo "::error::Components cannot deploy at all and will drift until fixed (#244):"
+            echo "::error::Deploy configuration is incomplete for these components; they will drift until it is corrected (#244):"
             printf '%s\n' "${structural}"
             exit 1
           fi
@@ -301,9 +301,9 @@ jobs:
             # wrong: the deploy IS the problem, just not for the components
             # that shipped. Name that directly rather than sending someone to
             # read workflow logs looking for CI plumbing.
-            title="${skipped} component(s) cannot deploy - extrachill.com"
+            title="${skipped} component(s) misconfigured for deploy - extrachill.com"
             colour=15105570
-            body="Scope: ${SCOPE}. Anything listed as updated did deploy and is live. The skipped components below cannot deploy at all and will stay behind until their cause is fixed."
+            body="Scope: ${SCOPE}. Anything listed as updated did deploy and is live. The components below were not attempted because their deploy configuration is incomplete - they stay behind until it is corrected."
           elif [ "${JOB_STATUS}" != "success" ]; then
             title="Deploy OK, workflow failed - extrachill.com"
             colour=16098851
@@ -313,9 +313,9 @@ jobs:
             colour=10181046
             body="${deployed} component(s) would deploy."
           elif [ "${deployed}" -eq 0 ] && [ "${skipped}" -gt 0 ]; then
-            title="Nothing deployed - ${skipped} component(s) skipped"
+            title="Nothing deployed - ${skipped} component(s) misconfigured"
             colour=16098851
-            body="Scope: ${SCOPE}. Homeboy could not deploy these at all, so they stay behind until this is fixed."
+            body="Scope: ${SCOPE}. Homeboy did not attempt these because their deploy configuration is incomplete, so they stay behind until it is corrected."
           else
             title="Deployed to extrachill.com"
             colour=3066993
@@ -327,7 +327,7 @@ jobs:
           fi
 
           if [ -n "${skip_lines}" ]; then
-            body="${body}"$'\n\n'"Skipped (${skipped}) - these did NOT deploy:"$'\n'"${skip_lines}"
+            body="${body}"$'\n\n'"Not attempted (${skipped}) - deploy config needs fixing:"$'\n'"${skip_lines}"
           fi
 
           jq -n --arg t "${title}" --arg d "${body}" --arg u "${RUN_URL}" --argjson c "${colour}" '{embeds:[{title:$t,description:$d,color:$c,url:$u}]}' > "${RUNNER_TEMP}/discord.json"
