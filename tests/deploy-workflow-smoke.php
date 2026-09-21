@@ -57,7 +57,16 @@ preg_match( '/^    env:\s*\n((?:\s{6,}\S.*\n)+)/m', $yaml, $job_env );
 dws_assert( ! preg_match( '/\$\{\{\s*runner\./', $job_env[1] ?? '' ), 'job-level env does not use the step-scoped runner context' );
 $clone_steps = array_filter( $lines, static fn( $l ) => preg_match( '/^\s*repository:\s*\$\{\{/', $l ) === 1 );
 dws_assert( empty( $clone_steps ), 'workflow never clones a component (checkout-less deploy, homeboy#14782)' );
-dws_assert( str_contains( $yaml, 'deploy extrachill-site --outdated' ), 'scheduled --outdated catch-up is enabled' );
+dws_assert( str_contains( $yaml, 'deploy extrachill-site --outdated' ), 'scheduled --outdated poll is enabled' );
+// homeboy#14813: an all-skipped poll reports "No outdated components found",
+// which reads like success. A silent no-op loop is worse than a loud failure.
+dws_assert( str_contains( $yaml, 'Reject a poll that resolved nothing' ), 'an all-skipped poll is rejected rather than reported as up to date' );
+dws_assert( str_contains( $yaml, 'homeboy#14813' ), 'the guard cites the upstream issue it compensates for' );
+// Unattended runs must be gated behind an explicit repository variable so the
+// schedule cannot start mutating the server the moment it is merged.
+dws_assert( str_contains( $yaml, 'AUTOMATION: ${{ vars.DEPLOY_AUTOMATION }}' ), 'unattended deploys are gated on the DEPLOY_AUTOMATION repository variable' );
+dws_assert( str_contains( $yaml, 'if [ "${AUTOMATION:-}" != "enabled" ]' ), 'anything other than "enabled" keeps unattended runs in plan-only mode' );
+dws_assert( (bool) preg_match( '/workflow_dispatch\)\s*\n\s+component="\$\{M_COMPONENT\}"; version="\$\{M_VERSION\}"; dry_run="\$\{M_DRY_RUN\}"/', $yaml ), 'manual dispatch is never gated by DEPLOY_AUTOMATION' );
 dws_assert( (bool) preg_match( '/name:\s*deploy-evidence-\$\{\{ github\.run_id \}\}/', $yaml ), 'evidence artifact uploaded' );
 dws_assert( str_contains( $yaml, 'GATE(extrachill-network#223)' ), 'rig gate placeholder present' );
 
@@ -71,6 +80,9 @@ dws_assert( ( $p['server_id'] ?? null ) === 'hetzner', 'project targets server h
 dws_assert( ( $p['base_path'] ?? null ) === '/var/www/extrachill.com', 'project base_path is the site root' );
 $attachments = $p['components'] ?? null;
 dws_assert( is_array( $attachments ) && count( $attachments ) >= 30, 'project attaches the deployable component set' );
+// Only components whose repositories cut GitHub Releases can be polled.
+$not_releasing = array_filter( (array) $attachments, static fn( $c ) => in_array( $c['id'], array( 'chubes-gallery-lightbox', 'wp-native-auth' ), true ) );
+dws_assert( empty( $not_releasing ), 'components without a usable GitHub Release are not attached (homeboy#14813)' );
 // local_path must be empty: the runner has no checkouts and Homeboy resolves
 // each component from its GitHub Release (homeboy#14782). The key is still
 // present as "" until homeboy#14795 ships serde(default).
@@ -88,6 +100,9 @@ foreach ( glob( $registry_dir . '/*.json' ) ?: array() as $f ) {
 }
 dws_assert( empty( $bad_reg ), 'every registry entry has a GitHub remote_url, matching id, and no local_path' );
 dws_assert( ( $s['id'] ?? null ) === 'hetzner' && array_key_exists( 'identity_file', $s ) && null === $s['identity_file'], 'server has null identity_file (key comes from ssh-key)' );
+// CI must connect as the restricted deploy account, never as an operator
+// account with broader reach than wp-content/{plugins,themes,mu-plugins}.
+dws_assert( ( $s['user'] ?? null ) === 'deploy', 'server targets the restricted deploy user' );
 dws_assert( '' === ( $p['database']['name'] ?? 'x' ) && '' === ( $p['database']['user'] ?? 'x' ), 'no database credentials committed' );
 dws_assert( false === ( $p['api']['enabled'] ?? true ), 'project api disabled' );
 

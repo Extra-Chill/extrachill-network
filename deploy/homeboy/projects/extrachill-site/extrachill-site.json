@@ -72,11 +72,6 @@
       "local_path": ""
     },
     {
-      "id": "chubes-gallery-lightbox",
-      "remote_path": "wp-content/plugins/chubes-gallery-lightbox",
-      "local_path": ""
-    },
-    {
       "id": "data-machine",
       "remote_path": "wp-content/plugins/data-machine",
       "local_path": ""
@@ -244,11 +239,6 @@
     {
       "id": "wp-codebox",
       "remote_path": "wp-content/plugins/wp-codebox",
-      "local_path": ""
-    },
-    {
-      "id": "wp-native-auth",
-      "remote_path": "wp-content/plugins/wp-native-auth",
       "local_path": ""
     }
   ]
