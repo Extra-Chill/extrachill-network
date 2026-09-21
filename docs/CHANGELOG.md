@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.15.1] - 2026-09-21
+
+### Fixed
+- stop hiding components that never deployed
+
 ## [2.15.0] - 2026-09-21
 
 ### Added
