@@ -220,23 +220,37 @@ jobs:
           set -euo pipefail
           [ -n "${WEBHOOK:-}" ] || { echo "No webhook configured; skipping."; exit 0; }
 
-          out="$(ls -1 "${HOMEBOY_OUTPUT_DIR}"/operations-*.json 2>/dev/null | head -1 || true)"
           deployed=0
           lines=""
-          if [ -n "${out}" ]; then
-            deployed="$(jq '[.data.results[]? | select(.status == "deployed")] | length' "${out}")"
-            lines="$(jq -r '.data.results[]? | select(.status == "deployed") | "- " + .id + " -> " + (.local_version // "?")' "${out}")"
-          fi
+          commands_ok=true
+          for out in "${HOMEBOY_OUTPUT_DIR}"/operations-*.json; do
+            [ -e "${out}" ] || continue
+            n="$(jq '[.data.results[]? | select(.status == "deployed")] | length' "${out}")"
+            deployed=$(( deployed + n ))
+            l="$(jq -r '.data.results[]? | select(.status == "deployed") | "- " + .id + " -> " + (.local_version // "?")' "${out}")"
+            [ -n "${l}" ] && lines="${lines}${lines:+$'\n'}${l}"
+            jq -e '.success == true' "${out}" >/dev/null 2>&1 || commands_ok=false
+          done
 
           if [ "${JOB_STATUS}" = "success" ] && [ "${deployed}" -eq 0 ]; then
             echo "Healthy no-op; staying quiet."
             exit 0
           fi
 
-          if [ "${JOB_STATUS}" != "success" ]; then
+          # A red job does not always mean a failed deploy. Homeboy reports its
+          # own success per command; when every command succeeded and the job
+          # still failed, the fault is in the CI plumbing around it, not in the
+          # deployment. Announcing that as "deploy failed" sends people to look
+          # at the server when they should be looking at the workflow — which is
+          # exactly what happened while homeboy-action#483 was unfixed.
+          if [ "${JOB_STATUS}" != "success" ] && [ "${commands_ok}" = "false" ]; then
             title="Deploy failed - extrachill.com"
             colour=15158332
-            body="Scope: ${SCOPE}. Nothing changed unless listed below."
+            body="Scope: ${SCOPE}. Homeboy reported a failure; nothing changed unless listed below."
+          elif [ "${JOB_STATUS}" != "success" ]; then
+            title="Deploy OK, workflow failed - extrachill.com"
+            colour=16098851
+            body="Scope: ${SCOPE}. Every Homeboy command succeeded; a later workflow step failed. The server is in the state listed below - investigate the run, not the deploy."
           elif [ "${DRY_RUN}" = "true" ]; then
             title="Deploy planned (dry run) - extrachill.com"
             colour=10181046
