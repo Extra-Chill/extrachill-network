@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.16.0] - 2026-09-21
+
+### Added
+- supply a logo brand token for the event OG card
+
 ## [2.15.2] - 2026-09-21
 
 ### Fixed
