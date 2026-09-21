@@ -73,6 +73,13 @@ dws_assert( str_contains( $yaml, 'AUTOMATION: ${{ vars.DEPLOY_AUTOMATION }}' ), 
 dws_assert( str_contains( $yaml, 'if [ "${AUTOMATION:-}" != "enabled" ]' ), 'anything other than "enabled" keeps unattended runs in plan-only mode' );
 dws_assert( (bool) preg_match( '/workflow_dispatch\)\s*\n\s+component="\$\{M_COMPONENT\}"; version="\$\{M_VERSION\}"; dry_run="\$\{M_DRY_RUN\}"/', $yaml ), 'manual dispatch is never gated by DEPLOY_AUTOMATION' );
 dws_assert( (bool) preg_match( '/name:\s*deploy-evidence-\$\{\{ github\.run_id \}\}/', $yaml ), 'evidence artifact uploaded' );
+// The poller runs 48x/day and ~46 find nothing. Reporting every run would
+// make the channel unreadable (homeboy#14833), so a healthy no-op must stay
+// silent while real deploys and failures always report.
+dws_assert( str_contains( $yaml, 'Report to Discord' ), 'deploy outcomes are reported to Discord' );
+dws_assert( str_contains( $yaml, 'Healthy no-op; staying quiet.' ), 'a healthy no-op does not notify' );
+dws_assert( str_contains( $yaml, 'secrets.DISCORD_DEPLOY_WEBHOOK' ), 'the webhook comes from a secret, never a literal' );
+dws_assert( ! preg_match( '#discord\.com/api/webhooks/[0-9]#', $yaml ), 'no webhook URL is hardcoded in the workflow' );
 dws_assert( str_contains( $yaml, 'GATE(extrachill-network#223)' ), 'rig gate placeholder present' );
 
 // Checked-in Homeboy config.
