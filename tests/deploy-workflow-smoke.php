@@ -44,7 +44,12 @@ dws_assert( empty( $uses_with_expr ), 'no uses: line contains an expression' );
 $action_steps = preg_split( '/(?=^\s*-\s*name:)/m', $yaml ) ?: array();
 $action_steps = array_filter( $action_steps, static fn( $s ) => preg_match( '/^\s*uses: Extra-Chill\/homeboy-action@v2\s*$/m', $s ) === 1 );
 $missing_ssh  = array_filter( $action_steps, static fn( $s ) => ! str_contains( $s, 'ssh-key: ${{ secrets.EXTRACHILL_DEPLOY_SSH_KEY }}' ) || ! str_contains( $s, 'ssh-known-hosts: ${{ secrets.EXTRACHILL_DEPLOY_KNOWN_HOSTS }}' ) );
-dws_assert( count( $action_steps ) >= 2, 'at least deploy and verify homeboy-action steps' );
+// Exactly one invocation: the action's results artifact has a fixed name per
+// run, so a second call in the same job collides (409) and reds a job whose
+// commands all succeeded (homeboy-action#483). Verification is a second
+// command in the same invocation instead.
+dws_assert( 1 === count( $action_steps ), 'exactly one homeboy-action invocation per job' );
+dws_assert( str_contains( $yaml, 'command="${command},deploy extrachill-site --check"' ), 'verification runs as a second command in the same invocation' );
 dws_assert( empty( $missing_ssh ), 'every homeboy-action step passes ssh-key and ssh-known-hosts' );
 // Checkout-less resolution reads release metadata from each component's own
 // repository; with no github.com token Homeboy resolves zero components and

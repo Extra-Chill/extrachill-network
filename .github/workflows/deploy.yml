@@ -132,6 +132,16 @@ jobs:
             command="${command} --dry-run"
           fi
 
+          # Verification runs in the SAME homeboy-action invocation. Calling the
+          # action twice in one job makes its second results-artifact upload
+          # collide with the first (409, homeboy-action#483), failing a job whose
+          # deploy and check both succeeded. The action accepts a comma-separated
+          # command list, so one invocation covers both — and re-resolves the
+          # binary once instead of twice.
+          if [ "${dry_run}" != "true" ]; then
+            command="${command},deploy extrachill-site --check"
+          fi
+
           {
             echo "command=${command}"
             echo "scope=${scope}"
@@ -167,18 +177,6 @@ jobs:
           ssh-known-hosts: ${{ secrets.EXTRACHILL_DEPLOY_KNOWN_HOSTS }}
           auto-issue: 'false'
 
-      - name: Verify
-        if: steps.plan.outputs.dry_run != 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GITHUB_TOKEN: ${{ github.token }}
-        uses: Extra-Chill/homeboy-action@v2
-        with:
-          commands: deploy extrachill-site --check
-          ssh-key: ${{ secrets.EXTRACHILL_DEPLOY_SSH_KEY }}
-          ssh-known-hosts: ${{ secrets.EXTRACHILL_DEPLOY_KNOWN_HOSTS }}
-          auto-issue: 'false'
-
       # homeboy#14813: a project-wide run that resolves nothing reports
       # "No outdated components found", which is indistinguishable from a
       # healthy no-op. Until that ships, refuse to treat an all-skipped poll
@@ -201,6 +199,12 @@ jobs:
           fi
 
       # Report to Discord only when the run means something. The poller fires
+      # 48 times a day and ~46 find nothing outdated; forwarding every one
+      # would train everybody to ignore the channel, which is the same
+      # signal-dilution failure tracked in homeboy#14833. Post when components
+      # actually deployed, or when the run failed. Stay silent on a healthy
+      # no-op. Reads Homeboy's own structured output rather than re-deriving
+      # state.      # Report to Discord only when the run means something. The poller fires
       # 48 times a day and ~46 find nothing outdated; forwarding every one
       # would train everybody to ignore the channel, which is the same
       # signal-dilution failure tracked in homeboy#14833. Post when components
