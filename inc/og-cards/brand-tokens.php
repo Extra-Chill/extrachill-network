@@ -37,6 +37,49 @@ function font_path( string $filename ): ?string {
 }
 
 /**
+ * Resolve an absolute path to a file in the *main* site's uploads
+ * directory, regardless of which site in the network is currently active.
+ *
+ * The Extra Chill wordmark is an org-level brand asset, not a per-site
+ * one — it lives in the main site's media library. Templates render in
+ * whatever site's context called them (e.g. events.extrachill.com), so a
+ * plain `wp_upload_dir()` call here would resolve against the *current*
+ * site's uploads path (`.../uploads/sites/7/...`) and silently miss the
+ * file. Switching to the main site for this one lookup is the correct,
+ * multisite-safe way to reach a shared asset by filesystem path — an
+ * attachment ID would not work here at all, since attachment IDs are
+ * scoped per-site and the main site's ID has no meaning in another
+ * site's posts table.
+ *
+ * Returns null when the file is missing so callers can omit the token
+ * entirely rather than pass a dangling path — EventOgCardTemplate is
+ * built to treat an omitted/unreadable logo token as "not supplied" and
+ * fall through to the next level of its own resolution chain.
+ *
+ * @param string $relative_path Path relative to the main site's uploads basedir.
+ * @return string|null
+ */
+function main_site_upload_path( string $relative_path ): ?string {
+	$main_site_id = is_multisite() ? get_main_site_id() : get_current_blog_id();
+	$switched     = is_multisite() && $main_site_id !== get_current_blog_id();
+
+	if ( $switched ) {
+		switch_to_blog( $main_site_id );
+	}
+
+	$upload_dir = wp_upload_dir();
+	$path       = empty( $upload_dir['error'] )
+		? trailingslashit( $upload_dir['basedir'] ) . ltrim( $relative_path, '/' )
+		: null;
+
+	if ( $switched ) {
+		restore_current_blog();
+	}
+
+	return ( null !== $path && file_exists( $path ) ) ? $path : null;
+}
+
+/**
  * Map the current blog ID to the short label shown on OG cards.
  *
  * Returns an empty string for the main site so cards there read just
@@ -109,6 +152,24 @@ function provide_tokens( array $tokens, string $template_id = '', $context = nul
 	$tokens['fonts']      = array_merge( (array) ( $tokens['fonts'] ?? array() ), $fonts );
 	$tokens['brand_text'] = 'Extra Chill';
 	$tokens['site_label'] = site_label();
+
+	// Logo token — dark ink, for use on light card backgrounds (the only
+	// kind this network currently renders). Verified transparent PNG,
+	// ink averaging rgb(0,0,30), works on white.
+	//
+	// `logo_path_inverse` (a light/white-ink variant for a dark
+	// background) is intentionally left unset: no verified light-ink
+	// asset exists in the media library today. EventOgCardTemplate's
+	// resolution chain treats a missing variant as "no token for this
+	// background" and falls through to the site icon, then text — so
+	// this omission cannot produce an invisible logo. It also cannot
+	// silently look wrong: whoever adds a dark-background card next
+	// either supplies `logo_path_inverse` here or gets the site-icon/text
+	// fallback, never a dark-on-dark wordmark.
+	$logo_path = main_site_upload_path( '2023/04/extra-chill-logo-no-bg.png' );
+	if ( null !== $logo_path ) {
+		$tokens['logo_path'] = $logo_path;
+	}
 
 	return $tokens;
 }
