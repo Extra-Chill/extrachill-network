@@ -295,10 +295,19 @@ jobs:
             title="Deploy failed - extrachill.com"
             colour=15158332
             body="Scope: ${SCOPE}. Homeboy reported a failure; nothing changed unless listed below."
+          elif [ "${JOB_STATUS}" != "success" ] && [ "${skipped}" -gt 0 ]; then
+            # The run is red because components could not deploy at all. Saying
+            # "investigate the run, not the deploy" here would be actively
+            # wrong: the deploy IS the problem, just not for the components
+            # that shipped. Name that directly rather than sending someone to
+            # read workflow logs looking for CI plumbing.
+            title="${skipped} component(s) cannot deploy - extrachill.com"
+            colour=15105570
+            body="Scope: ${SCOPE}. Anything listed as updated did deploy and is live. The skipped components below cannot deploy at all and will stay behind until their cause is fixed."
           elif [ "${JOB_STATUS}" != "success" ]; then
             title="Deploy OK, workflow failed - extrachill.com"
             colour=16098851
-            body="Scope: ${SCOPE}. Every Homeboy command succeeded; a later workflow step failed. The server is in the state listed below - investigate the run, not the deploy."
+            body="Scope: ${SCOPE}. Every Homeboy command succeeded and no component was skipped; a later workflow step failed. The server is in the state listed below - investigate the run, not the deploy."
           elif [ "${DRY_RUN}" = "true" ]; then
             title="Deploy planned (dry run) - extrachill.com"
             colour=10181046

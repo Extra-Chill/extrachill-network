@@ -97,6 +97,21 @@ dws_assert(
 	'a structural skip fails the run rather than warning inside a green one'
 );
 dws_assert( str_contains( $yaml, 'sort -u' ), 'skips reported by both invocations are deduplicated' );
+// A red run caused by undeployable components must not be described as a CI
+// plumbing failure. The amber "investigate the run, not the deploy" wording is
+// correct only when nothing was skipped.
+dws_assert(
+	str_contains( $yaml, '${skipped} component(s) cannot deploy' ),
+	'a run failed by structural skips names that as the cause'
+);
+dws_assert(
+	str_contains( $yaml, '[ "${JOB_STATUS}" != "success" ] && [ "${skipped}" -gt 0 ]' ),
+	'the skip-caused failure branch is evaluated before the generic workflow-failure branch'
+);
+dws_assert(
+	str_contains( $yaml, 'no component was skipped; a later workflow step failed' ),
+	'the CI-plumbing message states that it only applies when nothing was skipped'
+);
 dws_assert( str_contains( $yaml, 'commands_ok=false' ), 'the notification reads Homeboy own per-command success, not just job status' );
 dws_assert( str_contains( $yaml, 'secrets.DISCORD_DEPLOY_WEBHOOK' ), 'the webhook comes from a secret, never a literal' );
 dws_assert( ! preg_match( '#discord\.com/api/webhooks/[0-9]#', $yaml ), 'no webhook URL is hardcoded in the workflow' );
