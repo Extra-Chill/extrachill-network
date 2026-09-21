@@ -200,6 +200,61 @@ jobs:
             exit 1
           fi
 
+      # Report to Discord only when the run means something. The poller fires
+      # 48 times a day and ~46 find nothing outdated; forwarding every one
+      # would train everybody to ignore the channel, which is the same
+      # signal-dilution failure tracked in homeboy#14833. Post when components
+      # actually deployed, or when the run failed. Stay silent on a healthy
+      # no-op. Reads Homeboy's own structured output rather than re-deriving
+      # state.
+      - name: Report to Discord
+        if: always()
+        shell: bash
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_DEPLOY_WEBHOOK }}
+          JOB_STATUS: ${{ job.status }}
+          SCOPE: ${{ steps.plan.outputs.scope }}
+          DRY_RUN: ${{ steps.plan.outputs.dry_run }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          [ -n "${WEBHOOK:-}" ] || { echo "No webhook configured; skipping."; exit 0; }
+
+          out="$(ls -1 "${HOMEBOY_OUTPUT_DIR}"/operations-*.json 2>/dev/null | head -1 || true)"
+          deployed=0
+          lines=""
+          if [ -n "${out}" ]; then
+            deployed="$(jq '[.data.results[]? | select(.status == "deployed")] | length' "${out}")"
+            lines="$(jq -r '.data.results[]? | select(.status == "deployed") | "- " + .id + " -> " + (.local_version // "?")' "${out}")"
+          fi
+
+          if [ "${JOB_STATUS}" = "success" ] && [ "${deployed}" -eq 0 ]; then
+            echo "Healthy no-op; staying quiet."
+            exit 0
+          fi
+
+          if [ "${JOB_STATUS}" != "success" ]; then
+            title="Deploy failed - extrachill.com"
+            colour=15158332
+            body="Scope: ${SCOPE}. Nothing changed unless listed below."
+          elif [ "${DRY_RUN}" = "true" ]; then
+            title="Deploy planned (dry run) - extrachill.com"
+            colour=10181046
+            body="${deployed} component(s) would deploy."
+          else
+            title="Deployed to extrachill.com"
+            colour=3066993
+            body="${deployed} component(s) updated."
+          fi
+
+          if [ -n "${lines}" ]; then
+            body="${body}"$'\n'"${lines}"
+          fi
+
+          jq -n --arg t "${title}" --arg d "${body}" --arg u "${RUN_URL}" --argjson c "${colour}" '{embeds:[{title:$t,description:$d,color:$c,url:$u}]}' > "${RUNNER_TEMP}/discord.json"
+          curl -fsS -X POST -H 'Content-Type: application/json' -d @"${RUNNER_TEMP}/discord.json" "${WEBHOOK}" >/dev/null
+          echo "Reported: ${title}"
+
       - name: Upload deploy evidence
         if: always()
         uses: actions/upload-artifact@v4
