@@ -82,6 +82,21 @@ dws_assert( str_contains( $yaml, 'Healthy no-op; staying quiet.' ), 'a healthy n
 // "deploy failed" sends people to inspect the server instead of the workflow,
 // which is what happened throughout homeboy-action#483.
 dws_assert( str_contains( $yaml, 'Deploy OK, workflow failed' ), 'a workflow failure after successful commands is reported distinctly' );
+// A skipped component never deployed. Leaving that out of the report is the
+// same class of defect as a poll that never runs: absence indistinguishable
+// from health (#244).
+dws_assert( str_contains( $yaml, 'these did NOT deploy' ), 'skipped components are named in the notification' );
+dws_assert( str_contains( $yaml, 'Nothing deployed - ${skipped} component(s) skipped' ), 'a run that only skipped is reported, not silenced' );
+dws_assert(
+	str_contains( $yaml, '[ "${skipped}" -eq 0 ]' ),
+	'the silent no-op path requires zero skips as well as zero deploys'
+);
+dws_assert( str_contains( $yaml, 'missing extension|invalid_argument|local_path' ), 'structural skips are detected by reason' );
+dws_assert(
+	str_contains( $yaml, 'Components cannot deploy at all and will drift until fixed' ),
+	'a structural skip fails the run rather than warning inside a green one'
+);
+dws_assert( str_contains( $yaml, 'sort -u' ), 'skips reported by both invocations are deduplicated' );
 dws_assert( str_contains( $yaml, 'commands_ok=false' ), 'the notification reads Homeboy own per-command success, not just job status' );
 dws_assert( str_contains( $yaml, 'secrets.DISCORD_DEPLOY_WEBHOOK' ), 'the webhook comes from a secret, never a literal' );
 dws_assert( ! preg_match( '#discord\.com/api/webhooks/[0-9]#', $yaml ), 'no webhook URL is hardcoded in the workflow' );
