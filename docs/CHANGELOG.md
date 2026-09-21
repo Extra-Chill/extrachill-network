@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.15.0] - 2026-09-21
+
+### Added
+- report real deploys and failures to Discord, stay silent on no-ops
+- poll for tagged releases as the primary trigger; gate unattended runs on DEPLOY_AUTOMATION
+- push-based network deploy workflow with checked-in Homeboy config
+
+### Changed
+- adopt the shared Homeboy release train
+
+### Fixed
+- do not report a workflow failure as a failed deployment
+- export a github.com token so checkout-less resolution works
+- runner.temp is step-scoped — set HOMEBOY_OUTPUT_DIR from a step
+- move deploy.yml env into the job — runner/github.workspace are job-scoped
+
 ## [2.14.0] - 2026-09-19
 
 ### Added
