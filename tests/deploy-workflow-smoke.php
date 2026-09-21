@@ -78,6 +78,11 @@ dws_assert( (bool) preg_match( '/name:\s*deploy-evidence-\$\{\{ github\.run_id \
 // silent while real deploys and failures always report.
 dws_assert( str_contains( $yaml, 'Report to Discord' ), 'deploy outcomes are reported to Discord' );
 dws_assert( str_contains( $yaml, 'Healthy no-op; staying quiet.' ), 'a healthy no-op does not notify' );
+// A red job is not always a failed deploy. Reporting a CI-plumbing failure as
+// "deploy failed" sends people to inspect the server instead of the workflow,
+// which is what happened throughout homeboy-action#483.
+dws_assert( str_contains( $yaml, 'Deploy OK, workflow failed' ), 'a workflow failure after successful commands is reported distinctly' );
+dws_assert( str_contains( $yaml, 'commands_ok=false' ), 'the notification reads Homeboy own per-command success, not just job status' );
 dws_assert( str_contains( $yaml, 'secrets.DISCORD_DEPLOY_WEBHOOK' ), 'the webhook comes from a secret, never a literal' );
 dws_assert( ! preg_match( '#discord\.com/api/webhooks/[0-9]#', $yaml ), 'no webhook URL is hardcoded in the workflow' );
 dws_assert( str_contains( $yaml, 'GATE(extrachill-network#223)' ), 'rig gate placeholder present' );
