@@ -200,6 +200,32 @@ jobs:
             exit 1
           fi
 
+          # A partial skip is not benign either. A component skipped for a
+          # STRUCTURAL reason — a toolchain the runner does not have, or config
+          # it cannot read — can never deploy on its own, so it drifts until a
+          # human notices. extrachill-community released 1.27.1 at 15:28 and was
+          # still serving 1.27.0 hours later because every poll skipped it and
+          # still reported success (#244).
+          #
+          # This fails the run rather than merely warning, because a warning in
+          # a green run is indistinguishable from no warning at all. Deployments
+          # that DID succeed are not rolled back; the run is marked failed so the
+          # drift is visible and someone fixes the cause.
+          structural="$(jq -r '
+            .data.results[]?
+            | select(.status == "skipped" or .status == "unavailable")
+            | select(
+                ((.warnings // []) | join(" ") | test("missing extension|invalid_argument|local_path"; "i"))
+              )
+            | "- " + .id + ": " + ((.warnings // []) | join("; "))
+          ' "${out}")"
+
+          if [ -n "${structural}" ]; then
+            echo "::error::Components cannot deploy at all and will drift until fixed (#244):"
+            printf '%s\n' "${structural}"
+            exit 1
+          fi
+
       # Report to Discord only when the run means something. The poller fires
       # 48 times a day and ~46 find nothing outdated; forwarding every one
       # would train everybody to ignore the channel, which is the same
@@ -221,7 +247,9 @@ jobs:
           [ -n "${WEBHOOK:-}" ] || { echo "No webhook configured; skipping."; exit 0; }
 
           deployed=0
+          skipped=0
           lines=""
+          skip_lines=""
           commands_ok=true
           for out in "${HOMEBOY_OUTPUT_DIR}"/operations-*.json; do
             [ -e "${out}" ] || continue
@@ -229,10 +257,30 @@ jobs:
             deployed=$(( deployed + n ))
             l="$(jq -r '.data.results[]? | select(.status == "deployed") | "- " + .id + " -> " + (.local_version // "?")' "${out}")"
             [ -n "${l}" ] && lines="${lines}${lines:+$'\n'}${l}"
+
+            # A skipped component did not get what it was supposed to get. That
+            # is far closer to a failure than to a no-op, but it was previously
+            # invisible in every signal: not counted as failed, not named here,
+            # and not caught by the all-skipped guard, which only fires when
+            # NOTHING resolved. extrachill-community sat on 1.27.0 for hours
+            # after releasing 1.27.1 because every poll skipped it silently and
+            # still reported success (#244).
+            sn="$(jq '[.data.results[]? | select(.status == "skipped" or .status == "unavailable")] | length' "${out}")"
+            skipped=$(( skipped + sn ))
+            sl="$(jq -r '.data.results[]? | select(.status == "skipped" or .status == "unavailable") | "- " + .id + ": " + ((.warnings // []) | join("; ") | if . == "" then "no reason given" else . end)' "${out}")"
+            [ -n "${sl}" ] && skip_lines="${skip_lines}${skip_lines:+$'\n'}${sl}"
+
             jq -e '.success == true' "${out}" >/dev/null 2>&1 || commands_ok=false
           done
 
-          if [ "${JOB_STATUS}" = "success" ] && [ "${deployed}" -eq 0 ]; then
+          # Deduplicate: the deploy and verify invocations both report on the
+          # same component set, so an unfixed skip appears in both files.
+          if [ -n "${skip_lines}" ]; then
+            skip_lines="$(printf '%s\n' "${skip_lines}" | sort -u)"
+            skipped="$(printf '%s\n' "${skip_lines}" | grep -c '^- ' || true)"
+          fi
+
+          if [ "${JOB_STATUS}" = "success" ] && [ "${deployed}" -eq 0 ] && [ "${skipped}" -eq 0 ]; then
             echo "Healthy no-op; staying quiet."
             exit 0
           fi
@@ -255,6 +303,10 @@ jobs:
             title="Deploy planned (dry run) - extrachill.com"
             colour=10181046
             body="${deployed} component(s) would deploy."
+          elif [ "${deployed}" -eq 0 ] && [ "${skipped}" -gt 0 ]; then
+            title="Nothing deployed - ${skipped} component(s) skipped"
+            colour=16098851
+            body="Scope: ${SCOPE}. Homeboy could not deploy these at all, so they stay behind until this is fixed."
           else
             title="Deployed to extrachill.com"
             colour=3066993
@@ -263,6 +315,10 @@ jobs:
 
           if [ -n "${lines}" ]; then
             body="${body}"$'\n'"${lines}"
+          fi
+
+          if [ -n "${skip_lines}" ]; then
+            body="${body}"$'\n\n'"Skipped (${skipped}) - these did NOT deploy:"$'\n'"${skip_lines}"
           fi
 
           jq -n --arg t "${title}" --arg d "${body}" --arg u "${RUN_URL}" --argjson c "${colour}" '{embeds:[{title:$t,description:$d,color:$c,url:$u}]}' > "${RUNNER_TEMP}/discord.json"
