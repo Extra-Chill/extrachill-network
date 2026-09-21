@@ -46,6 +46,9 @@
     "tests/network-term-classification-smoke.php": {
       "environment": "standalone-php"
     },
+    "tests/og-card-content-addressed-cache-smoke.php": {
+      "environment": "standalone-php"
+    },
     "tests/service-assertion-smoke.php": {
       "environment": "standalone-php"
     },

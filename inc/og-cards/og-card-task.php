@@ -133,15 +133,15 @@ class OgCardGenerationTask extends SystemTask {
 			return array( 'error' => "No data collector returned data for post #{$post->ID}" );
 		}
 
-		$signature       = self::signature_for( $data );
-		$existing_url    = (string) get_post_meta( $post->ID, self::META_URL, true );
-		$existing_sig    = (string) get_post_meta( $post->ID, self::META_SIGNATURE, true );
-		$cached_path_for = self::cached_path_for( $post );
+		$signature    = self::signature_for( $data );
+		$existing_url = (string) get_post_meta( $post->ID, self::META_URL, true );
+		$existing_sig = (string) get_post_meta( $post->ID, self::META_SIGNATURE, true );
+		$cached_path  = self::cached_path_for( $post, $signature );
 
-		if ( ! $force && $existing_url && $existing_sig === $signature && file_exists( $cached_path_for ) ) {
+		if ( ! $force && $existing_url && $existing_sig === $signature && file_exists( $cached_path ) ) {
 			return array(
 				'cached_url'   => $existing_url,
-				'cached_path'  => $cached_path_for,
+				'cached_path'  => $cached_path,
 				'reused_cache' => true,
 			);
 		}
@@ -164,7 +164,7 @@ class OgCardGenerationTask extends SystemTask {
 				'output'      => 'cached_file',
 				'cache'       => array(
 					'bucket' => self::CACHE_BUCKET,
-					'key'    => self::cache_key_for( $post ),
+					'key'    => self::cache_key_for( $post, $signature ),
 				),
 			)
 		);
@@ -180,6 +180,15 @@ class OgCardGenerationTask extends SystemTask {
 		$url  = (string) $result['cached_urls'][0];
 		$path = (string) ( $result['cached_paths'][0] ?? '' );
 
+		// Content-addressed keys mean a regenerated card lands at a new
+		// path. Remove whatever the meta previously pointed at so the
+		// bucket holds exactly one live file per post. Derived from the
+		// stored URL (not a recomputed key) so this also sweeps up
+		// pre-#247 legacy filenames on their first regeneration.
+		if ( $existing_url && $existing_url !== $url ) {
+			self::delete_cached_file_for_url( $existing_url );
+		}
+
 		update_post_meta( $post->ID, self::META_URL, $url );
 		update_post_meta( $post->ID, self::META_SIGNATURE, $signature );
 
@@ -191,27 +200,91 @@ class OgCardGenerationTask extends SystemTask {
 	}
 
 	/**
-	 * Stable cache key for a post (used as the file stem).
+	 * Content-addressed cache key for a post (used as the file stem).
 	 *
 	 * Includes the blog ID so multisite cards from different sites do
-	 * not collide when the bucket is on shared storage.
+	 * not collide when the bucket is on shared storage, and an 8-char
+	 * digest of the data signature so a regenerated card lands at a new
+	 * URL — the stable-URL/30-day-CDN-cache combination otherwise makes
+	 * regenerated cards unreachable (see extrachill-network#247).
 	 *
-	 * @param \WP_Post $post Post object.
+	 * Reuses `signature_for()`'s existing signature rather than deriving
+	 * a second hash; there is exactly one "has this card changed" source
+	 * of truth.
+	 *
+	 * @param \WP_Post $post      Post object.
+	 * @param string   $signature Data signature from signature_for(). May be
+	 *                            empty if unavailable; the key stays usable
+	 *                            either way (falls back to a fixed digest
+	 *                            rather than an empty/trailing segment).
 	 * @return string
 	 */
-	public static function cache_key_for( \WP_Post $post ): string {
-		return sprintf( 'b%d-%s-%d', (int) get_current_blog_id(), $post->post_type, $post->ID );
+	public static function cache_key_for( \WP_Post $post, string $signature = '' ): string {
+		$base = sprintf( 'b%d-%s-%d', (int) get_current_blog_id(), $post->post_type, $post->ID );
+		return $base . '-' . self::signature_digest( $signature );
+	}
+
+	/**
+	 * Short, filename-safe digest of a data signature.
+	 *
+	 * Falls back to a fixed placeholder when the signature is empty so
+	 * card generation never produces a key with a missing/empty segment
+	 * (e.g. `b7-post-123-.png`) and never fatals over a formatting edge
+	 * case.
+	 *
+	 * @param string $signature Full signature from signature_for().
+	 * @return string 8-char digest, always non-empty.
+	 */
+	private static function signature_digest( string $signature ): string {
+		$signature = trim( $signature );
+		if ( '' === $signature ) {
+			return 'nosig000';
+		}
+		return substr( $signature, 0, 8 );
 	}
 
 	/**
 	 * Absolute filesystem path the cache file would live at.
 	 *
-	 * @param \WP_Post $post Post object.
+	 * @param \WP_Post $post      Post object.
+	 * @param string   $signature Data signature from signature_for().
 	 * @return string
 	 */
-	public static function cached_path_for( \WP_Post $post ): string {
+	public static function cached_path_for( \WP_Post $post, string $signature = '' ): string {
 		$upload_dir = wp_upload_dir();
-		return trailingslashit( $upload_dir['basedir'] ) . self::CACHE_BUCKET . '/' . self::cache_key_for( $post ) . '.png';
+		return trailingslashit( $upload_dir['basedir'] ) . self::CACHE_BUCKET . '/' . self::cache_key_for( $post, $signature ) . '.png';
+	}
+
+	/**
+	 * Delete the cached file a previously stored card URL points at.
+	 *
+	 * Parses the filename out of the URL itself rather than recomputing
+	 * a cache key, so this correctly locates and removes both current
+	 * content-addressed files and pre-#247 legacy (non-addressed) files
+	 * without needing to know which signature produced them. The lookup
+	 * is a direct filename join, not a directory glob.
+	 *
+	 * @param string $url Previously stored `_ec_og_card_url` value.
+	 * @return void
+	 */
+	private static function delete_cached_file_for_url( string $url ): void {
+		$url = trim( $url );
+		if ( '' === $url ) {
+			return;
+		}
+
+		$path     = wp_parse_url( $url, PHP_URL_PATH );
+		$filename = is_string( $path ) ? wp_basename( $path ) : '';
+		if ( '' === $filename ) {
+			return;
+		}
+
+		$upload_dir = wp_upload_dir();
+		$file       = trailingslashit( $upload_dir['basedir'] ) . self::CACHE_BUCKET . '/' . $filename;
+
+		if ( file_exists( $file ) ) {
+			wp_delete_file( $file );
+		}
 	}
 
 	/**
@@ -227,19 +300,17 @@ class OgCardGenerationTask extends SystemTask {
 	/**
 	 * Drop the cached card file + meta when post data changes.
 	 *
+	 * Resolves the file to delete from the stored URL (not a recomputed
+	 * key), so this works for both content-addressed and pre-#247
+	 * legacy filenames.
+	 *
 	 * @param int $post_id Post ID.
 	 * @return void
 	 */
 	public static function invalidate( int $post_id ): void {
-		$path = (string) get_post_meta( $post_id, self::META_URL, true );
-		if ( '' !== $path ) {
-			$post = get_post( $post_id );
-			if ( $post ) {
-				$file = self::cached_path_for( $post );
-				if ( file_exists( $file ) ) {
-					wp_delete_file( $file );
-				}
-			}
+		$existing_url = (string) get_post_meta( $post_id, self::META_URL, true );
+		if ( '' !== $existing_url ) {
+			self::delete_cached_file_for_url( $existing_url );
 		}
 
 		delete_post_meta( $post_id, self::META_URL );
