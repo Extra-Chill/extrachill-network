@@ -97,6 +97,17 @@ dws_assert(
 	'a structural skip fails the run rather than warning inside a green one'
 );
 dws_assert( str_contains( $yaml, 'sort -u' ), 'skips reported by both invocations are deduplicated' );
+// GitHub documents scheduled workflows as best-effort and names the start of
+// every hour as a high-load period. Asking for :00 and :30 lost ~91% of slots
+// over three days (#243), so the schedule must stay off those boundaries.
+dws_assert(
+	! str_contains( $yaml, "cron: '*/30" ) && ! str_contains( $yaml, 'cron: "*/30' ),
+	'the schedule does not fire on the :00 and :30 peak boundaries'
+);
+dws_assert(
+	(bool) preg_match( '/cron:\s*[\'"]\s*\d+(,\d+)*\s+\*/', $yaml ),
+	'the schedule pins explicit off-peak minutes rather than a */N interval'
+);
 // A component that was not attempted is a configuration fault, not a property
 // of the component. Wording that blames the component sends the reader to the
 // wrong repository.
