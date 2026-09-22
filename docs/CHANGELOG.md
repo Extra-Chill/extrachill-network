@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.17.5] - 2026-09-22
+
+### Fixed
+- move the deploy schedule off the peak hour boundaries
+
 ## [2.17.4] - 2026-09-22
 
 ### Changed
