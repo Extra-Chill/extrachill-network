@@ -22,7 +22,19 @@ use function ExtraChillNetwork\OgCards\provide_tokens;
  */
 class BrandTokensLogoTest extends WP_UnitTestCase {
 
+	/**
+	 * Absolute path of a logo asset seeded by
+	 * test_provide_tokens_sets_logo_path_when_the_asset_exists(), cleaned
+	 * up here so the fixture never leaks into other tests or runs.
+	 */
+	private ?string $seeded_logo_path = null;
+
 	public function tear_down() {
+		if ( null !== $this->seeded_logo_path ) {
+			@unlink( $this->seeded_logo_path ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- best-effort test cleanup.
+			$this->seeded_logo_path = null;
+		}
+
 		parent::tear_down();
 	}
 
@@ -73,16 +85,58 @@ class BrandTokensLogoTest extends WP_UnitTestCase {
 	}
 
 	public function test_provide_tokens_sets_logo_path_when_the_asset_exists(): void {
+		// provide_tokens() looks up this exact relative path on the main
+		// site's uploads dir (see the comment above the lookup in
+		// provide_tokens()). Seed it here instead of assuming it
+		// pre-exists in whatever WordPress boot the suite runs against —
+		// production and CI/sandbox environments start with different
+		// media libraries, and this test only exercises what
+		// provide_tokens()/main_site_upload_path() do when the asset is
+		// present, not whether any particular environment happens to
+		// have it uploaded.
+		$this->seeded_logo_path = $this->seed_main_site_logo_asset();
+
 		$tokens = provide_tokens( array() );
 
-		// This asserts against the real, verified asset shipped in the
-		// main site's media library (see the comment in provide_tokens()).
-		// If it's ever moved/deleted, this test is the tripwire — and the
-		// template's own resolve_logo() guard means a failure here would
-		// degrade to the site icon or text, not a broken card.
 		$this->assertArrayHasKey( 'logo_path', $tokens );
 		$this->assertIsString( $tokens['logo_path'] );
 		$this->assertFileExists( $tokens['logo_path'] );
+		$this->assertSame( $this->seeded_logo_path, $tokens['logo_path'] );
+	}
+
+	/**
+	 * Write a real file at the exact relative path
+	 * `provide_tokens()`/`main_site_upload_path()` look up
+	 * ('2023/04/extra-chill-logo-no-bg.png') under the *main* site's
+	 * uploads dir, mirroring how
+	 * test_main_site_upload_path_resolves_against_the_main_site_even_when_on_another_blog
+	 * writes its own fixture file directly into the main site's uploads
+	 * dir regardless of which site is currently active.
+	 *
+	 * @return string Absolute path of the seeded file.
+	 */
+	private function seed_main_site_logo_asset(): string {
+		$main_site_id = is_multisite() ? get_main_site_id() : get_current_blog_id();
+		$switched     = is_multisite() && $main_site_id !== get_current_blog_id();
+
+		if ( $switched ) {
+			switch_to_blog( $main_site_id );
+		}
+
+		$upload_dir = wp_upload_dir();
+		$absolute   = trailingslashit( $upload_dir['basedir'] ) . '2023/04/extra-chill-logo-no-bg.png';
+
+		wp_mkdir_p( dirname( $absolute ) );
+
+		$image = imagecreatetruecolor( 4, 4 );
+		imagepng( $image, $absolute );
+		imagedestroy( $image );
+
+		if ( $switched ) {
+			restore_current_blog();
+		}
+
+		return $absolute;
 	}
 
 	public function test_provide_tokens_does_not_set_logo_path_inverse(): void {
