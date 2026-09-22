@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.17.1] - 2026-09-22
+
+### Fixed
+- grant id-token so the shared release workflow can start
+
 ## [2.17.0] - 2026-09-22
 
 ### Added
