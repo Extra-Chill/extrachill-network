@@ -163,7 +163,8 @@ jobs:
       # metadata from its own GitHub repository (homeboy#14782), so Homeboy needs
       # a token for github.com. Without one it cannot resolve a single component
       # and the run fails closed with "nothing was compared" (homeboy#14813).
-      # Every deployable is a public repository, so the job's own GITHUB_TOKEN
+      # Every attached deployable is a public repository (private ones are shipped
+      # manually, see deploy/README.md), so the job's own GITHUB_TOKEN
       # is sufficient; it needs no permission beyond the contents: read declared
       # above, because it is reading public release metadata rather than this
       # repository.
