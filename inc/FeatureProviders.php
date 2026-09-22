@@ -119,6 +119,11 @@ function extrachill_network_boot_presentation_provider() {
 
 	if ( defined( 'DATAMACHINE_VERSION' ) ) {
 		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/og-cards/og-cards.php';
+
+		if ( function_exists( 'wp_register_ability' ) ) {
+			require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/Abilities/OgCardRegenerationAbility.php';
+			new \ExtraChillNetwork\Abilities\OgCardRegenerationAbility();
+		}
 	}
 }
 
