@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.17.0] - 2026-09-22
+
+### Added
+- add extrachill/regenerate-og-card ability
+
 ## [2.16.1] - 2026-09-22
 
 ### Fixed
