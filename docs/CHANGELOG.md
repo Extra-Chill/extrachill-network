@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.17.3] - 2026-09-22
+
+### Fixed
+- ability contracts are untestable and orphaned test files run nowhere
+
 ## [2.17.2] - 2026-09-22
 
 ### Fixed
