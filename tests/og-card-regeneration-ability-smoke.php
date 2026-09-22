@@ -505,7 +505,10 @@ namespace {
 	);
 	ogr_smoke_assert_same( 2, $page2['requested'], 'Page 2 picks up exactly the remaining candidates.' );
 	ogr_smoke_assert_true( ! $page2['has_more'], 'Page 2 reports no further candidates.' );
-	ogr_smoke_assert_same( null, $page2['next_offset'], 'next_offset is null once the candidate set is exhausted.' );
+	// next_offset is declared as an integer in the output schema (#253) — 0,
+	// not null, once the candidate set is exhausted. Consumers must key off
+	// has_more, never off next_offset's truthiness, to decide whether to page.
+	ogr_smoke_assert_same( 0, $page2['next_offset'], 'next_offset is 0 once the candidate set is exhausted.' );
 
 	// A follow-up unforced pass over the whole (now-current) set reuses everything.
 	$reuse_pass = $ability->execute(
