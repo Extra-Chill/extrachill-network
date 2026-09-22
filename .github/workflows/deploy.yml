@@ -29,7 +29,19 @@ name: Deploy
 
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    # Deliberately NOT */30, which fires at :00 and :30 — the two most
+    # contended minutes on the platform. GitHub documents scheduled workflows
+    # as best-effort and says plainly that "high load times include the start
+    # of every hour", advising a different time of the hour.
+    #
+    # Asking for peak slots cost roughly 91% of them. Over three days this
+    # workflow produced 13 runs where */30 should have produced ~144, and
+    # every run that did land arrived 12-45 minutes after its slot — never on
+    # it. Components sat released-but-undeployed for hours at a time (#243).
+    #
+    # These offsets are prime-ish and share no factor with the hour, so they
+    # do not drift back onto a busy boundary.
+    - cron: '7,37 * * * *'
   workflow_dispatch:
     inputs:
       component:
