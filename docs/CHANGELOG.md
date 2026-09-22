@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.16.1] - 2026-09-22
+
+### Fixed
+- report deploy config faults without blaming the component
+
 ## [2.16.0] - 2026-09-21
 
 ### Added
