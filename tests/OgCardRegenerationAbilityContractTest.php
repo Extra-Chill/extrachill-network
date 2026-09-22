@@ -159,28 +159,31 @@ class OgCardRegenerationAbilityContractTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The exact #253 violation: once the bulk candidate set is exhausted
-	 * (has_more === false), executeBulk() reports next_offset as `null` —
-	 * but the ability's own output_schema declares next_offset as a plain
-	 * `'type' => 'integer'`, with no null variant. WP_Ability::execute()
-	 * runs validate_output() against that schema before returning, so this
-	 * is not a hand-written assertion catching the bug — it is the real
-	 * ability runner's own contract enforcement catching it.
+	 * The exact #253 regression, now fixed: once the bulk candidate set is
+	 * exhausted (has_more === false), executeBulk() used to report
+	 * next_offset as `null` — but the ability's own output_schema declares
+	 * next_offset as a plain `'type' => 'integer'`, with no null variant.
+	 * WP_Ability::execute() runs validate_output() against that schema
+	 * before returning, so this harness (unlike the old wp_get_ability()
+	 * stub) actually caught it: before #253 landed, this exact call
+	 * returned `WP_Error( 'ability_invalid_output' )`. #253 changed the
+	 * exhausted-pagination value from `null` to `0`, which conforms to the
+	 * schema, so this now asserts the corrected output.
 	 *
 	 * This uses a bulk call over a post_type with zero real candidates, so
 	 * it never reaches OgCardGenerationTask::render_for_post() (no GD
 	 * rendering, no `datamachine/render-image-template` ability call) —
-	 * the violation is reachable purely through buildResponse()'s
+	 * the case is reachable purely through buildResponse()'s
 	 * has_more=false branch, independent of the rendering pipeline.
 	 *
-	 * This assertion documents CURRENT behavior and is expected to need
-	 * updating once extrachill-network#253 lands (the fix changes
-	 * next_offset's exhausted-pagination value from `null` to `0`, which
-	 * conforms to the existing schema). Do not "fix" this test in
-	 * isolation — update it alongside #253's schema/behavior change so the
-	 * two land together. See #253 and #254 for the full history.
+	 * Overlaps with tests/OgCardRegenerationAbilityOutputSchemaTest.php
+	 * (added by #253/#258), which covers the same has_more=false /
+	 * next_offset=0 case for both the single-post and bulk-final-page
+	 * paths with a more detailed rationale docblock. Kept here rather than
+	 * removed — see the #254 PR description for the proposed disposition
+	 * of that overlap.
 	 */
-	public function test_execute_output_violates_schema_for_the_253_next_offset_case(): void {
+	public function test_execute_output_validates_against_schema_when_candidates_are_exhausted(): void {
 		$administrator = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $administrator );
 
@@ -192,7 +195,9 @@ class OgCardRegenerationAbilityContractTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertWPError( $result, 'Expected the real ability runner to reject schema-invalid output (see #253) — if this now passes, #253 has landed and this test must be updated to assert the corrected (0, not null) next_offset value instead.' );
-		$this->assertSame( 'ability_invalid_output', $result->get_error_code() );
+		$this->assertNotWPError( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
+		$this->assertFalse( $result['has_more'] );
+		$this->assertIsInt( $result['next_offset'] );
+		$this->assertSame( 0, $result['next_offset'] );
 	}
 }
