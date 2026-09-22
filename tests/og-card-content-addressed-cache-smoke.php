@@ -330,5 +330,40 @@ namespace {
 	og_smoke_assert_true( str_starts_with( $other_site_key, 'b11-' ), 'Blog id prefix is preserved for multisite collision safety.' );
 	og_smoke_assert_true( str_starts_with( $this_site_key, 'b7-' ), 'Blog id prefix is preserved for multisite collision safety.' );
 
+	// -------------------------------------------------------------
+	// 8. inspect_for_post() — read-only predicate extracted from
+	//    render_for_post() for #250 (regenerate-og-card ability). Must
+	//    report reality without writing anything or calling the render
+	//    ability, and must agree exactly with what render_for_post()
+	//    itself would do (same signature, same reuse decision).
+	// -------------------------------------------------------------
+	$calls_before = $GLOBALS['og_smoke_render_calls'];
+
+	$inspect_post = new \WP_Post( 555001, 'og_smoke_test' );
+	$GLOBALS['og_smoke_event_name'] = 'Inspect Me';
+
+	$before = \ExtraChillNetwork\OgCards\OgCardGenerationTask::inspect_for_post( $inspect_post );
+	og_smoke_assert_same( 'smoke_template', $before['template_id'], 'inspect_for_post() resolves the mapped template id.' );
+	og_smoke_assert_same( '', $before['existing_url'], 'A never-rendered post has no existing URL.' );
+	og_smoke_assert_true( ! $before['is_current'], 'A never-rendered post is never reported as current.' );
+	og_smoke_assert_same( $calls_before, $GLOBALS['og_smoke_render_calls'], 'inspect_for_post() never calls the render ability.' );
+	og_smoke_assert_true( ! file_exists( $before['cached_path'] ), 'inspect_for_post() never writes a file.' );
+
+	// cached_url_for() must predict the exact URL render_for_post() lands on.
+	$predicted_url = \ExtraChillNetwork\OgCards\OgCardGenerationTask::cached_url_for( $inspect_post, $before['signature'] );
+	$actual        = \ExtraChillNetwork\OgCards\OgCardGenerationTask::render_for_post( $inspect_post );
+	og_smoke_assert_same( $actual['cached_url'], $predicted_url, 'cached_url_for() predicts the exact URL render_for_post() produces (content addressing is deterministic).' );
+
+	$after = \ExtraChillNetwork\OgCards\OgCardGenerationTask::inspect_for_post( $inspect_post );
+	og_smoke_assert_true( $after['is_current'], 'After a real render, inspect_for_post() reports the card as current.' );
+	og_smoke_assert_same( $actual['cached_url'], $after['existing_url'], 'inspect_for_post() reflects the just-written meta.' );
+
+	// Changing the data must flip is_current back to false, without inspect_for_post() itself writing anything.
+	$GLOBALS['og_smoke_event_name'] = 'Inspect Me — Changed';
+	$calls_after_first_render       = $GLOBALS['og_smoke_render_calls'];
+	$changed                        = \ExtraChillNetwork\OgCards\OgCardGenerationTask::inspect_for_post( $inspect_post );
+	og_smoke_assert_true( ! $changed['is_current'], 'Changed data is reported as not current by inspection alone.' );
+	og_smoke_assert_same( $calls_after_first_render, $GLOBALS['og_smoke_render_calls'], 'Detecting staleness via inspect_for_post() does not itself render anything.' );
+
 	fwrite( STDOUT, "OK: og-card-content-addressed-cache-smoke.php\n" );
 }

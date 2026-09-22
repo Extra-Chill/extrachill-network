@@ -123,22 +123,21 @@ class OgCardGenerationTask extends SystemTask {
 	 * @return array { cached_url?, cached_path?, reused_cache?, error? }
 	 */
 	public static function render_for_post( \WP_Post $post, bool $force = false ): array {
-		$template_id = template_id_for_post( $post );
-		if ( null === $template_id ) {
+		$inspection = self::inspect_for_post( $post );
+
+		if ( null === $inspection['template_id'] ) {
 			return array( 'error' => "No OG card template registered for post type '{$post->post_type}'" );
 		}
 
-		$data = resolve_card_data( $post );
-		if ( empty( $data ) ) {
+		if ( empty( $inspection['data'] ) ) {
 			return array( 'error' => "No data collector returned data for post #{$post->ID}" );
 		}
 
-		$signature    = self::signature_for( $data );
-		$existing_url = (string) get_post_meta( $post->ID, self::META_URL, true );
-		$existing_sig = (string) get_post_meta( $post->ID, self::META_SIGNATURE, true );
-		$cached_path  = self::cached_path_for( $post, $signature );
+		$signature    = $inspection['signature'];
+		$existing_url = $inspection['existing_url'];
+		$cached_path  = $inspection['cached_path'];
 
-		if ( ! $force && $existing_url && $existing_sig === $signature && file_exists( $cached_path ) ) {
+		if ( ! $force && $inspection['is_current'] ) {
 			return array(
 				'cached_url'   => $existing_url,
 				'cached_path'  => $cached_path,
@@ -157,8 +156,8 @@ class OgCardGenerationTask extends SystemTask {
 
 		$result = $ability->execute(
 			array(
-				'template_id' => $template_id,
-				'data'        => $data,
+				'template_id' => $inspection['template_id'],
+				'data'        => $inspection['data'],
 				'preset'      => 'open_graph',
 				'format'      => 'png',
 				'output'      => 'cached_file',
@@ -196,6 +195,59 @@ class OgCardGenerationTask extends SystemTask {
 			'cached_url'   => $url,
 			'cached_path'  => $path,
 			'reused_cache' => false,
+		);
+	}
+
+	/**
+	 * Read-only inspection of what render_for_post() would find for a post,
+	 * without rendering or writing anything.
+	 *
+	 * Extracted from render_for_post() so callers that need to report on
+	 * cards (dry-run reporting, bulk operator tooling) can ask "is this
+	 * card current?" and "what would its URL be?" using the exact same
+	 * eligibility, data-resolution, and signature logic render_for_post()
+	 * itself uses — rather than re-deriving it and risking drift between
+	 * what a dry-run reports and what a real run does.
+	 *
+	 * @param \WP_Post $post Post object.
+	 * @return array{
+	 *     template_id: string|null,
+	 *     data: array,
+	 *     signature: string,
+	 *     existing_url: string,
+	 *     existing_signature: string,
+	 *     cached_path: string,
+	 *     is_current: bool,
+	 * }
+	 */
+	public static function inspect_for_post( \WP_Post $post ): array {
+		$template_id = template_id_for_post( $post );
+		$data        = array();
+		$signature   = '';
+
+		if ( null !== $template_id ) {
+			$data      = resolve_card_data( $post );
+			$signature = self::signature_for( $data );
+		}
+
+		$existing_url = (string) get_post_meta( $post->ID, self::META_URL, true );
+		$existing_sig = (string) get_post_meta( $post->ID, self::META_SIGNATURE, true );
+		$cached_path  = self::cached_path_for( $post, $signature );
+
+		$is_current = null !== $template_id
+			&& ! empty( $data )
+			&& '' !== $existing_url
+			&& $existing_sig === $signature
+			&& file_exists( $cached_path );
+
+		return array(
+			'template_id'        => $template_id,
+			'data'               => $data,
+			'signature'          => $signature,
+			'existing_url'       => $existing_url,
+			'existing_signature' => $existing_sig,
+			'cached_path'        => $cached_path,
+			'is_current'         => $is_current,
 		);
 	}
 
@@ -253,6 +305,21 @@ class OgCardGenerationTask extends SystemTask {
 	public static function cached_path_for( \WP_Post $post, string $signature = '' ): string {
 		$upload_dir = wp_upload_dir();
 		return trailingslashit( $upload_dir['basedir'] ) . self::CACHE_BUCKET . '/' . self::cache_key_for( $post, $signature ) . '.png';
+	}
+
+	/**
+	 * Public URL the cache file would live at — the URL counterpart of
+	 * cached_path_for(). Content addressing makes this fully deterministic
+	 * from the post and signature alone, so callers (e.g. dry-run reporting)
+	 * can predict the post-regeneration URL without rendering anything.
+	 *
+	 * @param \WP_Post $post      Post object.
+	 * @param string   $signature Data signature from signature_for().
+	 * @return string
+	 */
+	public static function cached_url_for( \WP_Post $post, string $signature = '' ): string {
+		$upload_dir = wp_upload_dir();
+		return trailingslashit( $upload_dir['baseurl'] ) . self::CACHE_BUCKET . '/' . self::cache_key_for( $post, $signature ) . '.png';
 	}
 
 	/**
