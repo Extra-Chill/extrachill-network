@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.17.4] - 2026-09-22
+
+### Changed
+- seed the logo fixture instead of depending on a real main-site asset
+
 ## [2.17.3] - 2026-09-22
 
 ### Fixed
