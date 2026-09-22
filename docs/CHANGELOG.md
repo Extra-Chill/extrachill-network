@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.17.2] - 2026-09-22
+
+### Fixed
+- return next_offset as 0, not null, when there is no next page
+
 ## [2.17.1] - 2026-09-22
 
 ### Fixed
