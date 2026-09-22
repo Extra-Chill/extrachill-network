@@ -224,7 +224,7 @@ class OgCardRegenerationAbility {
 		}
 
 		$target_blog_id = $blog_id > 0 ? $blog_id : get_current_blog_id();
-		$switch_blog    = is_multisite() && $target_blog_id !== get_current_blog_id();
+		$switch_blog    = is_multisite() && get_current_blog_id() !== $target_blog_id;
 
 		if ( $switch_blog ) {
 			switch_to_blog( $target_blog_id );
@@ -283,7 +283,11 @@ class OgCardRegenerationAbility {
 		if ( ! $post ) {
 			return new \WP_Error(
 				'post_not_found',
-				sprintf( __( 'Post #%d not found.', 'extrachill-network' ), $post_id ),
+				sprintf(
+					/* translators: %d: post ID. */
+					__( 'Post #%d not found.', 'extrachill-network' ),
+					$post_id
+				),
 				array( 'status' => 404 )
 			);
 		}
