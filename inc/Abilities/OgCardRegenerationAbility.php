@@ -294,7 +294,7 @@ class OgCardRegenerationAbility {
 
 		$card = $this->processPost( $post, $force, $dry_run );
 
-		return $this->buildResponse( array( $card ), $force, $dry_run, $blog_id, 'single', false, null );
+		return $this->buildResponse( array( $card ), $force, $dry_run, $blog_id, 'single', false, 0 );
 	}
 
 	/**
@@ -322,7 +322,14 @@ class OgCardRegenerationAbility {
 			$cards[] = $this->processPost( $post, $force, $dry_run );
 		}
 
-		$next_offset = $candidates['has_more'] ? ( $candidates['offset'] + count( $candidates['ids'] ) ) : null;
+		// next_offset is declared as a plain integer in the output schema (no
+		// null variant — see #253), so "no next page" is 0, not null. 0 is
+		// unambiguous here: it is only ever meaningful together with
+		// has_more, and callers must not resume paging on has_more === false
+		// regardless of what next_offset holds. See RegenerateOgCardCommand
+		// in extrachill-cli, which only reads next_offset when has_more is
+		// truthy.
+		$next_offset = $candidates['has_more'] ? ( $candidates['offset'] + count( $candidates['ids'] ) ) : 0;
 
 		return $this->buildResponse( $cards, $force, $dry_run, $blog_id, $mode, $candidates['has_more'], $next_offset );
 	}
@@ -529,10 +536,12 @@ class OgCardRegenerationAbility {
 	 * @param int         $blog_id     Blog id operated on.
 	 * @param string      $mode        'single'|'post_type'|'blog'|'on_disk'.
 	 * @param bool        $has_more    Whether more candidates remain beyond this call.
-	 * @param int|null    $next_offset Offset to resume from, or null.
+	 * @param int         $next_offset Offset to resume from. Meaningless when $has_more is false — see the
+	 *                                 next_offset assignment in executeBulk()/executeSingle() for why this is
+	 *                                 0, not null, in that case.
 	 * @return array
 	 */
-	private function buildResponse( array $cards, bool $force, bool $dry_run, int $blog_id, string $mode, bool $has_more, ?int $next_offset ): array {
+	private function buildResponse( array $cards, bool $force, bool $dry_run, int $blog_id, string $mode, bool $has_more, int $next_offset ): array {
 		$regenerated = 0;
 		$reused      = 0;
 		$skipped     = 0;
