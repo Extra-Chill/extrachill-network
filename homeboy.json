@@ -4,6 +4,7 @@
   "extensions": {
     "wordpress": {
       "settings": {
+        "validation_dependencies": "data-machine",
         "wordpress_runtime_php_version": "8.4",
         "wp_codebox_multisite": true,
         "wp_codebox_phpunit_bootstrap_mode": "managed"
@@ -14,7 +15,8 @@
   "remote_path": "wp-content/plugins/extrachill-network",
   "self_checks": {
     "lint": [
-      "composer lint:php"
+      "composer lint:php",
+      "php tools/check-test-registration.php"
     ],
     "test": [
       "php tests/frontend-path-resolver-smoke.php",
