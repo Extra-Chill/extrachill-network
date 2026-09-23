@@ -73,7 +73,7 @@ needs about 10 lines, not 140:
 ```yaml
 - name: Boot the Extra Chill network
   run: |
-    homeboy rig install https://github.com/Extra-Chill/.github
+    homeboy rig install https://github.com/Extra-Chill/extrachill-network
     HOMEBOY_SETTINGS_JSON='{
       "extrachill_theme_source": "'"$THEME_CHECKOUT_PATH"'",
       "extrachill_component_source_overrides": { "extrachill-events": "'"$PWD"'" },
