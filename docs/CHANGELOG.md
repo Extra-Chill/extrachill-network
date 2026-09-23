@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.19.5] - 2026-09-23
+
+### Changed
+- install the pinned Chromium before the deploy gate boots the rig
+
 ## [2.19.4] - 2026-09-23
 
 ### Changed
