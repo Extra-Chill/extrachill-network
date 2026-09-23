@@ -365,6 +365,26 @@ jobs:
             exit 1
           fi
 
+      # The rig's per-site browser probes need the exact Chromium build that
+      # this WP Codebox package's own Playwright dependency pins. homeboy-action
+      # provisions the CLI but not the browser, so the first real gate run
+      # failed with "Required Playwright Chromium ... is unavailable". Install
+      # it from inside the package that owns the pin (the command WP Codebox
+      # itself prints), with OS deps, so the version always matches.
+      - name: Install Chromium for the network rig gate
+        if: steps.release_set.outputs.component_count != '0' && steps.plan.outputs.gate_bypassed != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # HOMEBOY_WP_CODEBOX_BIN = <source>/packages/cli/dist/index.js
+          source_root="$(cd "$(dirname "${HOMEBOY_WP_CODEBOX_BIN}")/../../.." && pwd)"
+          playwright_cli="${source_root}/node_modules/playwright/cli.js"
+          if [ ! -f "${playwright_cli}" ]; then
+            echo "::error::Playwright not found at ${playwright_cli}; cannot install the browser the rig gate needs. Refusing to deploy ungated."
+            exit 1
+          fi
+          (cd "${source_root}" && node ./node_modules/playwright/cli.js install --with-deps chromium)
+
       - name: Install extrachill-network rig
         if: steps.release_set.outputs.component_count != '0' && steps.plan.outputs.gate_bypassed != 'true'
         shell: bash
