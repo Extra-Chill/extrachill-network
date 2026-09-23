@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.19.1] - 2026-09-23
+
+### Changed
+- run the extrachill-network rig as a pre-deploy gate
+- wire managed Homeboy CI gate
+
 ## [2.19.0] - 2026-09-23
 
 ### Added
