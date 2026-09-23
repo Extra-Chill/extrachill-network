@@ -73,3 +73,71 @@ function ec_network_link_page_gtm_body() {
 	echo '<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=' . esc_attr( $id ) . '" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>';
 }
 add_action( 'ec_link_page_public_body_open', 'ec_network_link_page_gtm_body' );
+
+/**
+ * Resolve the artist profile ID behind a Link Page owner reference.
+ *
+ * @param string $owner_reference Normalized owner reference.
+ * @return int Artist profile ID, or 0 when the owner is not an artist.
+ */
+function ec_network_link_page_artist_owner_id( $owner_reference ) {
+	if ( ! function_exists( 'ec_parse_link_page_owner_reference' ) ) {
+		return 0;
+	}
+	$owner = ec_parse_link_page_owner_reference( (string) $owner_reference );
+	if ( is_wp_error( $owner ) || 'post' !== $owner['kind'] || 'artist_profile' !== $owner['subtype'] || (int) ec_get_blog_id( 'artist' ) !== (int) $owner['blog_id'] ) {
+		return 0;
+	}
+	return (int) $owner['object_id'];
+}
+
+/** Base URL of the network REST API on the artist site. */
+function ec_network_link_page_artist_api_base() {
+	$base = ec_get_site_url( 'artist' );
+	return $base ? $base . '/wp-json/extrachill/v1' : '';
+}
+
+/**
+ * Artist direct-subscriber endpoint for artist-owned Link Pages.
+ *
+ * @param string $url             Existing endpoint.
+ * @param int    $link_page_id    Link Page ID.
+ * @param string $owner_reference Owner reference.
+ * @return string
+ */
+function ec_network_link_page_subscribe_url( $url, $link_page_id, $owner_reference ) {
+	unset( $link_page_id );
+	if ( '' !== (string) $url ) {
+		return $url;
+	}
+	$artist_id = ec_network_link_page_artist_owner_id( $owner_reference );
+	$base      = ec_network_link_page_artist_api_base();
+	return $artist_id && $base ? $base . '/artists/' . $artist_id . '/subscribe' : '';
+}
+add_filter( 'ec_link_page_subscribe_url', 'ec_network_link_page_subscribe_url', 20, 3 );
+
+/**
+ * Edit-button endpoints for artist-owned Link Pages.
+ *
+ * @param array  $endpoints       Existing endpoints.
+ * @param int    $link_page_id    Link Page ID.
+ * @param string $owner_reference Owner reference.
+ * @return array
+ */
+function ec_network_link_page_management_endpoints( $endpoints, $link_page_id, $owner_reference ) {
+	unset( $link_page_id );
+	if ( is_array( $endpoints ) && ! empty( $endpoints['permissions_url'] ) ) {
+		return $endpoints;
+	}
+	$artist_id = ec_network_link_page_artist_owner_id( $owner_reference );
+	$base      = ec_network_link_page_artist_api_base();
+	$site      = ec_get_site_url( 'artist' );
+	if ( ! $artist_id || ! $base || ! $site ) {
+		return is_array( $endpoints ) ? $endpoints : array();
+	}
+	return array(
+		'permissions_url' => $base . '/artists/' . $artist_id . '/permissions',
+		'handoff_url'     => $site . '/wp-admin/admin-post.php?action=ec_link_token_handoff',
+	);
+}
+add_filter( 'ec_link_page_management_endpoints', 'ec_network_link_page_management_endpoints', 20, 3 );
