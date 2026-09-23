@@ -236,12 +236,20 @@ jobs:
           set -euo pipefail
           out="$(ls -1 "${RESOLVE_OUTPUT_DIR}"/operations-*.json 2>/dev/null | head -1 || true)"
           if [ -z "${out}" ]; then
-            echo "::warning::No resolve output found; treating as nothing to gate."
-            echo "component_count=0" >> "${GITHUB_OUTPUT}"
-            exit 0
+            # Resolve already succeeded to reach this step, so missing output
+            # means something unexpected happened. Fail closed: skipping here
+            # would let an unverified deploy through while looking gated.
+            echo "::error::No resolve output found in ${RESOLVE_OUTPUT_DIR}; refusing to deploy ungated."
+            exit 1
           fi
 
-          count="$(jq '[.data.results[]? | select(.status == "deployed")] | length' "${out}")"
+          # Resolve is always a dry run, and Homeboy reports dry-run results
+          # as "planned", never "deployed" (homeboy-deploy
+          # orchestration/modes.rs `.with_status("planned")`). Filtering on
+          # "deployed" here previously made the count always 0, so the gate
+          # skipped on every run. "deployed" is kept so this stays correct if
+          # a non-dry resolve is ever introduced.
+          count="$(jq '[.data.results[]? | select(.status == "planned" or .status == "deployed")] | length' "${out}")"
           echo "component_count=${count}" >> "${GITHUB_OUTPUT}"
           echo "Resolved ${count} component(s) for the gate."
           if [ "${count}" -eq 0 ]; then
@@ -256,7 +264,7 @@ jobs:
           # deployed_ref is absent.
           release_set_json="$(jq -c '
             [ .data.results[]?
-              | select(.status == "deployed")
+              | select(.status == "planned" or .status == "deployed")
               | select(.local_version != null)
               | { (.id): { ref: (.deployed_ref // ("v" + .local_version)) } }
             ] | add // {}
@@ -268,7 +276,7 @@ jobs:
           # a real `up` always needs *some* theme source.
           theme_ref="$(jq -r '
             .data.results[]?
-            | select(.id == "extrachill" and .status == "deployed")
+            | select(.id == "extrachill" and (.status == "planned" or .status == "deployed"))
             | (.deployed_ref // (if .local_version then "v" + .local_version else empty end))
           ' "${out}")"
           if [ -n "${theme_ref}" ]; then
