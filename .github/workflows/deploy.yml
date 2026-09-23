@@ -340,31 +340,30 @@ jobs:
         with:
           node-version: 24
 
-      # Pinned to the wp-codebox v0.27.0 tag's commit
-      # (Automattic/wp-codebox#2519, merged 2026-09-21) — the first release
-      # that accepts a remote theme zip for inputs.extra_themes, which the
-      # rig's forward-compatible theme sourcing needs (see
-      # rigs/extrachill-network/components.json theme.note). Built from
-      # source at this pinned commit, not the prebuilt release tarball,
-      # matching the pattern already proven for a real Playground boot in
-      # extrachill-events' booking-network-e2e.yml.
-      - name: Checkout WP Codebox v0.27.0
-        if: steps.release_set.outputs.component_count != '0' && steps.plan.outputs.gate_bypassed != 'true'
-        uses: actions/checkout@v6
-        with:
-          repository: Automattic/wp-codebox
-          ref: 2f32eee5191e32b8659d8ab794730da238f730b8
-          path: .ci/wp-codebox
-
-      - name: Build WP Codebox CLI
+      # WP Codebox comes from homeboy-action, which provisions a pinned,
+      # already-built CLI and exports HOMEBOY_WP_CODEBOX_BIN to every later
+      # step. A second from-source checkout here was redundant and broke:
+      # it inherited the action's WP_CODEBOX_SOURCE_SHA, and wp-codebox's
+      # build provenance check refused to build a different commit under
+      # that SHA ("does not match source checkout HEAD"). The action's copy
+      # (v0.27.1 at the time of writing) already includes the remote
+      # theme-zip support the rig needs (Automattic/wp-codebox#2519, v0.27.0).
+      # Fail closed if it is missing or too old.
+      - name: Verify WP Codebox from homeboy-action
         if: steps.release_set.outputs.component_count != '0' && steps.plan.outputs.gate_bypassed != 'true'
         shell: bash
         run: |
           set -euo pipefail
-          npm install --prefix=.ci/wp-codebox
-          npm run --prefix=.ci/wp-codebox build
-          chmod +x .ci/wp-codebox/packages/cli/dist/index.js
-          .ci/wp-codebox/packages/cli/dist/index.js --version
+          if [ -z "${HOMEBOY_WP_CODEBOX_BIN:-}" ] || [ ! -f "${HOMEBOY_WP_CODEBOX_BIN}" ]; then
+            echo "::error::HOMEBOY_WP_CODEBOX_BIN is not set or missing; homeboy-action did not provision WP Codebox. Refusing to deploy ungated."
+            exit 1
+          fi
+          version="$(node "${HOMEBOY_WP_CODEBOX_BIN}" --version | tr -d '[:space:]')"
+          echo "WP Codebox ${version} at ${HOMEBOY_WP_CODEBOX_BIN}"
+          if [ "$(printf '%s\n%s\n' 0.27.0 "${version}" | sort -V | head -1)" != "0.27.0" ]; then
+            echo "::error::WP Codebox ${version} is older than 0.27.0, which the rig needs for remote theme zips. Refusing to deploy ungated."
+            exit 1
+          fi
 
       - name: Install extrachill-network rig
         if: steps.release_set.outputs.component_count != '0' && steps.plan.outputs.gate_bypassed != 'true'
@@ -376,7 +375,6 @@ jobs:
         if: steps.release_set.outputs.component_count != '0' && steps.plan.outputs.gate_bypassed != 'true'
         shell: bash
         env:
-          HOMEBOY_WP_CODEBOX_BIN: ${{ github.workspace }}/.ci/wp-codebox/packages/cli/dist/index.js
           HOMEBOY_ARTIFACT_ROOT: ${{ runner.temp }}/extrachill-network-gate/artifacts
           HOMEBOY_SETTINGS_JSON: ${{ steps.release_set.outputs.gate_settings_json }}
         run: |
