@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.19.2] - 2026-09-23
+
+### Changed
+- always pass --dry-run to the deploy gate's resolve step
+
 ## [2.19.1] - 2026-09-23
 
 ### Changed
