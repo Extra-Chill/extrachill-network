@@ -13,6 +13,13 @@
   },
   "id": "extrachill-network",
   "remote_path": "wp-content/plugins/extrachill-network",
+  "scopes": {
+    "release": {
+      "exclude": [
+        "rigs/"
+      ]
+    }
+  },
   "self_checks": {
     "lint": [
       "composer lint:php",
