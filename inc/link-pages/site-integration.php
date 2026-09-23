@@ -48,6 +48,13 @@ function ec_network_link_page_click_tracking_url( $url ) {
 	if ( '' !== (string) $url ) {
 		return $url;
 	}
+	// Post the beacon to the site that serves the page. Telemetry
+	// validation only accepts a source host belonging to the site that
+	// handles the request, so after the cutover extrachill.link pages must
+	// post to extrachill.link itself (its own REST API), not the artist site.
+	if ( function_exists( 'ec_link_pages_site_cutover_enabled' ) && ec_link_pages_site_cutover_enabled() ) {
+		return 'https://extrachill.link/wp-json/extrachill/v1/analytics/click';
+	}
 	$base = ec_get_site_url( 'artist' );
 	return $base ? $base . '/wp-json/extrachill/v1/analytics/click' : '';
 }
