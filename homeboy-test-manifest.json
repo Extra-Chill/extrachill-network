@@ -46,6 +46,9 @@
     "tests/mediavine-cache-purge-smoke.php": {
       "environment": "standalone-php"
     },
+    "tests/multisite-guard-smoke.php": {
+      "environment": "standalone-php"
+    },
     "tests/network-bridge-composer-fallback-smoke.php": {
       "environment": "standalone-php"
     },
