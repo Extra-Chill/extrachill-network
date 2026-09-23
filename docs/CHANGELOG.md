@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.19.3] - 2026-09-23
+
+### Changed
+- count planned results so the deploy gate actually runs
+
 ## [2.19.2] - 2026-09-23
 
 ### Changed
