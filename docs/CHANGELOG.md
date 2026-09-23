@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.19.0] - 2026-09-23
+
+### Added
+- answer Link Pages subscribe and edit endpoints for artist owners
+
 ## [2.18.0] - 2026-09-23
 
 ### Added
