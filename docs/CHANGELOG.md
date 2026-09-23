@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.17.6] - 2026-09-23
+
+### Changed
+- move extrachill-network Homeboy rig from Extra-Chill/.github
+
+### Fixed
+- exclude rigs/ from the release package-completeness check
+
 ## [2.17.5] - 2026-09-22
 
 ### Fixed
