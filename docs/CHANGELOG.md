@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.18.0] - 2026-09-23
+
+### Added
+- Extra Chill host integration for the owner-neutral Link Pages runtime
+
 ## [2.17.6] - 2026-09-23
 
 ### Changed
