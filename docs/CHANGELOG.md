@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.19.6] - 2026-09-23
+
+### Fixed
+- post link page click beacons to the serving site after the cutover
+
 ## [2.19.5] - 2026-09-23
 
 ### Changed
