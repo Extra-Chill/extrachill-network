@@ -29,3 +29,6 @@ package-lock.json
 .claude/
 .buildignore
 build.sh
+
+# extrachill-network Homeboy rig runtime output
+/rigs/extrachill-network/artifacts/

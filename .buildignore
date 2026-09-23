@@ -13,3 +13,4 @@ package-lock.json
 .DS_Store
 .claude/
 /README.md
+rigs/
