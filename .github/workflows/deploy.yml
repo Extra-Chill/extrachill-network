@@ -156,10 +156,14 @@ jobs:
           # this particular invocation is itself a dry run. resolve_command is
           # always the dry-run form of `command`, so the gate can resolve the
           # release set without touching the server even on a live deploy.
-          resolve_command="${command}"
-          if [ "${dry_run}" != "true" ]; then
-            resolve_command="${resolve_command} --dry-run"
-          fi
+          #
+          # Unconditional on purpose. This was previously appended only when
+          # dry_run != "true", on the assumption that `command` already carried
+          # --dry-run in dry-run mode. It does not: `command` gets --dry-run
+          # appended below, AFTER this copy is taken. So a manual "dry run"
+          # dispatch ran the resolve step as a real deploy. Resolution must
+          # never be able to deploy, whatever mode the run is in.
+          resolve_command="${command} --dry-run"
           if [ "${dry_run}" = "true" ]; then
             command="${command} --dry-run"
           fi
