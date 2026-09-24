@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.19.7] - 2026-09-24
+
+### Fixed
+- bail cleanly from bootstrap when loaded outside multisite
+
 ## [2.19.6] - 2026-09-23
 
 ### Fixed
