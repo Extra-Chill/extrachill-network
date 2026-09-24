@@ -68,10 +68,53 @@ add_action( 'plugins_loaded', 'extrachill_network_init' );
 /**
  * Load network-owned runtime integrations.
  *
+ * Runtime counterpart to the activation guard in extrachill_network_activate().
+ * That guard only stops *activation* outside multisite; a plugin that is
+ * force-loaded without going through WordPress's normal activation flow
+ * (a test fixture, a WP-CLI scaffold, `muplugin_loaded`) never hits it.
+ * Every integration this plugin boots eventually reaches `switch_to_blog()`
+ * or another multisite-only API somewhere in its call graph, so booting
+ * them off multisite doesn't gracefully degrade — it just moves the fatal
+ * deeper into the request, onto whichever hook happens to fire first. Bail
+ * here instead, before any of that code loads.
+ *
+ * `inc/core/blog-ids.php` is the one exception: its blog-ID/site-URL
+ * helpers (`ec_get_blog_id()`, `ec_get_site_url()`, etc.) are pure lookups
+ * against hardcoded constants — no `switch_to_blog()`, no other
+ * multisite-only API — and dozens of other network plugins call them
+ * directly. Loading it unconditionally costs nothing and keeps those
+ * plugins from trading one undefined-function fatal for another.
+ *
  * @return void
  */
 function extrachill_network_init() {
+	if ( ! is_multisite() ) {
+		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/blog-ids.php';
+		add_action( 'admin_notices', 'extrachill_network_multisite_required_notice' );
+		return;
+	}
+
 	extrachill_network_boot_foundation();
 	extrachill_network_register_default_feature_providers();
 	extrachill_network_boot_feature_providers();
+}
+
+/**
+ * Notify plugin managers that Extra Chill Network requires multisite.
+ *
+ * Fires only when extrachill_network_init() took the non-multisite branch
+ * above, i.e. the plugin was loaded outside its declared `Network: true`
+ * requirement without going through register_activation_hook().
+ *
+ * @return void
+ */
+function extrachill_network_multisite_required_notice() {
+	if ( ! current_user_can( 'activate_plugins' ) ) {
+		return;
+	}
+
+	printf(
+		'<div class="notice notice-error"><p>%s</p></div>',
+		esc_html__( 'Extra Chill Network requires a WordPress multisite installation. Network integrations on this site are disabled.', 'extrachill-network' )
+	);
 }
