@@ -73,7 +73,17 @@ class QRCodeAbility {
 	}
 
 	/**
-	 * Preserve Admin Tools' automation and network-admin access contract.
+	 * Authorize automation contexts and any authenticated user.
+	 *
+	 * Originally gated to network admins only (Admin Tools' original
+	 * consumer). That was too narrow for this ability's actual risk
+	 * profile: generate() is read-only, idempotent, has no side effects,
+	 * and exposes nothing the caller doesn't already have — it renders a
+	 * URL the caller supplied as an image, nothing more. There is no
+	 * meaningful additional risk in letting any authenticated user render
+	 * a QR code for a URL they already know (extrachill-network#278;
+	 * concretely unblocks extrachill-events#877 slice 2, an attendee
+	 * generating a QR for their own already-known pass-verify URL).
 	 */
 	public function check_permission(): bool {
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
@@ -84,7 +94,7 @@ class QRCodeAbility {
 			return true;
 		}
 
-		return current_user_can( 'manage_network_options' );
+		return is_user_logged_in();
 	}
 
 	/**
