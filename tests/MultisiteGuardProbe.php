@@ -18,16 +18,16 @@
  * keeps this probe's stub surface small without skipping any real code path.
  */
 
-$mode = $argv[1] ?? '';
-if ( ! in_array( $mode, array( 'multisite', 'single' ), true ) ) {
-	fwrite( STDERR, "Usage: php MultisiteGuardProbe.php <multisite|single>\n" );
+$requested_mode = $argv[1] ?? '';
+if ( ! in_array( $requested_mode, array( 'multisite', 'single' ), true ) ) {
+	fwrite( STDERR, "Usage: php MultisiteGuardProbe.php <multisite|single>\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- CLI test probe writing to STDERR.
 	exit( 2 );
 }
 
 define( 'ABSPATH', __DIR__ . '/' );
 define( 'MINUTE_IN_SECONDS', 60 );
 
-$GLOBALS['probe_mode']             = $mode;
+$GLOBALS['probe_mode']             = $requested_mode;
 $GLOBALS['probe_actions']          = array();
 $GLOBALS['probe_current_user_can'] = false;
 
@@ -35,8 +35,8 @@ function is_multisite() {
 	return 'multisite' === $GLOBALS['probe_mode'];
 }
 
-function trailingslashit( $string ) {
-	return rtrim( $string, '/\\' ) . '/';
+function trailingslashit( $path ) {
+	return rtrim( $path, '/\\' ) . '/';
 }
 
 function plugin_dir_path( $file ) {
@@ -70,9 +70,9 @@ function do_action( ...$args ) {
 	unset( $args );
 }
 
-function get_site_option( $name, $default = false ) {
-	unset( $name );
-	return $default;
+function get_site_option( $option, $default_value = false ) {
+	unset( $option );
+	return $default_value;
 }
 
 function is_admin() {
@@ -114,7 +114,7 @@ $notice_output_with_permission = ob_get_clean();
 
 $providers = $GLOBALS['extrachill_network_feature_providers'] ?? array();
 
-echo wp_json_encode_stub(
+echo wp_json_encode(
 	array(
 		'foundation_booted'                 => function_exists( 'ec_send_email' ),
 		'blog_ids_loaded'                   => function_exists( 'ec_get_blog_id' ),
@@ -132,12 +132,14 @@ echo wp_json_encode_stub(
 ), "\n";
 
 /**
- * json_encode() wrapper kept local so this probe has zero dependency on
- * wp_json_encode() (not stubbed above — nothing under test needs it).
+ * Minimal wp_json_encode() stub — core's real implementation adds recursive
+ * UTF-8/invalid-character handling this probe's fixed, all-scalar result
+ * array never exercises, so a thin wrapper is enough to stay off the WP
+ * bootstrap this test deliberately avoids.
  *
  * @param mixed $data Data to encode.
- * @return string JSON.
+ * @return string|false JSON, or false on failure.
  */
-function wp_json_encode_stub( $data ) {
-	return (string) json_encode( $data );
+function wp_json_encode( $data ) {
+	return json_encode( $data ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- local wp_json_encode() stub; no WordPress bootstrap in this standalone-php probe.
 }
