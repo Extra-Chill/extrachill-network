@@ -95,11 +95,37 @@ class QRCodeAbilityTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * REST exposure remains restricted to network managers.
+	 * Logged-out visitors are denied; any authenticated user is permitted.
+	 *
+	 * Broadened in extrachill-network#278: this ability is read-only,
+	 * idempotent, has no side effects, and exposes nothing the caller
+	 * doesn't already have (it renders a caller-supplied URL as an image).
+	 * A network-admin-only gate had no matching risk to justify it and
+	 * blocked a legitimate use case (extrachill-events#877 slice 2: an
+	 * ordinary attendee generating a QR for their own already-known
+	 * pass-verify URL).
 	 */
-	public function test_permission_requires_network_management_capability(): void {
-		$this->assertFalse( $this->ability->check_permission() );
+	public function test_permission_denies_logged_out_visitors(): void {
+		wp_set_current_user( 0 );
 
+		$this->assertFalse( $this->ability->check_permission() );
+	}
+
+	/**
+	 * Any authenticated user — not just a network admin — is authorized.
+	 */
+	public function test_permission_allows_any_authenticated_user(): void {
+		$subscriber = self::factory()->user->create( array( 'role' => 'subscriber' ) );
+		wp_set_current_user( $subscriber );
+
+		$this->assertTrue( $this->ability->check_permission() );
+	}
+
+	/**
+	 * A network admin remains authorized (superset of "any authenticated
+	 * user"), preserving the prior automation/network-admin contract.
+	 */
+	public function test_permission_still_allows_network_admins(): void {
 		$administrator = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		$user          = get_userdata( $administrator );
 
