@@ -176,3 +176,23 @@ function ec_network_link_page_join_route( $route, $path ) {
 	);
 }
 add_filter( 'ec_link_page_public_special_route', 'ec_network_link_page_join_route', 20, 2 );
+
+/**
+ * Public host for Link Pages: extrachill.link.
+ *
+ * @return string
+ */
+function ec_network_link_page_public_host() {
+	return 'extrachill.link';
+}
+add_filter( 'ec_link_page_public_host', 'ec_network_link_page_public_host' );
+
+/**
+ * The Extra Chill Link Page is served at the public root.
+ *
+ * @return string
+ */
+function ec_network_link_page_root_slug() {
+	return 'extra-chill';
+}
+add_filter( 'ec_link_page_root_slug', 'ec_network_link_page_root_slug' );
