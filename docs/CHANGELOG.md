@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.21.0] - 2026-09-25
+
+### Added
+- answer Link Pages /edit endpoints
+
 ## [2.20.0] - 2026-09-25
 
 ### Added
