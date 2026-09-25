@@ -203,16 +203,16 @@ add_filter( 'ec_link_page_root_slug', 'ec_network_link_page_root_slug' );
  * Editor configuration and the bearer-token handoff live on the artist site,
  * where the owner adapter and the .extrachill.com login session are.
  *
- * @param array $endpoints Existing endpoints.
- * @return array
+ * @param mixed $endpoints Existing endpoints.
+ * @return mixed
  */
 function ec_network_link_page_edit_endpoints( $endpoints ) {
-	if ( is_array( $endpoints ) && ! empty( $endpoints['configuration_url'] ) ) {
+	if ( ! empty( $endpoints['configuration_url'] ) ) {
 		return $endpoints;
 	}
 	$site = ec_get_site_url( 'artist' );
 	if ( ! $site ) {
-		return is_array( $endpoints ) ? $endpoints : array();
+		return $endpoints;
 	}
 	return array(
 		'configuration_url' => $site . '/wp-json/extrachill/v1/link-pages/editor-configuration',
