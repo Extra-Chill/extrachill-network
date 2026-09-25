@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.20.0] - 2026-09-25
+
+### Added
+- answer Link Pages public host and root page settings
+
 ## [2.19.8] - 2026-09-25
 
 ### Fixed
