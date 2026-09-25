@@ -221,3 +221,38 @@ function ec_network_link_page_edit_endpoints( $endpoints ) {
 	);
 }
 add_filter( 'ec_link_page_edit_endpoints', 'ec_network_link_page_edit_endpoints' );
+
+/**
+ * Where a user lands after onboarding from extrachill.link/join.
+ *
+ * A user who already manages an artist goes straight to editing that
+ * artist's Link Page on extrachill.link; anyone else creates an artist.
+ * Professionals have no Link Page owner entity yet
+ * (extrachill-link-pages#27 §7), so they keep that destination for now.
+ * Runs wherever onboarding runs (the community site), so it resolves
+ * through network-active APIs only.
+ *
+ * @param string   $redirect_url Default destination.
+ * @param int      $user_id      User ID.
+ * @param string[] $roles        Roles chosen during onboarding.
+ * @return string
+ */
+function ec_network_onboarding_join_destination( $redirect_url, $user_id, $roles ) {
+	if ( ! array_intersect( array( 'artist', 'professional' ), (array) $roles ) ) {
+		return $redirect_url;
+	}
+	$artist_blog_id = (int) ec_get_blog_id( 'artist' );
+	$can_edit_here  = function_exists( 'ec_get_link_page_id_for_owner' ) && function_exists( 'ec_link_page_public_base_url' ) && function_exists( 'ec_get_link_page_edit_endpoints' )
+		&& '' !== ( ec_get_link_page_edit_endpoints()['configuration_url'] ?? '' );
+	if ( $can_edit_here && $artist_blog_id && function_exists( 'ec_get_artists_for_user' ) ) {
+		foreach ( (array) ec_get_artists_for_user( (int) $user_id ) as $artist_id ) {
+			$link_page_id = ec_get_link_page_id_for_owner( 'post:' . $artist_blog_id . ':artist_profile:' . (int) $artist_id );
+			if ( ! is_wp_error( $link_page_id ) && (int) $link_page_id > 0 ) {
+				return add_query_arg( 'link_page', (int) $link_page_id, ec_link_page_public_base_url() . 'edit' );
+			}
+		}
+	}
+	$artist_site = ec_get_site_url( 'artist' );
+	return $artist_site ? $artist_site . '/create-artist/' : $redirect_url;
+}
+add_filter( 'ec_onboarding_join_destination', 'ec_network_onboarding_join_destination', 10, 3 );
