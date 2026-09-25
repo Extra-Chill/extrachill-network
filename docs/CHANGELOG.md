@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.22.0] - 2026-09-25
+
+### Added
+- send /join onboarding to the right link page destination
+
 ## [2.21.0] - 2026-09-25
 
 ### Added
