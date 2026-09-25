@@ -148,3 +148,31 @@ function ec_network_link_page_management_endpoints( $endpoints, $link_page_id, $
 	);
 }
 add_filter( 'ec_link_page_management_endpoints', 'ec_network_link_page_management_endpoints', 20, 3 );
+
+/**
+ * Send extrachill.link/join to artist signup.
+ *
+ * The public Link Pages host serves no signup of its own yet
+ * (extrachill-link-pages#27), so /join forwards to the artist site's login
+ * with the join context. Lives here rather than in an owner plugin so it
+ * works on the dedicated Link Pages site, where owner plugins are not active.
+ *
+ * @param mixed  $route Existing special route.
+ * @param string $path  Requested public path.
+ * @return mixed
+ */
+function ec_network_link_page_join_route( $route, $path ) {
+	if ( null !== $route || 'join' !== $path ) {
+		return $route;
+	}
+	$artist = ec_get_site_url( 'artist' );
+	if ( ! $artist ) {
+		return $route;
+	}
+	return array(
+		'url'    => $artist . '/login/?from_join=true',
+		'status' => 301,
+		'safe'   => false,
+	);
+}
+add_filter( 'ec_link_page_public_special_route', 'ec_network_link_page_join_route', 20, 2 );
