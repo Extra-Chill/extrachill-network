@@ -33,6 +33,7 @@
       "php tests/service-assertion-smoke.php",
       "node tests/ExperimentAssignmentJsTest.js",
       "php tests/deploy-workflow-smoke.php",
+      "php tests/media-webp-smoke.php",
       "node rigs/extrachill-network/tests/contract.test.mjs"
     ]
   },
