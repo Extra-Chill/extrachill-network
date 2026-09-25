@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.19.8] - 2026-09-25
+
+### Fixed
+- route extrachill.link/join to artist signup from the host integration
+
 ## [2.19.7] - 2026-09-24
 
 ### Fixed
