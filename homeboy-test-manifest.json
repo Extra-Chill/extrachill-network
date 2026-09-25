@@ -72,6 +72,9 @@
     },
     "tests/user-profile-links-smoke.php": {
       "environment": "standalone-php"
+    },
+    "tests/media-webp-smoke.php": {
+      "environment": "standalone-php"
     }
   }
 }
