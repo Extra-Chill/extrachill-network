@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.23.0] - 2026-09-25
+
+### Added
+- core-based image optimization (WebP on upload, serve existing WebP siblings) to replace Imagify
+
 ## [2.22.0] - 2026-09-25
 
 ### Added
