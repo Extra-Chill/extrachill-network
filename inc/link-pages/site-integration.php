@@ -196,3 +196,28 @@ function ec_network_link_page_root_slug() {
 	return 'extra-chill';
 }
 add_filter( 'ec_link_page_root_slug', 'ec_network_link_page_root_slug' );
+
+/**
+ * Endpoints for the extrachill.link /edit shell.
+ *
+ * Editor configuration and the bearer-token handoff live on the artist site,
+ * where the owner adapter and the .extrachill.com login session are.
+ *
+ * @param mixed $endpoints Existing endpoints.
+ * @return mixed
+ */
+function ec_network_link_page_edit_endpoints( $endpoints ) {
+	if ( ! empty( $endpoints['configuration_url'] ) ) {
+		return $endpoints;
+	}
+	$site = ec_get_site_url( 'artist' );
+	if ( ! $site ) {
+		return $endpoints;
+	}
+	return array(
+		'configuration_url' => $site . '/wp-json/extrachill/v1/link-pages/editor-configuration',
+		'handoff_url'       => $site . '/wp-admin/admin-post.php?action=ec_link_token_handoff',
+		'login_url'         => $site . '/login',
+	);
+}
+add_filter( 'ec_link_page_edit_endpoints', 'ec_network_link_page_edit_endpoints' );
