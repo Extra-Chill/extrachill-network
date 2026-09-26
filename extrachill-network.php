@@ -25,6 +25,25 @@ define( 'EXTRACHILL_NETWORK_PLUGIN_FILE', __FILE__ );
 define( 'EXTRACHILL_NETWORK_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'EXTRACHILL_NETWORK_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
+/**
+ * Load unconditionally, at file-include time, not deferred to
+ * 'plugins_loaded' via extrachill_network_init(). Its blog-ID/site-URL
+ * helpers (ec_get_blog_id(), ec_get_site_url(), etc.) are pure lookups
+ * against hardcoded constants plus two add_filter() registrations -- no
+ * switch_to_blog(), no other multisite-only API -- and dozens of other
+ * network plugins call them directly, including from their OWN activation
+ * hooks (extrachill-link-pages resolves its canonical storage blog via the
+ * ec_link_page_storage_blog_id filter this file registers). A plugin
+ * activating in the same request as -- but after -- extrachill-network
+ * (bulk-activate in wp-admin, or a CI rig activating the whole matrix in
+ * one process) never sees 'plugins_loaded' fire again in that request, so
+ * requiring this file only from the 'plugins_loaded' callback silently
+ * drops the dependency for exactly that ordering. require_once is a no-op
+ * on the second call from extrachill_network_boot_foundation(), so nothing
+ * downstream changes.
+ */
+require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/blog-ids.php';
+
 if ( file_exists( EXTRACHILL_NETWORK_PLUGIN_DIR . 'vendor/autoload.php' ) ) {
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'vendor/autoload.php';
 }
@@ -78,18 +97,14 @@ add_action( 'plugins_loaded', 'extrachill_network_init' );
  * deeper into the request, onto whichever hook happens to fire first. Bail
  * here instead, before any of that code loads.
  *
- * `inc/core/blog-ids.php` is the one exception: its blog-ID/site-URL
- * helpers (`ec_get_blog_id()`, `ec_get_site_url()`, etc.) are pure lookups
- * against hardcoded constants — no `switch_to_blog()`, no other
- * multisite-only API — and dozens of other network plugins call them
- * directly. Loading it unconditionally costs nothing and keeps those
- * plugins from trading one undefined-function fatal for another.
+ * `inc/core/blog-ids.php` is already loaded unconditionally at file-include
+ * time above (see the top of this file for why), so it's available on the
+ * non-multisite branch below without a second require.
  *
  * @return void
  */
 function extrachill_network_init() {
 	if ( ! is_multisite() ) {
-		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/blog-ids.php';
 		add_action( 'admin_notices', 'extrachill_network_multisite_required_notice' );
 		return;
 	}

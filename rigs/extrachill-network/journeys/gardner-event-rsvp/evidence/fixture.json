@@ -1,0 +1,32 @@
+{
+  "schema": "extrachill-network/journey-fixture/gardner-event-rsvp/v1",
+  "persona": "extra-chill-users/chris-gardner@1.0.0",
+  "events_blog_id": 5,
+  "main_blog_id": 1,
+  "steps": {
+    "registration_enabled_by_seed": true,
+    "bootstrap": {
+      "data_machine_events_required": true,
+      "cpt_registered": true,
+      "dme_taxonomies_registered": true,
+      "extrachill_events_required": true,
+      "event_taxonomies_attached": true,
+      "events_abilities_initialized": true
+    },
+    "event_post": {
+      "ok": true
+    },
+    "priority_event": {
+      "ok": true
+    },
+    "event_dates": {
+      "ok": true,
+      "start": "2026-10-21 18:30:00",
+      "end": "2026-10-21 21:00:00"
+    }
+  },
+  "gardner_id": 201,
+  "returning_subscriber_id": 202,
+  "event_id": 4,
+  "event_url": "http://events.extrachill.com/events/wordpress-meetup-charleston-october-2026/"
+}

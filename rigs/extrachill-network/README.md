@@ -31,13 +31,35 @@ multisite topology, release-zip mounting, and the theme-remote-sourcing gap).
   11-site matrix. Every plugin mounts with `activate: false`; a single
   `wordpress.run-php` workflow step applies the exact per-site/network
   activation matrix itself, with dependency-tolerant multi-pass retries (see
-  "Activation ordering" below).
+  "Activation ordering" below). Activation runs with hooks **enabled**
+  (`activate_plugin(..., $silent = false)`): core skips
+  `register_activation_hook` callbacks entirely in silent mode, which left
+  the 2026-09-23 baseline looking green while no plugin table existed
+  anywhere. The rig also loads `wp-admin/includes/upgrade.php` (so `dbDelta`
+  is available to callbacks the way a real admin activation provides it) and
+  re-fires each network-activated plugin's activation hook per site, because
+  network activation fires it only once from the current site -- per-site
+  setup on the other 10 sites otherwise never runs.
 - **Baseline scenario**: after activation, one assertion step compares actual
   vs. expected active plugins per site and does an internal anonymous
   `wp_remote_get(home_url('/'))` HTTP-status/fatal-marker check; then one
   `wordpress.browser-probe` per site asserts no console/page errors on an
   anonymous page load, with `network-policy=block` scoped to that site's own
   host.
+- **Domain-ID alignment** (generated mu-plugin): a fresh install assigns new
+  sequential blog IDs, but the network plugin set routes through
+  `EC_BLOG_ID_*` constants (production's IDs: events = 7, newsletter = 9,
+  ...). On every boot the rig generates `ec-network-domain-ids.php` from
+  `network-topology.json` and mounts it into `mu-plugins/`; it resolves each
+  `EC_BLOG_ID_*` constant **by domain** against the actual sites table on
+  every request, so `ec_is_events_site()` and every cross-site route built on
+  `ec_get_blog_id()` target the right site. Without it, the events-site
+  identity silently lands on whichever site draws blog 7 (docs, on this
+  topology). This is rig infrastructure, not a product workaround; the
+  upstream fix is for `ec_get_blog_id()` to resolve by domain itself.
+- **Journeys** (optional): full user journeys -- seeded personas, real
+  browser interactions, persona-oracle grading -- that run after the baseline
+  when selected via `extrachill_journeys`. See "The journey contract" below.
 
 ## Running it
 
@@ -59,38 +81,91 @@ this is a local checkout path today, not a release zip.
 | Key | Purpose |
 | --- | --- |
 | `extrachill_theme_source` | Absolute local theme checkout path, or (forward-compatible only, see below) an `https://…zip` URL. Required for a real `up`. |
+| `extrachill_journeys` | Array of journey IDs from `journeys/` to run after the baseline, e.g. `["gardner-event-rsvp"]`. Unknown IDs, wrong schemas, undeclared site domains, or missing persona files fail recipe validation loudly. |
 | `extrachill_component_source_overrides` | `{ "<slug>": "<local path or URL>" }`. Overrides one component's mount source, e.g. to test an unreleased branch of `extrachill-network` itself. |
 | `extrachill_release_set` | `{ "<slug>": { "ref": "<tag>" } }`. Pins a GitHub-hosted component to an explicit release tag instead of `latest`. There is no resolver that turns a `homeboy/release-set/v1` manifest into these entries yet -- a caller wanting deploy-parity pinning composes this map itself (see extrachill-network#223's spike notes on why `release-set/v1` is a gate, not a resolver). |
 | `extrachill_include_excluded_components` | Array of slugs from `components.json`'s `excludedComponents` list to force-include; requires a matching `extrachill_component_source_overrides` entry (no default source exists for those). |
 | `wordpress_runtime_php_version` | Overrides the default `8.4` (production's actual PHP major.minor, verified read-only via `wp eval 'echo PHP_VERSION;'`). |
 | `wordpress_runtime_prepare_steps` / `wordpress_runtime_post_steps` | Consumer-owned recipe steps inserted before/after this rig's own workflow (same contract as `wordpress-multisite-e2e`). |
 
-## Consumer CI: adding a network scenario
+## The journey contract
 
-A consumer repo (e.g. extrachill-events replacing `booking-network-e2e.yml`)
-needs about 10 lines, not 140:
+**Journeys live here. This rig is the only place a network boot / E2E
+user-journey harness may live** (extrachill-network#291). Consumer repos do
+not keep their own runners, recipes, persona fixtures, or journey workflows;
+they are components of this boot and, when a journey must exercise
+unreleased consumer code, callers pass that code through
+`extrachill_component_source_overrides` -- never by adding scenario files to
+the consumer repo.
 
-```yaml
-- name: Boot the Extra Chill network
-  run: |
-    homeboy rig install https://github.com/Extra-Chill/extrachill-network
-    HOMEBOY_SETTINGS_JSON='{
-      "extrachill_theme_source": "'"$THEME_CHECKOUT_PATH"'",
-      "extrachill_component_source_overrides": { "extrachill-events": "'"$PWD"'" },
-      "wordpress_runtime_post_steps": [{"command":"wordpress.browser-scenario","args":["scenario-json=@my-booking-journey.json","route-host=events.extrachill.com","network-policy=block","allow-host=events.extrachill.com"]}]
-    }' homeboy rig up extrachill-network
+A journey is a directory under `journeys/<journey-id>/`:
+
+```
+journeys/gardner-event-rsvp/
+  journey.json   # the contract document (schema extrachill-network/journey/v1)
+  seed.php       # optional: run-php step executed before the browser steps
+  grade.php      # optional: run-php step executed after the browser steps
+  README.md      # what the journey walks, seed decisions, evidence layout
+  evidence/      # committed run artifacts: FINDINGS.md, screenshots, result JSON
 ```
 
-`extrachill_component_source_overrides` points the consumer's own component at
-`$PWD` (the checked-out worktree under test) instead of its released zip --
-this is how a consumer reproduces a cross-plugin fatal against a real network
-rather than a synthetic single-plugin fixture. `wordpress_runtime_post_steps`
-layers the consumer's own scenario on top of this rig's baseline; it runs
-after every site's activation and baseline page-load assertion.
+Contract rules enforced by `run.mjs` and `tests/contract.test.mjs`:
 
-The same recipe works from Homeboy's `rig:` action input / a reusable
-workflow wrapper wherever the calling repo's CI already uses `homeboy-action`;
-nothing here is CLI-specific.
+- `schema` must be `extrachill-network/journey/v1`; `id` must match the
+  directory name.
+- `sites` is a non-empty array of **domains** from `network-topology.json`.
+  Sites are resolved by domain, never by blog ID -- seed and grade scripts
+  resolve their target site with `get_sites(['domain' => ...])`.
+- Every browser step carries an absolute `http://<domain>/...` URL, and its
+  `url`, `route-host`, and `allow-host` hosts must be inside the journey's
+  declared `sites` (with `network-policy=block`, journey steps block all
+  other egress).
+- `persona.file` must exist in `personas/` (pinned canonical copies; see
+  `personas/README.md`). Single-scenario fixture users are not personas and
+  stay inside the journey's seed.
+- `seed`/`grade` are `wordpress.run-php` `code-file` steps read from the
+  journey directory at boot time; no mount of the journey directory is
+  needed.
+- `runtimeEnv` entries (e.g. `WP_AGENT_RUNTIME=1`, which forces Data
+  Machine's full runtime -- and abilities registration -- on front-end
+  requests) merge into the recipe inputs when the journey is selected.
+- Steps run **after the full baseline** (activation, per-site assertion, and
+  every site's anonymous browser probe), in the order the setting lists
+  them; consumer `wordpress_runtime_post_steps` still run last.
+
+Selecting journeys:
+
+```bash
+HOMEBOY_SETTINGS_JSON='{
+  "extrachill_theme_source": "/path/to/extrachill-theme-checkout",
+  "extrachill_journeys": ["gardner-event-rsvp"]
+}' homeboy rig up extrachill-network
+```
+
+Testing unreleased consumer code remains a pure settings concern:
+
+```bash
+HOMEBOY_SETTINGS_JSON='{
+  "extrachill_theme_source": "/path/to/extrachill-theme-checkout",
+  "extrachill_journeys": ["gardner-event-rsvp"],
+  "extrachill_component_source_overrides": { "extrachill-events": "/abs/worktree" }
+}' homeboy rig up extrachill-network
+```
+
+Writing a new journey: copy the shape of `journeys/gardner-event-rsvp/`,
+grade against the oracles of a pinned persona (or document why there is no
+persona), commit curated evidence under `journeys/<id>/evidence/` (FINDINGS.md
+plus screenshots plus the result JSON), and file every product finding in
+the repo that owns it after a duplicate search. Keep the honest-outcomes
+rule from the events repo journeys: a **finding** is a real product defect,
+a **skip** is a runtime that could not fairly judge the case, and neither is
+ever silently converted into a pass.
+
+The old "consumer-owned scenario" pattern (a consumer repo layering its own
+`wordpress_runtime_post_steps` browser scenario onto this baseline) is
+superseded: `wordpress_runtime_prepare_steps` / `wordpress_runtime_post_steps`
+remain for arbitrary workflow-level composition, but user journeys belong in
+this directory.
 
 ## Activation ordering
 
@@ -106,24 +181,23 @@ WooCommerce to already be active).
 
 ## Theme sourcing (documented gap)
 
-`wp_codebox_extra_themes` / `inputs.extra_themes` only accepts a remote
+`wp_codebox_extra_themes` / `inputs.extra_themes` accepts a remote
 `https://…zip` source as of
 [Automattic/wp-codebox#2519](https://github.com/Automattic/wp-codebox/pull/2519)
 (merged into wp-codebox `main` 2026-09-21 as v0.27.0, itself born from
 [homeboy-extensions#2857](https://github.com/Extra-Chill/homeboy-extensions/issues/2857)
-filed during this rig's own spike). **The wp-codebox CLI installed on this
-host as of authoring is still v0.26.12** -- `packages/cli/dist` is 5 commits
-behind `origin/main` and only accepts an absolute local directory path for a
-theme mount.
+filed during this rig's own spike). The wp-codebox CLI installed on this host
+is v0.27.1, so both sourcing modes below are available. One caveat drove the
+rig's default: wp-codebox's own `extra_themes` activation is not
+multisite-aware (it does not `switch_theme()` on every created site), while
+the local-mount path carries a rig-owned activation step that switches the
+theme on all 11 sites. A network boot therefore uses the local checkout path;
+the remote zip path stays supported for single-site consumers of the rig.
 
 `run.mjs` auto-detects which mode to use from `extrachill_theme_source`:
 
 - An `https://…zip` URL is passed straight through to `inputs.extra_themes`.
-  This is forward-compatible and will start working the moment the installed
-  CLI updates past v0.26.12 -- **no rig code change needed**, only flip the
-  setting. Today it fails recipe validation with a clear schema error on the
-  currently-installed CLI, which is the correct, honest failure mode for an
-  unsupported input.
+  Works on wp-codebox v0.27.0+; note the multisite activation caveat above.
 - Anything else is treated as a local checkout path and mounted as a readonly
   directory the same way `wordpress-multisite-e2e`'s own `run.mjs` already
   does, with a workflow step that `switch_theme()`s every created site.
@@ -145,6 +219,7 @@ production plugins this rig does **not** mount by default, and why:
 | `wp-coding-agents-integration` | extrachill.com | Agent-runtime development tooling, not network product code. |
 | `intelligence` | studio.extrachill.com | Private repository with no public source (NETWORK-ARCHITECTURE.MD: "the installed repository is not publicly linkable"). |
 | `mediavine-control-panel` | extrachill.com, events.extrachill.com, wire.extrachill.com | Proprietary vendor plugin with no public zip. |
+| `redis-cache` | network | Requires a Redis server the disposable runtime does not run. Its activation hook (which the rig now fires for real) installs the `object-cache.php` drop-in; with no Redis reachable, every persistent option read fails through to defaults and the boot breaks. Production runs Redis; the sandbox documents the exclusion instead of pretending. |
 
 Force-include one with `extrachill_include_excluded_components` +
 `extrachill_component_source_overrides` if you have a private/local source for

@@ -1,0 +1,246 @@
+{
+  "schema": "extrachill-network/journey-result/gardner-event-rsvp/v1",
+  "persona": "extra-chill-users/chris-gardner@1.0.0",
+  "scenario": "gardner-event-rsvp",
+  "event_id": 4,
+  "event_url": "http://events.extrachill.com/events/wordpress-meetup-charleston-october-2026/",
+  "events_blog_id": 5,
+  "assertions": 15,
+  "skipped": 0,
+  "passed": 9,
+  "findings": [
+    {
+      "id": "perk-pass-email-queued",
+      "oracle": "obvious-state",
+      "passed": false,
+      "task": "Get the pass in his email too, so it survives losing the page.",
+      "evidence": {
+        "queued_email_actions": 0,
+        "note": "Action Scheduler records the queued send; actual SMTP delivery is not attributable in this runtime (no real mail transport), so this verifies queuing only."
+      },
+      "status": "open"
+    },
+    {
+      "id": "door-list-reality-matches-shipped-privacy-decision",
+      "oracle": "server-authorization",
+      "passed": false,
+      "task": "Check the public attendee list and understand who is actually coming.",
+      "evidence": {
+        "count": 1,
+        "listed": [
+          "Chris Gardner (Test Persona)"
+        ],
+        "note": "Known, already-decided tension from extrachill-users#414/#415: a host cannot verify a private attendee from the public list. The door-list surface itself (host view, browser step) now shows the full private-inclusive list; verified here, not re-filed."
+      },
+      "status": "open"
+    },
+    {
+      "id": "new-creative-registration-completes",
+      "oracle": "task-completion",
+      "passed": false,
+      "task": "Create an account from the event page when he decides to join.",
+      "evidence": {
+        "user_found": false,
+        "user_id": null
+      },
+      "status": "open"
+    },
+    {
+      "id": "new-creative-rsvp-completes-after-register",
+      "oracle": "task-completion",
+      "passed": false,
+      "task": "Come back to the event after registering and mark himself Going without starting over.",
+      "evidence": {
+        "marked": false,
+        "member_of_site": false
+      },
+      "status": "open"
+    },
+    {
+      "id": "free-events-show-a-free-indicator",
+      "oracle": "obvious-state",
+      "passed": false,
+      "task": "Tell at a glance that the event costs nothing, without reading the description.",
+      "evidence": {
+        "free_indicator_visible": false,
+        "note": "Filed as data-machine-events#861; expected to remain a finding until that ships."
+      },
+      "status": "open"
+    },
+    {
+      "id": "local-scene-card-prioritizes-saved-market",
+      "oracle": "obvious-state",
+      "passed": false,
+      "task": "See the scene he cares about first on the main site, not whichever city has the most shows.",
+      "evidence": {
+        "first_market": null,
+        "markets": null,
+        "error": "Invalid or expired route-affinity token.",
+        "note": "Gardner seeded with _extrachill_local_scene=charleston; the browser step asserts the card DOM, this verifies the cross-site data path it renders from."
+      },
+      "status": "open"
+    }
+  ],
+  "cases": [
+    {
+      "id": "gardner-going-completes",
+      "oracle": "task-completion",
+      "passed": true,
+      "task": "Mark himself as Going and have it actually take.",
+      "evidence": {
+        "marked": true
+      }
+    },
+    {
+      "id": "gardner-single-row-no-duplicates",
+      "oracle": "duplicate-prevention",
+      "passed": true,
+      "task": "Not end up marked twice just because the page reloaded or he came back to check.",
+      "evidence": {
+        "rows": 1
+      }
+    },
+    {
+      "id": "gardner-first-show-milestone-fires",
+      "oracle": "obvious-state",
+      "passed": true,
+      "task": "See some acknowledgment that marking himself Going registered, beyond the button itself.",
+      "evidence": {
+        "milestone_row_found": true
+      }
+    },
+    {
+      "id": "perk-pass-issued-with-code",
+      "oracle": "task-completion",
+      "passed": true,
+      "task": "Get something he can actually show at the door to claim the free beer promised in the event description.",
+      "evidence": {
+        "pass_found": true,
+        "status": "active",
+        "code_length": 17
+      }
+    },
+    {
+      "id": "perk-pass-email-queued",
+      "oracle": "obvious-state",
+      "passed": false,
+      "task": "Get the pass in his email too, so it survives losing the page.",
+      "evidence": {
+        "queued_email_actions": 0,
+        "note": "Action Scheduler records the queued send; actual SMTP delivery is not attributable in this runtime (no real mail transport), so this verifies queuing only."
+      }
+    },
+    {
+      "id": "perk-pass-redeems-at-door-safely",
+      "oracle": "safe-retry",
+      "passed": true,
+      "task": "Have the pass scanned at the door, including if the host taps redeem twice.",
+      "evidence": {
+        "redeem_outcome": {
+          "ok": true,
+          "already_redeemed": false,
+          "error": null
+        },
+        "final_status": "redeemed",
+        "redeemed_at": "2026-09-26 16:08:02"
+      }
+    },
+    {
+      "id": "rapid-double-click-does-not-duplicate",
+      "oracle": "duplicate-prevention",
+      "passed": true,
+      "task": "Click Going twice quickly (a real double-submit) without ending up in a broken or duplicated state.",
+      "evidence": {
+        "rows": 0
+      }
+    },
+    {
+      "id": "private-by-default-still-holds",
+      "oracle": "server-authorization",
+      "passed": true,
+      "task": "Not have his RSVP made publicly visible just because he never opened a settings screen.",
+      "evidence": {
+        "stored_meta": "",
+        "note": "Empty string is correct: absent meta is the private-by-default state extrachill-users#415 shipped."
+      }
+    },
+    {
+      "id": "door-list-reality-matches-shipped-privacy-decision",
+      "oracle": "server-authorization",
+      "passed": false,
+      "task": "Check the public attendee list and understand who is actually coming.",
+      "evidence": {
+        "count": 1,
+        "listed": [
+          "Chris Gardner (Test Persona)"
+        ],
+        "note": "Known, already-decided tension from extrachill-users#414/#415: a host cannot verify a private attendee from the public list. The door-list surface itself (host view, browser step) now shows the full private-inclusive list; verified here, not re-filed."
+      }
+    },
+    {
+      "id": "new-creative-registration-completes",
+      "oracle": "task-completion",
+      "passed": false,
+      "task": "Create an account from the event page when he decides to join.",
+      "evidence": {
+        "user_found": false,
+        "user_id": null
+      }
+    },
+    {
+      "id": "new-creative-rsvp-completes-after-register",
+      "oracle": "task-completion",
+      "passed": false,
+      "task": "Come back to the event after registering and mark himself Going without starting over.",
+      "evidence": {
+        "marked": false,
+        "member_of_site": false
+      }
+    },
+    {
+      "id": "login-page-responds-for-logged-out-visitors",
+      "oracle": "obvious-state",
+      "passed": true,
+      "task": "Click Going while logged out and reach a working sign-in page.",
+      "evidence": {
+        "login_url": "http://events.extrachill.com/login/",
+        "status": 200,
+        "body_start": "<!DOCTYPE html>\n<html lang=\"en-US\">\n<head>\n\t<meta charset=\"UTF-8\" />\n\t<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\t<link rel=\"profile\" href=\"https://gmpg.org/xfn/11\" />\n  \n\t\t<link rel=\"preload\" href=\"https://events.extrachill.com/wp-content/themes/extrachill/assets/fonts/WilcoLoftSans-Treble.woff2\" as=\"font\" type=\"font/woff2\" crossorigin>\n\t\t\t<link rel=\"preload\" href=\"https",
+        "note": "Diagnostic for the register->RSVP loop: a non-200 or error here means the loop failure is the login page, not the registration form."
+      }
+    },
+    {
+      "id": "event-end-time-now-visible",
+      "oracle": "obvious-state",
+      "passed": true,
+      "task": "Know what time the event actually ends without reading the whole description.",
+      "evidence": {
+        "end_time_visible": true,
+        "html_len": 117200,
+        "note": "data-machine-events#860 was fixed in v0.64.7; this case flipped from recorded-finding to pass-expectation."
+      }
+    },
+    {
+      "id": "free-events-show-a-free-indicator",
+      "oracle": "obvious-state",
+      "passed": false,
+      "task": "Tell at a glance that the event costs nothing, without reading the description.",
+      "evidence": {
+        "free_indicator_visible": false,
+        "note": "Filed as data-machine-events#861; expected to remain a finding until that ships."
+      }
+    },
+    {
+      "id": "local-scene-card-prioritizes-saved-market",
+      "oracle": "obvious-state",
+      "passed": false,
+      "task": "See the scene he cares about first on the main site, not whichever city has the most shows.",
+      "evidence": {
+        "first_market": null,
+        "markets": null,
+        "error": "Invalid or expired route-affinity token.",
+        "note": "Gardner seeded with _extrachill_local_scene=charleston; the browser step asserts the card DOM, this verifies the cross-site data path it renders from."
+      }
+    }
+  ]
+}

@@ -1,0 +1,174 @@
+{
+  "schema": "extrachill-network/journey/v1",
+  "id": "gardner-event-rsvp",
+  "title": "Gardner event RSVP: the Oct 21 2026 Lo-Fi Brewing WordPress meetup",
+  "description": "Walks a nontechnical attendee through discovery, comprehension, account creation, RSVP, the perk pass, and the door list for a real, currently-live Extra Chill event, then grades the run against the persona oracles. Ported from extrachill-events/tests/wp-codebox/gardner-event-rsvp-journey.json (extrachill-events#876) onto the full 11-site network; every single-site workaround was dropped.",
+  "origin": {
+    "repository": "Extra-Chill/extrachill-events",
+    "files": [
+      "tests/wp-codebox/gardner-event-rsvp-journey.json",
+      "tests/wp-codebox/gardner-event-rsvp-journey-seed.php",
+      "tests/wp-codebox/gardner-event-rsvp-journey-grade.php"
+    ],
+    "mergedIn": "extrachill-events#876"
+  },
+  "persona": {
+    "id": "extra-chill-users/chris-gardner",
+    "version": "1.0.0",
+    "file": "gardner.v1.json"
+  },
+  "sites": ["events.extrachill.com", "extrachill.com"],
+  "runtimeEnv": {
+    "WP_AGENT_RUNTIME": "1"
+  },
+  "seed": { "codeFile": "seed.php", "timeoutMs": 300000 },
+  "grade": { "codeFile": "grade.php", "timeoutMs": 120000 },
+  "steps": [
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "comprehension-desktop" },
+      "args": [
+        "url=http://events.extrachill.com/events/wordpress-meetup-charleston-october-2026",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "step-timeout=60s",
+        "timeout=180s",
+        "capture=steps,console,errors,network,html,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/events/wordpress-meetup-charleston-october-2026\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\"#ec-attendance-root\"},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('meta[property=\\\"og:title\\\"]')||{}).content||''\"},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('.event-date-time')||{innerText:''}).innerText.includes('6:30')\",\"assert\":true},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('.event-date-time')||{innerText:''}).innerText.includes('9:00')\",\"assert\":true},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('.event-venue')||{innerText:''}).innerText.includes('2038 Meeting Street Road')\",\"assert\":true},{\"kind\":\"evaluate\",\"expression\":\"document.body.innerText.includes('All experience levels are welcome')\",\"assert\":true},{\"kind\":\"evaluate\",\"expression\":\"document.body.innerText.includes('your first beer is on Extra Chill')\",\"assert\":true},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('.event-price')||{innerText:''}).innerText.trim()===''\"},{\"kind\":\"screenshot\",\"name\":\"desktop-event-page-logged-out\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "charleston-archive-callout" },
+      "args": [
+        "url=http://events.extrachill.com/location/usa/south-carolina/charleston",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "step-timeout=60s",
+        "timeout=150s",
+        "capture=steps,console,errors,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/location/usa/south-carolina/charleston\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\".promoted-events\"},{\"kind\":\"evaluate\",\"expression\":\"((document.querySelector('.promoted-event-card')||{}).href||'').includes('/events/wordpress-meetup-charleston-october-2026')\",\"assert\":true},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('.promoted-event-card__venue')||{innerText:''}).innerText.includes('Lo-Fi Brewing')\",\"assert\":true},{\"kind\":\"screenshot\",\"name\":\"charleston-location-archive-promoted-callout\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "comprehension-mobile" },
+      "args": [
+        "url=http://events.extrachill.com/events/wordpress-meetup-charleston-october-2026",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "viewport=390x844",
+        "step-timeout=60s",
+        "timeout=150s",
+        "capture=steps,console,errors,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/events/wordpress-meetup-charleston-october-2026\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\"#ec-attendance-root\"},{\"kind\":\"evaluate\",\"expression\":\"document.documentElement.scrollWidth <= document.documentElement.clientWidth + 4\",\"assert\":true},{\"kind\":\"evaluate\",\"expression\":\"window.__wpCodeboxBrowserErrors?.length ?? 0\",\"assert\":0},{\"kind\":\"screenshot\",\"name\":\"mobile-event-page\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "local-scene-card-main-site" },
+      "args": [
+        "url=http://extrachill.com/",
+        "route-host=extrachill.com",
+        "network-policy=block",
+        "allow-host=extrachill.com",
+        "auth=wordpress-admin",
+        "auth-user-id=201",
+        "step-timeout=60s",
+        "timeout=150s",
+        "capture=steps,console,errors,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://extrachill.com/\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\".home-3x3-col-newsletter\"},{\"kind\":\"evaluate\",\"expression\":\"Array.from(document.querySelectorAll('.home-city-badges .location-badge')).map(b=>b.innerText.trim())\"},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('.home-city-badges .location-badge')||{className:''}).className.includes('location-charleston')\",\"assert\":true},{\"kind\":\"screenshot\",\"name\":\"main-site-local-scene-card\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "gardner-rsvp-with-pass" },
+      "args": [
+        "url=http://events.extrachill.com/events/wordpress-meetup-charleston-october-2026",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "auth=wordpress-admin",
+        "auth-user-id=201",
+        "step-timeout=60s",
+        "timeout=180s",
+        "capture=steps,console,errors,network,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/events/wordpress-meetup-charleston-october-2026\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\".ec-attendance__button\"},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('.ec-attendance-visibility')||{innerText:''}).innerText.includes('appears in the public attendee list')\",\"assert\":true},{\"kind\":\"click\",\"selector\":\".ec-attendance__button\"},{\"kind\":\"waitFor\",\"selector\":\".ec-attendance__button:not([aria-busy=\\\"true\\\"])\"},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('.ec-attendance__button')||{}).getAttribute('aria-pressed')\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"3000ms\"},{\"kind\":\"evaluate\",\"expression\":\"JSON.stringify({passInDom:!!document.querySelector('.ec-rsvp-pass'),visible:!!(document.querySelector('.ec-rsvp-pass')||{}).offsetParent,code:((document.querySelector('.ec-rsvp-pass__code')||{textContent:''}).textContent||'').trim(),perk:((document.querySelector('.ec-rsvp-pass__perk')||{textContent:''}).textContent||'').trim()})\"},{\"kind\":\"screenshot\",\"name\":\"gardner-marked-going-with-pass\"},{\"kind\":\"evaluate\",\"expression\":\"!!(document.querySelector('.ec-rsvp-pass')||{}).offsetParent\",\"assert\":true}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "gardner-reload-persistence-share" },
+      "args": [
+        "url=http://events.extrachill.com/events/wordpress-meetup-charleston-october-2026",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "auth=wordpress-admin",
+        "auth-user-id=201",
+        "step-timeout=60s",
+        "timeout=150s",
+        "capture=steps,console,errors,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/events/wordpress-meetup-charleston-october-2026\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\".ec-attendance__button[aria-pressed=\\\"true\\\"]\",\"timeout\":\"15s\"},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('.ec-rsvp-pass__code')||{innerText:''}).innerText.trim().length\"},{\"kind\":\"evaluate\",\"expression\":\"document.body.innerText.includes('Chris Gardner (Test Persona)')\",\"assert\":true},{\"kind\":\"click\",\"selector\":\".ec-mini-dropdown-toggle.button-2\"},{\"kind\":\"waitFor\",\"selector\":\".share-option.copy-link a\"},{\"kind\":\"evaluate\",\"expression\":\"((document.querySelector('.share-option.copy-link a')||{}).getAttribute('data-share-url')||'').includes('/events/wordpress-meetup-charleston-october-2026')\",\"assert\":true},{\"kind\":\"screenshot\",\"name\":\"gardner-reload-persistence-and-share\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "returning-subscriber-private-double-click" },
+      "args": [
+        "url=http://events.extrachill.com/events/wordpress-meetup-charleston-october-2026",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "auth=wordpress-admin",
+        "auth-user-id=202",
+        "step-timeout=60s",
+        "timeout=150s",
+        "capture=steps,console,errors,network,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/events/wordpress-meetup-charleston-october-2026\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\".ec-attendance__button\"},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('.ec-attendance-visibility')||{innerText:''}).innerText.includes('private')\",\"assert\":true},{\"kind\":\"click\",\"selector\":\".ec-attendance__button\"},{\"kind\":\"waitFor\",\"selector\":\".ec-attendance__button:not([aria-busy=\\\"true\\\"])\"},{\"kind\":\"click\",\"selector\":\".ec-attendance__button\"},{\"kind\":\"click\",\"selector\":\".ec-attendance__button\"},{\"kind\":\"waitFor\",\"selector\":\".ec-attendance__button\"},{\"kind\":\"screenshot\",\"name\":\"returning-subscriber-rapid-double-click\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "door-list-host-view-and-redeem" },
+      "args": [
+        "url=http://events.extrachill.com/events/wordpress-meetup-charleston-october-2026",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "auth=wordpress-admin",
+        "auth-user-id=1",
+        "step-timeout=60s",
+        "timeout=180s",
+        "capture=steps,console,errors,network,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/events/wordpress-meetup-charleston-october-2026\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\".ec-door-list\",\"timeout\":\"20s\"},{\"kind\":\"evaluate\",\"expression\":\"document.querySelector('.ec-door-list').innerText\"},{\"kind\":\"evaluate\",\"expression\":\"document.querySelector('.ec-door-list').innerText.includes('Chris Gardner (Test Persona)')\",\"assert\":true},{\"kind\":\"evaluate\",\"expression\":\"document.querySelector('.ec-door-list').innerText.includes('Returning Community Member (Test Persona)')\",\"assert\":true},{\"kind\":\"screenshot\",\"name\":\"door-list-host-view\"},{\"kind\":\"evaluate\",\"expression\":\"(()=>{const b=document.querySelector('.ec-door-list__redeem');if(!b)return 'no-redeem-button';const r=b.getBoundingClientRect();const el=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return el?el.className||el.tagName:'none';})()\"},{\"kind\":\"click\",\"selector\":\".ec-door-list__redeem\"},{\"kind\":\"waitFor\",\"selector\":\".ec-door-list__status\",\"timeout\":\"15s\"},{\"kind\":\"evaluate\",\"expression\":\"document.querySelector('.ec-door-list').innerText.toLowerCase().includes('redeemed') || document.querySelector('.ec-door-list').innerText.toLowerCase().includes('already')\"},{\"kind\":\"screenshot\",\"name\":\"door-list-after-redeem\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "new-creative-register-rsvp-loop" },
+      "args": [
+        "url=http://events.extrachill.com/events/wordpress-meetup-charleston-october-2026",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "step-timeout=60s",
+        "timeout=240s",
+        "capture=steps,console,errors,network,html,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/events/wordpress-meetup-charleston-october-2026\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\".ec-attendance__button\"},{\"kind\":\"screenshot\",\"name\":\"new-creative-logged-out-event-page\"},{\"kind\":\"evaluate\",\"expression\":\"(()=>{const b=document.querySelector('.ec-attendance__button');const r=b.getBoundingClientRect();const el=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return JSON.stringify({rect:{x:r.x,y:r.y,w:r.width,h:r.height},atPoint:el?(el.className||el.tagName):'none'});})()\"},{\"kind\":\"click\",\"selector\":\".ec-attendance__button\"},{\"kind\":\"waitFor\",\"selector\":\"[data-ec-login-register-root]\",\"timeout\":\"15s\"},{\"kind\":\"screenshot\",\"name\":\"new-creative-going-click-logged-out\"},{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/login/#tab-register\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\"[data-ec-login-register-root]\"},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('a[href*=\\\"tab-register\\\"]')||{}).dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}))\"},{\"kind\":\"waitFor\",\"selector\":\"#extrachill_email\",\"timeout\":\"15s\"},{\"kind\":\"screenshot\",\"name\":\"new-creative-register-form\"},{\"kind\":\"fill\",\"selector\":\"#extrachill_email\",\"value\":\"new-creative-fixture@example.invalid\"},{\"kind\":\"fill\",\"selector\":\"input[type=\\\"password\\\"] >> nth=0\",\"value\":\"Fixture-Password-2026!\"},{\"kind\":\"fill\",\"selector\":\"input[type=\\\"password\\\"] >> nth=1\",\"value\":\"Fixture-Password-2026!\"},{\"kind\":\"screenshot\",\"name\":\"new-creative-register-filled\"},{\"kind\":\"click\",\"selector\":\"input[name=\\\"extrachill_register\\\"]\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"6000ms\"},{\"kind\":\"evaluate\",\"expression\":\"window.location.href\"},{\"kind\":\"screenshot\",\"name\":\"new-creative-post-registration\"},{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/events/wordpress-meetup-charleston-october-2026\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\".ec-attendance__button\",\"timeout\":\"20s\"},{\"kind\":\"click\",\"selector\":\".ec-attendance__button\"},{\"kind\":\"waitFor\",\"selector\":\".ec-attendance__button[aria-pressed=\\\"true\\\"]\",\"timeout\":\"15s\"},{\"kind\":\"screenshot\",\"name\":\"new-creative-marked-going\"}]"
+      ]
+    }
+  ]
+}
