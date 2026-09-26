@@ -179,12 +179,20 @@ $bluesky->save_config( array(
 ) );
 
 require_once ABSPATH . 'wp-admin/includes/image.php';
-$uploads = wp_upload_dir();
-$media   = array();
-foreach ( array(
-	'crowd' => array( 25, 38, 66 ),
-	'stage' => array( 113, 45, 189 ),
-) as $slug => $rgb ) {
+
+/**
+ * Create one deterministic public JPEG fixture attachment on the CURRENT
+ * blog and return its NetworkMediaItem-shaped reference
+ * (`source_id` = "<blog_id>:<attachment_id>", matching how Studio's own
+ * `social_asset_refs_from_studio_images()` resolves media against whichever
+ * site's own library the caller currently has switched into).
+ *
+ * @param string $slug Fixture filename slug.
+ * @param int[]  $rgb  RGB color.
+ * @return array{id:int,source_id:string,url:string}
+ */
+function ec_rig_social_operator_create_media( string $slug, array $rgb ): array {
+	$uploads    = wp_upload_dir();
 	$image_path = trailingslashit( $uploads['path'] ) . 'gardner-social-operator-' . $slug . '.jpg';
 	$image      = imagecreatetruecolor( 1200, 800 );
 	$color      = imagecolorallocate( $image, $rgb[0], $rgb[1], $rgb[2] );
@@ -203,14 +211,31 @@ foreach ( array(
 		throw new RuntimeException( 'Unable to create public JPEG fixture.' );
 	}
 	wp_update_attachment_metadata( $attachment_id, wp_generate_attachment_metadata( $attachment_id, $image_path ) );
-	$media[] = array(
+	return array(
 		'id'        => (int) $attachment_id,
-		'source_id' => '1:' . $attachment_id,
+		'source_id' => get_current_blog_id() . ':' . $attachment_id,
 		'url'       => (string) wp_get_attachment_url( $attachment_id ),
 	);
 }
 
-$article_id = wp_insert_post(
+/*
+ * ---------------------------------------------------------------------------
+ * The canonical article lives on the REAL main site (extrachill.com), not on
+ * studio.extrachill.com -- Studio's own social_source_attribution() (Studio
+ * inc/social-drafts.php) validates a draft's declared source_post_id/
+ * source_url by switching to ec_get_blog_id('main') and comparing the
+ * ACTUAL post's permalink there. Creating the article on studio's own
+ * database (as an earlier version of this seed did) makes that lookup miss
+ * on the real network and fail the whole delivery with
+ * social_publish_attribution_invalid -- a real cross-site identity
+ * requirement the old single-site sandbox could not surface, because a
+ * single-site multisite-convert made "studio" and "main" the same blog.
+ * ---------------------------------------------------------------------------
+ */
+$main_blog_id = ec_rig_social_operator_site_id( 'extrachill.com' );
+switch_to_blog( $main_blog_id );
+$article_media = ec_rig_social_operator_create_media( 'crowd', array( 25, 38, 66 ) );
+$article_id    = wp_insert_post(
 	array(
 		'post_title'   => 'Gardner Operator Canonical Article',
 		'post_excerpt' => 'A canonical Extra Chill article for stateful social operations.',
@@ -221,9 +246,20 @@ $article_id = wp_insert_post(
 	true
 );
 if ( is_wp_error( $article_id ) ) {
+	restore_current_blog();
 	throw new RuntimeException( esc_html( 'Unable to create canonical article: ' . $article_id->get_error_message() ) );
 }
-set_post_thumbnail( $article_id, $media[0]['id'] );
+set_post_thumbnail( $article_id, $article_media['id'] );
+$article_permalink = (string) get_permalink( $article_id );
+restore_current_blog();
+
+/*
+ * The Studio draft, and the media Gardner actually attaches to the social
+ * post, live on studio.extrachill.com -- its own composer's own media
+ * library, independent of the article's own featured image.
+ */
+$draft_media_original = ec_rig_social_operator_create_media( 'stage-original', array( 90, 90, 90 ) );
+$draft_media_approved = ec_rig_social_operator_create_media( 'stage', array( 113, 45, 189 ) );
 
 $draft_id = wp_insert_post(
 	array(
@@ -242,13 +278,14 @@ $approved_caption = 'Edited and approved: local music belongs to the people who 
 update_post_meta( $draft_id, '_studio_social_platforms', array( 'instagram', 'bluesky' ) );
 update_post_meta( $draft_id, '_studio_social_caption', $original_caption );
 update_post_meta( $draft_id, '_studio_social_media_kind', 'image' );
-update_post_meta( $draft_id, '_studio_social_images', array( $media[0] ) );
+update_post_meta( $draft_id, '_studio_social_images', array( $draft_media_original ) );
 update_post_meta( $draft_id, '_studio_social_source_post_id', (int) $article_id );
-update_post_meta( $draft_id, '_studio_social_source_url', (string) get_permalink( $article_id ) );
+update_post_meta( $draft_id, '_studio_social_source_url', $article_permalink );
 
 // Gardner changes both caption and media before approval; these values become frozen input.
 update_post_meta( $draft_id, '_studio_social_caption', $approved_caption );
-update_post_meta( $draft_id, '_studio_social_images', array( $media[1] ) );
+update_post_meta( $draft_id, '_studio_social_images', array( $draft_media_approved ) );
+$media = array( $draft_media_original, $draft_media_approved );
 
 // The Studio app's own front page, matching production's real single-page
 // operator surface. Idempotent: reuse an existing front page if one is

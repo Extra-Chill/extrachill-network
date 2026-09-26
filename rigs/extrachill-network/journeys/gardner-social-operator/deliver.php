@@ -23,6 +23,27 @@ use DataMachine\Engine\Tasks\TaskRegistry;
 use DataMachineSocials\Operations\DelegatedCrossPostAction;
 
 /**
+ * Read the canonical article's diagnostic fields from its OWN site -- it
+ * lives on the main site, never on studio's own blog.
+ *
+ * @param int $site_id   Blog ID the article actually lives on.
+ * @param int $post_id   Article post ID.
+ * @return array{id:int,status:string,url:string}
+ */
+function ec_studio_operator_source_post_diagnostic( int $site_id, int $post_id ): array {
+	switch_to_blog( $site_id );
+	try {
+		return array(
+			'id'     => $post_id,
+			'status' => (string) get_post_status( $post_id ),
+			'url'    => (string) get_permalink( $post_id ),
+		);
+	} finally {
+		restore_current_blog();
+	}
+}
+
+/**
  * Fail the deterministic journey with an actionable oracle name.
  *
  * @param bool   $condition Condition that must hold.
@@ -62,25 +83,26 @@ function ec_studio_operator_execute_job( array $job ): array {
 }
 
 /**
- * Resolve the studio site by domain, never by blog ID -- this run-php
- * process starts on the primary site, so the fixture (written to studio's
- * OWN options table by the seed step, inside its own switch_to_blog()) is
+ * Resolve a rig site by domain, never by blog ID -- this run-php process
+ * starts on the primary site, so the fixture (written to studio's OWN
+ * options table by the seed step, inside its own switch_to_blog()) is
  * unreadable via a plain get_option() until we are on that blog too.
  *
- * @return int Blog ID of studio.extrachill.com.
+ * @param string $domain Site domain.
+ * @return int Blog ID.
  */
-function ec_rig_social_operator_deliver_studio_blog_id(): int {
+function ec_rig_social_operator_deliver_site_id( string $domain ): int {
 	$sites = get_sites( array(
-		'domain' => 'studio.extrachill.com',
+		'domain' => $domain,
 		'number' => 1,
 	) );
 	if ( empty( $sites ) ) {
-		throw new RuntimeException( 'Journey deliver step could not resolve studio.extrachill.com by domain.' );
+		throw new RuntimeException( esc_html( 'Journey deliver step could not resolve ' . $domain . ' by domain.' ) );
 	}
 	return (int) $sites[0]->blog_id;
 }
 
-switch_to_blog( ec_rig_social_operator_deliver_studio_blog_id() );
+switch_to_blog( ec_rig_social_operator_deliver_site_id( 'studio.extrachill.com' ) );
 $fixture = get_option( 'ec_rig_journey_fixture_gardner_social_operator', array() );
 ec_studio_operator_assert( is_array( $fixture ) && ! empty( $fixture['studio_blog_id'] ), 'persisted seed fixture reloads' );
 require_once WP_PLUGIN_DIR . '/extrachill-studio/extrachill-studio.php';
@@ -99,6 +121,10 @@ $gardner_id       = (int) $fixture['gardner_user_id'];
 $ordinary_id      = (int) $fixture['ordinary_user_id'];
 $approved_caption = (string) $fixture['approved_caption'];
 $approved_media   = $fixture['media'][1];
+// The article lives on the REAL main site, never on studio's own blog --
+// get_current_blog_id() here would be studio, which fails
+// DelegatedCrossPostAction's own attribution_post site validation.
+$article_site_id = ec_rig_social_operator_deliver_site_id( 'extrachill.com' );
 
 ec_studio_operator_assert( 'pending' === get_post_status( $draft_id ), 'draft begins pending review' );
 ec_studio_operator_assert( get_post_meta( $draft_id, '_studio_social_caption', true ) === $approved_caption, 'pre-approval caption edit is canonical' );
@@ -123,7 +149,7 @@ $publish_input = array(
 	),
 	'idempotency_key'  => 'studio-social-publish:' . get_current_blog_id() . ':' . $draft_id,
 	'attribution_post' => array(
-		'site_id' => get_current_blog_id(),
+		'site_id' => $article_site_id,
 		'post_id' => $article_id,
 	),
 );
@@ -259,11 +285,7 @@ $diagnostic = array(
 	'acting_user_id'           => get_current_user_id(),
 	'execution_owner_user_id'  => $fixture['execution_owner_user_id'],
 	'execution_owner_agent_id' => $fixture['execution_owner_agent_id'],
-	'source_post'              => array(
-		'id'     => $article_id,
-		'status' => get_post_status( $article_id ),
-		'url'    => get_permalink( $article_id ),
-	),
+	'source_post'              => ec_studio_operator_source_post_diagnostic( $article_site_id, $article_id ),
 	'draft_post'               => array(
 		'id'           => $draft_id,
 		'status'       => get_post_status( $draft_id ),
@@ -353,7 +375,12 @@ $partial = ExtraChillStudio\get_social_publish_state( $draft_id );
 ec_studio_operator_assert( ! empty( $partial['success'] ) && 'failed' === ( $partial['delivery']['status'] ?? '' ), 'partial delivery reload is plain failed state' );
 ec_studio_operator_assert( ! empty( $partial['delivery']['retryable'] ), 'partial delivery is safely retryable' );
 
+// Shares are recorded against the attribution_post's OWN site (the main
+// site the article lives on, per DelegatedCrossPostAction::with_site()),
+// never against whichever blog the delegated job itself executes on.
+switch_to_blog( $article_site_id );
 $shares = DataMachineSocials\Tracking\SocialShareTracker::get_shares( $article_id );
+restore_current_blog();
 ec_studio_operator_assert( 1 === count( $shares ) && 'instagram' === $shares[0]['platform'], 'partial delivery preserves Instagram exactly once' );
 
 $transitions   = get_option( 'ec_studio_operator_transition_ledger', array() );

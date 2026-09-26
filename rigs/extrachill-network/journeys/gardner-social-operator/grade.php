@@ -58,20 +58,21 @@ function ec_rig_social_operator_count_calls( array $ledger, string $provider_cal
 }
 
 /**
- * Resolve the studio site by domain, never by blog ID -- this run-php
- * process starts on the primary site, so the fixture (written to studio's
- * OWN options table by the seed step, inside its own switch_to_blog()) is
+ * Resolve a rig site by domain, never by blog ID -- this run-php process
+ * starts on the primary site, so the fixture (written to studio's OWN
+ * options table by the seed step, inside its own switch_to_blog()) is
  * unreadable via a plain get_option() until we are on that blog too.
  *
- * @return int Blog ID of studio.extrachill.com.
+ * @param string $domain Site domain.
+ * @return int Blog ID.
  */
-function ec_rig_social_operator_grade_studio_blog_id(): int {
+function ec_rig_social_operator_grade_studio_blog_id( string $domain = 'studio.extrachill.com' ): int {
 	$sites = get_sites( array(
-		'domain' => 'studio.extrachill.com',
+		'domain' => $domain,
 		'number' => 1,
 	) );
 	if ( empty( $sites ) ) {
-		throw new RuntimeException( 'Journey grade step could not resolve studio.extrachill.com by domain.' );
+		throw new RuntimeException( esc_html( 'Journey grade step could not resolve ' . $domain . ' by domain.' ) );
 	}
 	return (int) $sites[0]->blog_id;
 }
@@ -221,6 +222,11 @@ if ( $retry_ok ) {
 			)
 		);
 
+		// Shares are recorded against the attribution_post's OWN site (the
+		// main site the article lives on, per
+		// DelegatedCrossPostAction::with_site()), never against whichever
+		// blog the delegated job itself executes on.
+		switch_to_blog( ec_rig_social_operator_grade_studio_blog_id( 'extrachill.com' ) );
 		$shares                    = SocialShareTracker::get_shares( $article_id );
 		$operation_hash            = hash( 'sha256', $ref );
 		$share_identity_consistent = true;
@@ -229,16 +235,20 @@ if ( $retry_ok ) {
 				$share_identity_consistent = false;
 			}
 		}
+		$share_total      = SocialShareTracker::count_shares( $article_id );
+		$instagram_shares = SocialShareTracker::count_shares( $article_id, 'instagram' );
+		$bluesky_shares   = SocialShareTracker::count_shares( $article_id, 'bluesky' );
+		restore_current_blog();
 		ec_rig_social_operator_case(
 			'final-share-history-shows-exactly-two-receipts',
 			'attribution',
-			2 === SocialShareTracker::count_shares( $article_id )
-				&& 1 === SocialShareTracker::count_shares( $article_id, 'instagram' )
-				&& 1 === SocialShareTracker::count_shares( $article_id, 'bluesky' )
+			2 === $share_total
+				&& 1 === $instagram_shares
+				&& 1 === $bluesky_shares
 				&& $share_identity_consistent,
 			'See a final, correctly-attributed record of exactly one Instagram and one Bluesky share on his article -- not zero, not four.',
 			array(
-				'total'               => SocialShareTracker::count_shares( $article_id ),
+				'total'               => $share_total,
 				'identity_consistent' => $share_identity_consistent,
 			)
 		);
