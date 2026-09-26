@@ -68,7 +68,7 @@
     },
     {
       "command": "wordpress.run-php",
-      "args": ["code-file=deliver.php"],
+      "args": ["code-file=${journey.dir}/deliver.php"],
       "timeoutMs": 180000
     }
   ]
