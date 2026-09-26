@@ -31,7 +31,15 @@ multisite topology, release-zip mounting, and the theme-remote-sourcing gap).
   11-site matrix. Every plugin mounts with `activate: false`; a single
   `wordpress.run-php` workflow step applies the exact per-site/network
   activation matrix itself, with dependency-tolerant multi-pass retries (see
-  "Activation ordering" below).
+  "Activation ordering" below). Activation runs with hooks **enabled**
+  (`activate_plugin(..., $silent = false)`): core skips
+  `register_activation_hook` callbacks entirely in silent mode, which left
+  the 2026-09-23 baseline looking green while no plugin table existed
+  anywhere. The rig also loads `wp-admin/includes/upgrade.php` (so `dbDelta`
+  is available to callbacks the way a real admin activation provides it) and
+  re-fires each network-activated plugin's activation hook per site, because
+  network activation fires it only once from the current site -- per-site
+  setup on the other 10 sites otherwise never runs.
 - **Baseline scenario**: after activation, one assertion step compares actual
   vs. expected active plugins per site and does an internal anonymous
   `wp_remote_get(home_url('/'))` HTTP-status/fatal-marker check; then one
@@ -211,6 +219,7 @@ production plugins this rig does **not** mount by default, and why:
 | `wp-coding-agents-integration` | extrachill.com | Agent-runtime development tooling, not network product code. |
 | `intelligence` | studio.extrachill.com | Private repository with no public source (NETWORK-ARCHITECTURE.MD: "the installed repository is not publicly linkable"). |
 | `mediavine-control-panel` | extrachill.com, events.extrachill.com, wire.extrachill.com | Proprietary vendor plugin with no public zip. |
+| `redis-cache` | network | Requires a Redis server the disposable runtime does not run. Its activation hook (which the rig now fires for real) installs the `object-cache.php` drop-in; with no Redis reachable, every persistent option read fails through to defaults and the boot breaks. Production runs Redis; the sandbox documents the exclusion instead of pretending. |
 
 Force-include one with `extrachill_include_excluded_components` +
 `extrachill_component_source_overrides` if you have a private/local source for

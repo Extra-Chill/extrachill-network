@@ -1,6 +1,5 @@
 {
   "$comment": "Component and activation-matrix data read read-only from production on 2026-09-23 via `wp plugin list --status=active-network --fields=name,file,version --format=json` and `wp --url=<site> plugin list --status=active --fields=name,file,version --format=json` for all 11 sites (see network-topology.json). `scope: \"network\"` means network-activated in production; an array of domains means activated on exactly those sites in production. Every plugin defaults to its owning repository's latest GitHub Release asset (`https://github.com/<repo>/releases/latest/download/<asset>`) or, for WordPress.org-hosted third-party plugins, `https://downloads.wordpress.org/plugin/<wporgSlug>.zip`. `homeboy rig up` never activates a plugin through wp-codebox's own extra_plugins activation (which can only pick network-wide vs the single current blog) -- run.mjs mounts every plugin with activate:false and applies this exact per-site/network activation matrix itself via fixtures/network-activate.php so multi-site products land on the right sites.",
-
   "theme": {
     "slug": "extrachill",
     "repo": "Extra-Chill/extrachill",
@@ -8,109 +7,563 @@
     "settingsKey": "extrachill_theme_source",
     "note": "wp_codebox_extra_themes / inputs.extra_themes only accepts a remote https zip as of Automattic/wp-codebox#2519 (merged into wp-codebox main 2026-09-21 as v0.27.0). The wp-codebox CLI installed on this host is still v0.26.12 (packages/cli/dist not yet rebuilt past 'release: v0.26.12'), which only accepts an absolute local directory path. run.mjs auto-detects which mode to use from the value supplied in extrachill_theme_source: an https://...zip URL is passed straight through to inputs.extra_themes (forward-compatible, will start working the moment the installed CLI updates); anything else is treated as a local checkout path and mounted the way wordpress-multisite-e2e's run.mjs already does. There is no default: callers must supply extrachill_theme_source (a local checkout of Extra-Chill/extrachill, or eventually its release zip)."
   },
-
   "excludedComponents": [
-    { "slug": "wp-codebox", "scope": "network", "reason": "This rig runs the whole network inside a WP Codebox sandbox; mounting the WP Codebox WordPress companion plugin a second time inside its own disposable sandbox is out of scope and would be self-referential." },
-    { "slug": "chubes-gallery-lightbox", "scope": "network", "reason": "chubes4/chubes-gallery-lightbox has no GitHub Releases and is not listed on WordPress.org, so there is no zip to source by default. A local override can be added the same way extrachill_theme_source works once this is needed." },
-    { "slug": "wp-coding-agents-integration", "scope": ["extrachill.com"], "reason": "Agent-runtime development tooling (wp-coding-agents bridge), not network product code the deploy gate is meant to verify." },
-    { "slug": "intelligence", "scope": ["studio.extrachill.com"], "reason": "Private repository with no public source, per NETWORK-ARCHITECTURE.MD ('the installed repository is not publicly linkable'). Requires a local override to include in a run." },
-    { "slug": "mediavine-control-panel", "scope": ["extrachill.com", "events.extrachill.com", "wire.extrachill.com"], "reason": "Proprietary vendor plugin Mediavine distributes directly to publisher accounts; there is no public zip to source." }
+    {
+      "slug": "wp-codebox",
+      "scope": "network",
+      "reason": "This rig runs the whole network inside a WP Codebox sandbox; mounting the WP Codebox WordPress companion plugin a second time inside its own disposable sandbox is out of scope and would be self-referential."
+    },
+    {
+      "slug": "chubes-gallery-lightbox",
+      "scope": "network",
+      "reason": "chubes4/chubes-gallery-lightbox has no GitHub Releases and is not listed on WordPress.org, so there is no zip to source by default. A local override can be added the same way extrachill_theme_source works once this is needed."
+    },
+    {
+      "slug": "wp-coding-agents-integration",
+      "scope": [
+        "extrachill.com"
+      ],
+      "reason": "Agent-runtime development tooling (wp-coding-agents bridge), not network product code the deploy gate is meant to verify."
+    },
+    {
+      "slug": "intelligence",
+      "scope": [
+        "studio.extrachill.com"
+      ],
+      "reason": "Private repository with no public source, per NETWORK-ARCHITECTURE.MD ('the installed repository is not publicly linkable'). Requires a local override to include in a run."
+    },
+    {
+      "slug": "mediavine-control-panel",
+      "scope": [
+        "extrachill.com",
+        "events.extrachill.com",
+        "wire.extrachill.com"
+      ],
+      "reason": "Proprietary vendor plugin Mediavine distributes directly to publisher accounts; there is no public zip to source."
+    },
+    {
+      "slug": "redis-cache",
+      "scope": "network",
+      "reason": "Requires a Redis server the disposable runtime does not run. Its activation hook (which the rig now fires for real) installs the object-cache.php drop-in; with no Redis reachable, every persistent option/site-option read fails through to defaults and the boot breaks (all network plugins read as inactive). Production runs Redis; the sandbox documents the exclusion instead of pretending."
+    }
   ],
-
   "plugins": [
-    { "slug": "extrachill-network", "repo": "Extra-Chill/extrachill-network", "asset": "extrachill-network.zip", "source": "github",
-      "activations": [{ "pluginFile": "extrachill-network/extrachill-network.php", "scope": "network" }] },
-    { "slug": "extrachill-analytics", "repo": "Extra-Chill/extrachill-analytics", "asset": "extrachill-analytics.zip", "source": "github",
-      "activations": [{ "pluginFile": "extrachill-analytics/extrachill-analytics.php", "scope": "network" }] },
-    { "slug": "extrachill-api", "repo": "Extra-Chill/extrachill-api", "asset": "extrachill-api.zip", "source": "github",
-      "activations": [{ "pluginFile": "extrachill-api/extrachill-api.php", "scope": "network" }] },
-    { "slug": "extrachill-cache", "repo": "Extra-Chill/extrachill-cache", "asset": "extrachill-cache.zip", "source": "github",
-      "activations": [{ "pluginFile": "extrachill-cache/extrachill-cache.php", "scope": "network" }] },
-    { "slug": "extrachill-cli", "repo": "Extra-Chill/extrachill-cli", "asset": "extrachill-cli.zip", "source": "github",
-      "activations": [{ "pluginFile": "extrachill-cli/extrachill-cli.php", "scope": "network" }] },
-    { "slug": "extrachill-link-pages", "repo": "Extra-Chill/extrachill-link-pages", "asset": "extrachill-link-pages.zip", "source": "github",
-      "activations": [{ "pluginFile": "extrachill-link-pages/extrachill-link-pages.php", "scope": "network" }] },
-    { "slug": "extrachill-newsletter", "repo": "Extra-Chill/extrachill-newsletter", "asset": "extrachill-newsletter.zip", "source": "github",
-      "activations": [{ "pluginFile": "extrachill-newsletter/extrachill-newsletter.php", "scope": "network" }] },
-    { "slug": "extrachill-search", "repo": "Extra-Chill/extrachill-search", "asset": "extrachill-search.zip", "source": "github",
-      "activations": [{ "pluginFile": "extrachill-search/extrachill-search.php", "scope": "network" }] },
-    { "slug": "extrachill-seo", "repo": "Extra-Chill/extrachill-seo", "asset": "extrachill-seo.zip", "source": "github",
-      "activations": [{ "pluginFile": "extrachill-seo/extrachill-seo.php", "scope": "network" }] },
-    { "slug": "extrachill-users", "repo": "Extra-Chill/extrachill-users", "asset": "extrachill-users.zip", "source": "github",
-      "activations": [{ "pluginFile": "extrachill-users/extrachill-users.php", "scope": "network" }] },
-    { "slug": "extrachill-events", "repo": "Extra-Chill/extrachill-events", "asset": "extrachill-events.zip", "source": "github",
+    {
+      "slug": "extrachill-network",
+      "repo": "Extra-Chill/extrachill-network",
+      "asset": "extrachill-network.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "extrachill-network/extrachill-network.php",
+          "scope": "network"
+        }
+      ]
+    },
+    {
+      "slug": "extrachill-analytics",
+      "repo": "Extra-Chill/extrachill-analytics",
+      "asset": "extrachill-analytics.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "extrachill-analytics/extrachill-analytics.php",
+          "scope": "network"
+        }
+      ]
+    },
+    {
+      "slug": "extrachill-api",
+      "repo": "Extra-Chill/extrachill-api",
+      "asset": "extrachill-api.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "extrachill-api/extrachill-api.php",
+          "scope": "network"
+        }
+      ]
+    },
+    {
+      "slug": "extrachill-cache",
+      "repo": "Extra-Chill/extrachill-cache",
+      "asset": "extrachill-cache.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "extrachill-cache/extrachill-cache.php",
+          "scope": "network"
+        }
+      ]
+    },
+    {
+      "slug": "extrachill-cli",
+      "repo": "Extra-Chill/extrachill-cli",
+      "asset": "extrachill-cli.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "extrachill-cli/extrachill-cli.php",
+          "scope": "network"
+        }
+      ]
+    },
+    {
+      "slug": "extrachill-link-pages",
+      "repo": "Extra-Chill/extrachill-link-pages",
+      "asset": "extrachill-link-pages.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "extrachill-link-pages/extrachill-link-pages.php",
+          "scope": "network"
+        }
+      ]
+    },
+    {
+      "slug": "extrachill-newsletter",
+      "repo": "Extra-Chill/extrachill-newsletter",
+      "asset": "extrachill-newsletter.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "extrachill-newsletter/extrachill-newsletter.php",
+          "scope": "network"
+        }
+      ]
+    },
+    {
+      "slug": "extrachill-search",
+      "repo": "Extra-Chill/extrachill-search",
+      "asset": "extrachill-search.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "extrachill-search/extrachill-search.php",
+          "scope": "network"
+        }
+      ]
+    },
+    {
+      "slug": "extrachill-seo",
+      "repo": "Extra-Chill/extrachill-seo",
+      "asset": "extrachill-seo.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "extrachill-seo/extrachill-seo.php",
+          "scope": "network"
+        }
+      ]
+    },
+    {
+      "slug": "extrachill-users",
+      "repo": "Extra-Chill/extrachill-users",
+      "asset": "extrachill-users.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "extrachill-users/extrachill-users.php",
+          "scope": "network"
+        }
+      ]
+    },
+    {
+      "slug": "extrachill-events",
+      "repo": "Extra-Chill/extrachill-events",
+      "asset": "extrachill-events.zip",
+      "source": "github",
       "note": "One mounted zip ships two plugin files: the events-site plugin and the network-wide 'Extra Chill Events Network Blocks' adapter (see NETWORK-ARCHITECTURE.MD Adapters section). Both activations mount from this single component entry.",
       "activations": [
-        { "pluginFile": "extrachill-events/extrachill-events.php", "scope": ["events.extrachill.com"] },
-        { "pluginFile": "extrachill-events/extrachill-events-network-blocks.php", "scope": "network" }
-      ] },
-    { "slug": "data-machine", "repo": "Extra-Chill/data-machine", "asset": "data-machine.zip", "source": "github",
-      "activations": [{ "pluginFile": "data-machine/data-machine.php", "scope": "network" }] },
-    { "slug": "data-machine-business", "repo": "Extra-Chill/data-machine-business", "asset": "data-machine-business.zip", "source": "github",
-      "activations": [{ "pluginFile": "data-machine-business/data-machine-business.php", "scope": "network" }] },
-    { "slug": "ai-provider-for-anthropic", "repo": "wp.org", "wporgSlug": "ai-provider-for-anthropic", "source": "wporg",
-      "activations": [{ "pluginFile": "ai-provider-for-anthropic/plugin.php", "scope": "network" }] },
-    { "slug": "ai-provider-for-openai", "repo": "wp.org", "wporgSlug": "ai-provider-for-openai", "source": "wporg",
-      "activations": [{ "pluginFile": "ai-provider-for-openai/plugin.php", "scope": "network" }] },
-    { "slug": "easy-wp-smtp", "repo": "wp.org", "wporgSlug": "easy-wp-smtp", "source": "wporg",
-      "activations": [{ "pluginFile": "easy-wp-smtp/easy-wp-smtp.php", "scope": "network" }] },
-    { "slug": "gutenberg", "repo": "wp.org", "wporgSlug": "gutenberg", "source": "wporg",
-      "activations": [{ "pluginFile": "gutenberg/gutenberg.php", "scope": "network" }] },
-    { "slug": "html-to-blocks-converter", "repo": "chubes4/html-to-blocks-converter", "asset": "html-to-blocks-converter.zip", "source": "github",
-      "activations": [{ "pluginFile": "html-to-blocks-converter/html-to-blocks-converter.php", "scope": "network" }] },
-    { "slug": "imagify", "repo": "wp.org", "wporgSlug": "imagify", "source": "wporg",
-      "activations": [{ "pluginFile": "imagify/imagify.php", "scope": "network" }] },
-    { "slug": "redis-cache", "repo": "wp.org", "wporgSlug": "redis-cache", "source": "wporg",
-      "activations": [{ "pluginFile": "redis-cache/redis-cache.php", "scope": "network" }] },
-    { "slug": "two-factor", "repo": "wp.org", "wporgSlug": "two-factor", "source": "wporg",
-      "activations": [{ "pluginFile": "two-factor/two-factor.php", "scope": "network" }] },
-    { "slug": "wp-native-auth", "repo": "chubes4/wp-native", "asset": "wp-native-auth.zip", "source": "github",
+        {
+          "pluginFile": "extrachill-events/extrachill-events.php",
+          "scope": [
+            "events.extrachill.com"
+          ]
+        },
+        {
+          "pluginFile": "extrachill-events/extrachill-events-network-blocks.php",
+          "scope": "network"
+        }
+      ]
+    },
+    {
+      "slug": "data-machine",
+      "repo": "Extra-Chill/data-machine",
+      "asset": "data-machine.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "data-machine/data-machine.php",
+          "scope": "network"
+        }
+      ]
+    },
+    {
+      "slug": "data-machine-business",
+      "repo": "Extra-Chill/data-machine-business",
+      "asset": "data-machine-business.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "data-machine-business/data-machine-business.php",
+          "scope": "network"
+        }
+      ]
+    },
+    {
+      "slug": "ai-provider-for-anthropic",
+      "repo": "wp.org",
+      "wporgSlug": "ai-provider-for-anthropic",
+      "source": "wporg",
+      "activations": [
+        {
+          "pluginFile": "ai-provider-for-anthropic/plugin.php",
+          "scope": "network"
+        }
+      ]
+    },
+    {
+      "slug": "ai-provider-for-openai",
+      "repo": "wp.org",
+      "wporgSlug": "ai-provider-for-openai",
+      "source": "wporg",
+      "activations": [
+        {
+          "pluginFile": "ai-provider-for-openai/plugin.php",
+          "scope": "network"
+        }
+      ]
+    },
+    {
+      "slug": "easy-wp-smtp",
+      "repo": "wp.org",
+      "wporgSlug": "easy-wp-smtp",
+      "source": "wporg",
+      "activations": [
+        {
+          "pluginFile": "easy-wp-smtp/easy-wp-smtp.php",
+          "scope": "network"
+        }
+      ]
+    },
+    {
+      "slug": "gutenberg",
+      "repo": "wp.org",
+      "wporgSlug": "gutenberg",
+      "source": "wporg",
+      "activations": [
+        {
+          "pluginFile": "gutenberg/gutenberg.php",
+          "scope": "network"
+        }
+      ]
+    },
+    {
+      "slug": "html-to-blocks-converter",
+      "repo": "chubes4/html-to-blocks-converter",
+      "asset": "html-to-blocks-converter.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "html-to-blocks-converter/html-to-blocks-converter.php",
+          "scope": "network"
+        }
+      ]
+    },
+    {
+      "slug": "imagify",
+      "repo": "wp.org",
+      "wporgSlug": "imagify",
+      "source": "wporg",
+      "activations": [
+        {
+          "pluginFile": "imagify/imagify.php",
+          "scope": "network"
+        }
+      ]
+    },
+    {
+      "slug": "two-factor",
+      "repo": "wp.org",
+      "wporgSlug": "two-factor",
+      "source": "wporg",
+      "activations": [
+        {
+          "pluginFile": "two-factor/two-factor.php",
+          "scope": "network"
+        }
+      ]
+    },
+    {
+      "slug": "wp-native-auth",
+      "repo": "chubes4/wp-native",
+      "asset": "wp-native-auth.zip",
+      "source": "github",
       "note": "chubes4/wp-native is a multi-component monorepo (wp-native-auth, wp-native-client, wp-native-shell each release independently with prefixed tags). releases/latest/download/wp-native-auth.zip only resolves correctly while a wp-native-auth-* tag happens to be the repo's overall latest release. Verified true on 2026-09-23; if another component releases after wp-native-auth, this default will 404 until wp-native-auth releases again. Use extrachill_release_set to pin an explicit wp-native-auth-* tag when that matters.",
-      "activations": [{ "pluginFile": "wp-native-auth/wp-native-auth.php", "scope": "network" }] },
-
-    { "slug": "data-machine-editor", "repo": "Extra-Chill/data-machine-editor", "asset": "data-machine-editor.zip", "source": "github",
-      "activations": [{ "pluginFile": "data-machine-editor/data-machine-editor.php", "scope": ["extrachill.com"] }] },
-    { "slug": "data-machine-socials", "repo": "Extra-Chill/data-machine-socials", "asset": "data-machine-socials.zip", "source": "github",
-      "activations": [{ "pluginFile": "data-machine-socials/data-machine-socials.php", "scope": ["extrachill.com", "wire.extrachill.com", "studio.extrachill.com"] }] },
-    { "slug": "extrachill-ai-adventure", "repo": "Extra-Chill/extrachill-ai-adventure", "asset": "extrachill-ai-adventure.zip", "source": "github",
-      "activations": [{ "pluginFile": "extrachill-ai-adventure/extrachill-ai-adventure.php", "scope": ["extrachill.com"] }] },
-    { "slug": "extrachill-blog", "repo": "Extra-Chill/extrachill-blog", "asset": "extrachill-blog.zip", "source": "github",
-      "activations": [{ "pluginFile": "extrachill-blog/extrachill-blog.php", "scope": ["extrachill.com"] }] },
-    { "slug": "extrachill-contact", "repo": "Extra-Chill/extrachill-contact", "asset": "extrachill-contact.zip", "source": "github",
-      "activations": [{ "pluginFile": "extrachill-contact/extrachill-contact.php", "scope": ["extrachill.com"] }] },
-    { "slug": "extrachill-content-blocks", "repo": "Extra-Chill/extrachill-content-blocks", "asset": "extrachill-content-blocks.zip", "source": "github",
-      "activations": [{ "pluginFile": "extrachill-content-blocks/extrachill-content-blocks.php", "scope": ["extrachill.com", "community.extrachill.com"] }] },
-    { "slug": "co-authors-plus", "repo": "wp.org", "wporgSlug": "co-authors-plus", "source": "wporg",
-      "activations": [{ "pluginFile": "co-authors-plus/co-authors-plus.php", "scope": ["extrachill.com"] }] },
-
-    { "slug": "bbpress", "repo": "wp.org", "wporgSlug": "bbpress", "source": "wporg",
-      "activations": [{ "pluginFile": "bbpress/bbpress.php", "scope": ["community.extrachill.com"] }] },
-    { "slug": "blocks-everywhere", "repo": "Extra-Chill/blocks-everywhere", "asset": "blocks-everywhere.zip", "source": "github",
-      "activations": [{ "pluginFile": "blocks-everywhere/blocks-everywhere.php", "scope": ["community.extrachill.com", "studio.extrachill.com"] }] },
-    { "slug": "extrachill-community", "repo": "Extra-Chill/extrachill-community", "asset": "extrachill-community.zip", "source": "github",
-      "activations": [{ "pluginFile": "extrachill-community/extrachill-community.php", "scope": ["community.extrachill.com"] }] },
-
-    { "slug": "extrachill-shop", "repo": "Extra-Chill/extrachill-shop", "asset": "extrachill-shop.zip", "source": "github",
-      "activations": [{ "pluginFile": "extrachill-shop/extrachill-shop.php", "scope": ["shop.extrachill.com"] }] },
-    { "slug": "woocommerce", "repo": "wp.org", "wporgSlug": "woocommerce", "source": "wporg",
-      "activations": [{ "pluginFile": "woocommerce/woocommerce.php", "scope": ["shop.extrachill.com"] }] },
-
-    { "slug": "extrachill-artist-platform", "repo": "Extra-Chill/extrachill-artist-platform", "asset": "extrachill-artist-platform.zip", "source": "github",
-      "activations": [{ "pluginFile": "extrachill-artist-platform/extrachill-artist-platform.php", "scope": ["artist.extrachill.com", "extrachill.link"] }] },
-
-    { "slug": "data-machine-events", "repo": "Extra-Chill/data-machine-events", "asset": "data-machine-events.zip", "source": "github",
-      "activations": [{ "pluginFile": "data-machine-events/data-machine-events.php", "scope": ["events.extrachill.com"] }] },
-
-    { "slug": "extrachill-docs", "repo": "Extra-Chill/extrachill-docs", "asset": "extrachill-docs.zip", "source": "github",
-      "activations": [{ "pluginFile": "extrachill-docs/extrachill-docs.php", "scope": ["docs.extrachill.com"] }] },
-
-    { "slug": "extrachill-news-wire", "repo": "Extra-Chill/extrachill-news-wire", "asset": "extrachill-news-wire.zip", "source": "github",
-      "activations": [{ "pluginFile": "extrachill-news-wire/extrachill-news-wire.php", "scope": ["wire.extrachill.com"] }] },
-
-    { "slug": "extrachill-studio", "repo": "Extra-Chill/extrachill-studio", "asset": "extrachill-studio.zip", "source": "github",
-      "activations": [{ "pluginFile": "extrachill-studio/extrachill-studio.php", "scope": ["studio.extrachill.com"] }] },
-
-    { "slug": "extrachill-mcp", "repo": "Extra-Chill/extrachill-mcp", "asset": "extrachill-mcp.zip", "source": "github",
-      "activations": [{ "pluginFile": "extrachill-mcp/extrachill-mcp.php", "scope": ["auth.extrachill.com"] }] }
+      "activations": [
+        {
+          "pluginFile": "wp-native-auth/wp-native-auth.php",
+          "scope": "network"
+        }
+      ]
+    },
+    {
+      "slug": "data-machine-editor",
+      "repo": "Extra-Chill/data-machine-editor",
+      "asset": "data-machine-editor.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "data-machine-editor/data-machine-editor.php",
+          "scope": [
+            "extrachill.com"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "data-machine-socials",
+      "repo": "Extra-Chill/data-machine-socials",
+      "asset": "data-machine-socials.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "data-machine-socials/data-machine-socials.php",
+          "scope": [
+            "extrachill.com",
+            "wire.extrachill.com",
+            "studio.extrachill.com"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "extrachill-ai-adventure",
+      "repo": "Extra-Chill/extrachill-ai-adventure",
+      "asset": "extrachill-ai-adventure.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "extrachill-ai-adventure/extrachill-ai-adventure.php",
+          "scope": [
+            "extrachill.com"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "extrachill-blog",
+      "repo": "Extra-Chill/extrachill-blog",
+      "asset": "extrachill-blog.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "extrachill-blog/extrachill-blog.php",
+          "scope": [
+            "extrachill.com"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "extrachill-contact",
+      "repo": "Extra-Chill/extrachill-contact",
+      "asset": "extrachill-contact.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "extrachill-contact/extrachill-contact.php",
+          "scope": [
+            "extrachill.com"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "extrachill-content-blocks",
+      "repo": "Extra-Chill/extrachill-content-blocks",
+      "asset": "extrachill-content-blocks.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "extrachill-content-blocks/extrachill-content-blocks.php",
+          "scope": [
+            "extrachill.com",
+            "community.extrachill.com"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "co-authors-plus",
+      "repo": "wp.org",
+      "wporgSlug": "co-authors-plus",
+      "source": "wporg",
+      "activations": [
+        {
+          "pluginFile": "co-authors-plus/co-authors-plus.php",
+          "scope": [
+            "extrachill.com"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "bbpress",
+      "repo": "wp.org",
+      "wporgSlug": "bbpress",
+      "source": "wporg",
+      "activations": [
+        {
+          "pluginFile": "bbpress/bbpress.php",
+          "scope": [
+            "community.extrachill.com"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "blocks-everywhere",
+      "repo": "Extra-Chill/blocks-everywhere",
+      "asset": "blocks-everywhere.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "blocks-everywhere/blocks-everywhere.php",
+          "scope": [
+            "community.extrachill.com",
+            "studio.extrachill.com"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "extrachill-community",
+      "repo": "Extra-Chill/extrachill-community",
+      "asset": "extrachill-community.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "extrachill-community/extrachill-community.php",
+          "scope": [
+            "community.extrachill.com"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "extrachill-shop",
+      "repo": "Extra-Chill/extrachill-shop",
+      "asset": "extrachill-shop.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "extrachill-shop/extrachill-shop.php",
+          "scope": [
+            "shop.extrachill.com"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "woocommerce",
+      "repo": "wp.org",
+      "wporgSlug": "woocommerce",
+      "source": "wporg",
+      "activations": [
+        {
+          "pluginFile": "woocommerce/woocommerce.php",
+          "scope": [
+            "shop.extrachill.com"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "extrachill-artist-platform",
+      "repo": "Extra-Chill/extrachill-artist-platform",
+      "asset": "extrachill-artist-platform.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "extrachill-artist-platform/extrachill-artist-platform.php",
+          "scope": [
+            "artist.extrachill.com",
+            "extrachill.link"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "data-machine-events",
+      "repo": "Extra-Chill/data-machine-events",
+      "asset": "data-machine-events.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "data-machine-events/data-machine-events.php",
+          "scope": [
+            "events.extrachill.com"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "extrachill-docs",
+      "repo": "Extra-Chill/extrachill-docs",
+      "asset": "extrachill-docs.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "extrachill-docs/extrachill-docs.php",
+          "scope": [
+            "docs.extrachill.com"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "extrachill-news-wire",
+      "repo": "Extra-Chill/extrachill-news-wire",
+      "asset": "extrachill-news-wire.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "extrachill-news-wire/extrachill-news-wire.php",
+          "scope": [
+            "wire.extrachill.com"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "extrachill-studio",
+      "repo": "Extra-Chill/extrachill-studio",
+      "asset": "extrachill-studio.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "extrachill-studio/extrachill-studio.php",
+          "scope": [
+            "studio.extrachill.com"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "extrachill-mcp",
+      "repo": "Extra-Chill/extrachill-mcp",
+      "asset": "extrachill-mcp.zip",
+      "source": "github",
+      "activations": [
+        {
+          "pluginFile": "extrachill-mcp/extrachill-mcp.php",
+          "scope": [
+            "auth.extrachill.com"
+          ]
+        }
+      ]
+    }
   ]
 }
