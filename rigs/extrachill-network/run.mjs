@@ -522,7 +522,7 @@ if (!is_array($matrix)) {
  * already satisfied each pass, and progress strictly increases until either
  * everything activates or a real, non-ordering failure remains.
  */
-function extrachill_network_activate_with_retries($plugin_files, $network_wide) {
+function extrachill_network_activate_with_retries($plugin_files, $network_wide, &$evidence_errors) {
     $pending = array_values(array_unique($plugin_files));
     $last_errors = array();
     while (count($pending) > 0) {
@@ -540,9 +540,11 @@ function extrachill_network_activate_with_retries($plugin_files, $network_wide) 
             $result = activate_plugin($plugin_file, '', $network_wide, false);
             if (is_wp_error($result)) {
                 $last_errors[$plugin_file] = $result->get_error_message();
+                $evidence_errors[$plugin_file] = $result->get_error_code() . ': ' . $result->get_error_message();
                 $still_pending[] = $plugin_file;
                 continue;
             }
+            $evidence_errors[$plugin_file] = 'ok (hook fired: ' . (did_action('activate_' . $plugin_file) > 0 ? 'yes' : 'NO') . ')';
             $activated_this_pass++;
         }
         if ($activated_this_pass === 0) {
@@ -556,7 +558,8 @@ function extrachill_network_activate_with_retries($plugin_files, $network_wide) 
     }
 }
 
-extrachill_network_activate_with_retries($matrix['network'], true);
+$activation_errors = array();
+extrachill_network_activate_with_retries($matrix['network'], true, $activation_errors);
 $expected_network = array_values(array_unique($matrix['network']));
 $still_missing_network = array_values(array_diff($expected_network, array_keys(get_site_option('active_sitewide_plugins', array()))));
 
@@ -594,7 +597,7 @@ foreach (get_sites(array('number' => 0)) as $site) {
         }
         $plugin_files = $matrix['perDomain'][$site->domain] ?? array();
         try {
-            extrachill_network_activate_with_retries($plugin_files, false);
+            extrachill_network_activate_with_retries($plugin_files, false, $activation_errors);
         } catch (RuntimeException $e) {
             throw new RuntimeException($site->domain . ': ' . $e->getMessage());
         }
@@ -602,7 +605,8 @@ foreach (get_sites(array('number' => 0)) as $site) {
         restore_current_blog();
     }
 }
-echo wp_json_encode(array('activated' => true, 'selfDeactivatedNetwork' => $self_deactivated_network));`;
+update_site_option('ec_rig_activation_report', array('errors' => $activation_errors, 'selfDeactivatedNetwork' => $self_deactivated_network, 'finalNetworkActive' => array_keys(get_site_option('active_sitewide_plugins', array()))), false);
+echo wp_json_encode(array('activated' => true, 'selfDeactivatedNetwork' => $self_deactivated_network, 'activationErrors' => $activation_errors));`;
   return { command: 'wordpress.run-php', args: [`code=${code}`], metadata: { kind: 'extrachill-network-activation' } };
 }
 
@@ -623,6 +627,10 @@ if (!is_array($self_deactivated)) {
     $self_deactivated = array();
 }
 $report['environmentDeactivated'] = array('network' => array_values($self_deactivated), 'note' => 'Plugins whose own activation hook deactivated them again because a backing service the sandbox lacks is required; hooks fired, plugin re-marked active without hooks for code-path parity.');
+$activation_report = get_site_option('ec_rig_activation_report', array());
+if (is_array($activation_report)) {
+    $report['activationDiagnostics'] = $activation_report;
+}
 $active_network = array_keys(get_site_option('active_sitewide_plugins', array()));
 sort($active_network);
 $expected_network = $expected['network'];
