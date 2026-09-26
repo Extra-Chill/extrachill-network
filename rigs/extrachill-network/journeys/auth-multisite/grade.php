@@ -259,6 +259,22 @@ ec_rig_auth_multisite_case(
 	'A moderated (banned) user cannot obtain a session, even with correct credentials.',
 	array( 'status' => $blocked_login->get_status() )
 );
+if ( ! empty( $fixture['moderation_email_crash'] ) ) {
+	// A real product defect discovered live by this journey (see
+	// evidence/FINDINGS.md): extrachill_users_send_moderation_email() calls
+	// empty( $result['success'] ) on ec_send_email_queued()'s return value
+	// without an is_wp_error() guard first, so a WP_Error response fatals
+	// instead of failing softly. The moderation STATE this journey depends
+	// on is written before the crashed email step, so the case above still
+	// grades correctly; this is a separate, explicit finding about the
+	// email path, not something the seed step silently worked around.
+	ec_rig_auth_multisite_case(
+		'moderation-email-does-not-crash-on-a-queue-error',
+		false,
+		'A moderator applying a ban should never trigger an uncaught fatal error just because the notification email could not be queued.',
+		array( 'crash' => $fixture['moderation_email_crash'] )
+	);
+}
 
 $anonymous_me      = ec_rig_auth_multisite_rest( '/extrachill/v1/auth/me', array(), 0, 'GET' );
 $anonymous_logout  = ec_rig_auth_multisite_rest( '/extrachill/v1/auth/logout', array( 'device_id' => '00000000-0000-4000-8000-000000000256' ) );

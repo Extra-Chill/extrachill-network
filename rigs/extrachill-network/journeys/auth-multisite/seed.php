@@ -241,35 +241,58 @@ add_user_to_blog( $community_blog_id, $blocked_id, 'subscriber' );
 add_user_to_blog( $community_blog_id, $onboarding_id, 'subscriber' );
 add_user_to_blog( $community_blog_id, $victim_id, 'subscriber' );
 
-$moderated = function_exists( 'extrachill_users_apply_moderation_action' )
-	? extrachill_users_apply_moderation_action(
-		$blocked_id,
-		array(
-			'state'      => 'banned',
-			'reason_key' => 'other',
-			'source'     => 'auth-multisite-journey',
-		)
-	)
-	: new WP_Error( 'missing_moderation_function', 'extrachill_users_apply_moderation_action is unavailable.' );
-if ( is_wp_error( $moderated ) || ! function_exists( 'extrachill_users_is_blocked' ) || ! extrachill_users_is_blocked( $blocked_id ) ) {
-	throw new RuntimeException( 'Could not establish the moderated auth persona.' );
+/*
+ * extrachill_users_apply_moderation_action() persists the moderation
+ * state (update_user_meta) BEFORE it attempts the effect's own
+ * send_email step, so a real product defect discovered live by this
+ * journey -- extrachill_users_send_moderation_email() calls
+ * empty( $result['success'] ) without an is_wp_error( $result ) guard,
+ * fataling with "Cannot use object of type WP_Error as array" whenever
+ * ec_send_email_queued() (a wrapper over the datamachine/send-email-queued
+ * ability) returns a WP_Error in this fresh sandbox -- happens AFTER the
+ * moderation state this journey actually depends on is already durable.
+ * Caught here so the journey's own real assertions (extrachill_users_is_blocked())
+ * still hold; the underlying missing-guard bug is filed upstream (see
+ * evidence/FINDINGS.md), not papered over.
+ */
+$moderation_email_crash = null;
+if ( function_exists( 'extrachill_users_apply_moderation_action' ) ) {
+	try {
+		$moderated = extrachill_users_apply_moderation_action(
+			$blocked_id,
+			array(
+				'state'      => 'banned',
+				'reason_key' => 'other',
+				'source'     => 'auth-multisite-journey',
+			)
+		);
+	} catch ( \Throwable $throwable ) {
+		$moderated              = null;
+		$moderation_email_crash = $throwable->getMessage();
+	}
+} else {
+	$moderated = new WP_Error( 'missing_moderation_function', 'extrachill_users_apply_moderation_action is unavailable.' );
+}
+if ( ( null !== $moderated && is_wp_error( $moderated ) ) || ! function_exists( 'extrachill_users_is_blocked' ) || ! extrachill_users_is_blocked( $blocked_id ) ) {
+	throw new RuntimeException( esc_html( 'Could not establish the moderated auth persona.' . ( $moderation_email_crash ? ' (moderation email crashed: ' . $moderation_email_crash . ')' : '' ) ) );
 }
 update_user_meta( $onboarding_id, 'onboarding_completed', '0' );
 
 $fixture = array(
-	'schema'             => 'extrachill-network/journey-fixture/auth-multisite/v1',
-	'community_blog_id'  => $community_blog_id,
-	'artist_blog_id'     => $artist_blog_id,
-	'events_blog_id'     => $events_blog_id,
-	'existing_user_id'   => $user_id,
-	'nonmember_user_id'  => $nonmember_id,
-	'blocked_user_id'    => $blocked_id,
-	'onboarding_user_id' => $onboarding_id,
-	'victim_user_id'     => $victim_id,
-	'initial_user_count' => count( get_users( array(
+	'schema'                 => 'extrachill-network/journey-fixture/auth-multisite/v1',
+	'community_blog_id'      => $community_blog_id,
+	'artist_blog_id'         => $artist_blog_id,
+	'events_blog_id'         => $events_blog_id,
+	'existing_user_id'       => $user_id,
+	'nonmember_user_id'      => $nonmember_id,
+	'blocked_user_id'        => $blocked_id,
+	'onboarding_user_id'     => $onboarding_id,
+	'victim_user_id'         => $victim_id,
+	'initial_user_count'     => count( get_users( array(
 		'blog_id' => 0,
 		'fields'  => 'ID',
 	) ) ),
+	'moderation_email_crash' => $moderation_email_crash,
 );
 update_site_option( 'ec_rig_auth_multisite_fixture', $fixture );
 
