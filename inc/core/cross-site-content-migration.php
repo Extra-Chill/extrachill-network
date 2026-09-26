@@ -60,6 +60,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  *     @type int    $attachments_migrated Count actually created on dest (0 on dry-run).
  *     @type array  $missing_files    Attachments whose underlying file was missing on disk.
  *     @type int    $featured_image_id New featured image ID on dest (0 if none / dry-run).
+ *     @type array  $unrewritten_urls  Source upload URLs still present in the
+ *                                     stored dest content (empty when the
+ *                                     URL rewrite fully landed).
+ *     @type bool   $source_delete_blocked  True when `delete_source` was
+ *                                     requested but REFUSED because the
+ *                                     dest content still references the
+ *                                     source upload path.
  *     @type bool   $source_deleted   Whether the source was deleted.
  * }
  */
@@ -122,21 +129,23 @@ function ec_migrate_post( int $source_blog_id, int $post_id, int $dest_blog_id, 
 	// ---------------------------------------------------------------------
 	if ( $dry_run ) {
 		return array(
-			'dry_run'              => true,
-			'source_blog_id'       => $source_blog_id,
-			'source_post_id'       => $post_id,
-			'dest_blog_id'         => $dest_blog_id,
-			'dest_post_id'         => 0,
-			'dest_status'          => $dest_status,
-			'attachment_map'       => array(),
-			'url_map'              => array(),
-			'attachments_total'    => count( $attachments ),
-			'attachments_migrated' => 0,
-			'missing_files'        => array_values( $missing_files ),
-			'featured_image_id'    => 0,
-			'source_deleted'       => false,
-			'would_delete_source'  => $delete_source,
-			'source_title'         => $source_post['post_title'],
+			'dry_run'               => true,
+			'source_blog_id'        => $source_blog_id,
+			'source_post_id'        => $post_id,
+			'dest_blog_id'          => $dest_blog_id,
+			'dest_post_id'          => 0,
+			'dest_status'           => $dest_status,
+			'attachment_map'        => array(),
+			'url_map'               => array(),
+			'attachments_total'     => count( $attachments ),
+			'attachments_migrated'  => 0,
+			'missing_files'         => array_values( $missing_files ),
+			'featured_image_id'     => 0,
+			'unrewritten_urls'      => array(),
+			'source_delete_blocked' => false,
+			'source_deleted'        => false,
+			'would_delete_source'   => $delete_source,
+			'source_title'          => $source_post['post_title'],
 		);
 	}
 
@@ -202,30 +211,56 @@ function ec_migrate_post( int $source_blog_id, int $post_id, int $dest_blog_id, 
 	$dest_post_id = (int) $create;
 
 	// ---------------------------------------------------------------------
-	// 4/6. Only delete the source if explicitly requested AND we verified a
-	// successful migration (dest post exists). Never on dry-run/partial.
+	// 5. Verify the STORED dest content no longer references the source
+	// upload path. Any leftover URL means the rewrite missed — the dest post
+	// would silently point at the source blog's media (issue #286). Leftover
+	// URLs are reported and BLOCK --delete-source so the source files are
+	// never destroyed while dest still depends on them.
 	// ---------------------------------------------------------------------
-	$source_deleted = false;
+	$unrewritten_urls = array();
+	switch_to_blog( $dest_blog_id );
+	try {
+		$stored = get_post( $dest_post_id );
+		if ( $stored ) {
+			$unrewritten_urls = ec_migrate_find_source_upload_urls( (string) $stored->post_content, $source_baseurl );
+		}
+	} finally {
+		restore_current_blog();
+	}
+
+	// ---------------------------------------------------------------------
+	// 6. Only delete the source if explicitly requested AND we verified a
+	// successful migration (dest post exists, no leftover source upload
+	// URLs). Never on dry-run/partial.
+	// ---------------------------------------------------------------------
+	$source_deleted        = false;
+	$source_delete_blocked = false;
 	if ( $delete_source && $dest_post_id > 0 ) {
-		$deleted        = ec_migrate_delete_source( $source_blog_id, $post_id, array_keys( $attachments ) );
-		$source_deleted = ! is_wp_error( $deleted ) && $deleted;
+		if ( ! empty( $unrewritten_urls ) ) {
+			$source_delete_blocked = true;
+		} else {
+			$deleted        = ec_migrate_delete_source( $source_blog_id, $post_id, array_keys( $attachments ) );
+			$source_deleted = ! is_wp_error( $deleted ) && $deleted;
+		}
 	}
 
 	return array(
-		'dry_run'              => false,
-		'source_blog_id'       => $source_blog_id,
-		'source_post_id'       => $post_id,
-		'dest_blog_id'         => $dest_blog_id,
-		'dest_post_id'         => $dest_post_id,
-		'dest_status'          => $dest_status,
-		'attachment_map'       => $attachment_map,
-		'url_map'              => $url_map,
-		'attachments_total'    => count( $attachments ),
-		'attachments_migrated' => count( $new_attachments ),
-		'missing_files'        => array_values( $missing_files ),
-		'featured_image_id'    => $featured_dest_id,
-		'source_deleted'       => $source_deleted,
-		'source_title'         => $source_post['post_title'],
+		'dry_run'               => false,
+		'source_blog_id'        => $source_blog_id,
+		'source_post_id'        => $post_id,
+		'dest_blog_id'          => $dest_blog_id,
+		'dest_post_id'          => $dest_post_id,
+		'dest_status'           => $dest_status,
+		'attachment_map'        => $attachment_map,
+		'url_map'               => $url_map,
+		'attachments_total'     => count( $attachments ),
+		'attachments_migrated'  => count( $new_attachments ),
+		'missing_files'         => array_values( $missing_files ),
+		'featured_image_id'     => $featured_dest_id,
+		'unrewritten_urls'      => $unrewritten_urls,
+		'source_delete_blocked' => $source_delete_blocked,
+		'source_deleted'        => $source_deleted,
+		'source_title'          => $source_post['post_title'],
 	);
 }
 
@@ -574,6 +609,14 @@ function ec_migrate_copy_attachments( array $attachments, int $dest_blog_id ) {
  * on a subsite, or `https://extrachill.com/wp-content/uploads` on the main
  * (non-subdir) site. Returns '' if the baseurl can't be resolved.
  *
+ * The host is canonicalized to the blog's own home host: wp_get_upload_dir()
+ * builds its URL from the WP_CONTENT_URL constant, stamped once at bootstrap
+ * from the request host, so under WP-CLI with `--url=<other site>` the
+ * switch_to_blog()-correct `/sites/<n>/` path arrives on the wrong host.
+ * home_url() reads the per-blog `home` option and is always host-correct.
+ * A blog that deliberately serves uploads from a custom host (a non-empty
+ * `upload_url_path` option) is left untouched.
+ *
  * @param int $blog_id Blog ID.
  * @return string Upload baseurl with no trailing slash, or '' on failure.
  */
@@ -582,6 +625,22 @@ function ec_migrate_get_upload_baseurl( int $blog_id ): string {
 	try {
 		$uploads = wp_get_upload_dir();
 		$baseurl = isset( $uploads['baseurl'] ) ? (string) $uploads['baseurl'] : '';
+		$baseurl = untrailingslashit( $baseurl );
+
+		$custom_url_path = trim( (string) get_option( 'upload_url_path' ) );
+		$base_path       = (string) wp_parse_url( $baseurl, PHP_URL_PATH );
+		$base_host       = (string) wp_parse_url( $baseurl, PHP_URL_HOST );
+		$home            = home_url();
+		$home_host       = (string) wp_parse_url( $home, PHP_URL_HOST );
+		$home_port       = wp_parse_url( $home, PHP_URL_PORT );
+
+		if ( '' === $custom_url_path && '' !== $base_path && '' !== $base_host && '' !== $home_host
+			&& 0 !== strcasecmp( $base_host, $home_host ) ) {
+			$scheme  = (string) wp_parse_url( $baseurl, PHP_URL_SCHEME );
+			$scheme  = '' !== $scheme ? $scheme : ( is_ssl() ? 'https' : 'http' );
+			$baseurl = $scheme . '://' . $home_host . ( $home_port ? ':' . $home_port : '' ) . $base_path;
+		}
+
 		return untrailingslashit( $baseurl );
 	} finally {
 		restore_current_blog();
@@ -591,15 +650,19 @@ function ec_migrate_get_upload_baseurl( int $blog_id ): string {
 /**
  * Rewrite post content so old attachment IDs and URLs point at dest equivalents.
  *
- * Pure string function (no WP calls) — the load-bearing correctness surface,
+ * Pure string transformation (no DB access, blog switching, or file I/O) —
+ * the load-bearing correctness surface,
  * unit-tested directly. Handles:
- *   - source upload baseurl PREFIX => dest upload baseurl prefix. This is the
- *     load-bearing URL fix: it rewrites full, sized (`-1024x683.jpg`), and
- *     dedupe-suffixed (`-1.jpg`) variants uniformly in one pass, and bridges
- *     the multisite `.../uploads/sites/<n>/...` prefix that an exact-URL map
- *     can never match. Because migration copies files into the dest preserving
- *     the year/month subpath, swapping only the baseurl prefix resolves every
- *     variant to a real file on dest.
+ *   - source upload PATH => dest upload baseurl. This is the load-bearing
+ *     URL fix: it rewrites full, sized (`-1024x683.jpg`), and dedupe-suffixed
+ *     (`-1.jpg`) variants uniformly in one pass, and bridges the multisite
+ *     `.../uploads/sites/<n>/...` prefix that an exact-URL map can never
+ *     match. Host-agnostic: any scheme+host (or protocol-relative /
+ *     root-relative form) followed by the source upload path is rewritten to
+ *     the dest baseurl, so a source baseurl that resolved onto the wrong
+ *     host (WP-CLI `--url`) still matches. Because migration copies files
+ *     into the dest preserving the year/month subpath, swapping only the
+ *     baseurl prefix resolves every variant to a real file on dest.
  *   - `"id":OLD`          => `"id":NEW`   (image/media block attrs).
  *   - `"ids":[a,OLD,b]`   => remapped array (gallery block ids).
  *   - `wp-image-OLD`      => `wp-image-NEW` (inline <img> classes).
@@ -617,7 +680,9 @@ function ec_migrate_get_upload_baseurl( int $blog_id ): string {
  * @param array  $url_map        old_url => new_url.
  * @param string $source_baseurl Source blog upload baseurl (e.g.
  *                               `https://studio.extrachill.com/wp-content/uploads/sites/12`).
- *                               Empty string disables the prefix swap.
+ *                               Only its PATH drives the prefix swap; the
+ *                               host is matched agnostically. Empty string
+ *                               disables the swap.
  * @param string $dest_baseurl   Dest blog upload baseurl (e.g.
  *                               `https://extrachill.com/wp-content/uploads`).
  * @return string Rewritten content.
@@ -627,12 +692,55 @@ function ec_migrate_rewrite_post_content( string $content, array $attachment_map
 		return $content;
 	}
 
-	// 0. Prefix swap: replace the source upload baseurl prefix with the dest
-	// upload baseurl prefix. This is the primary URL fix — it rewrites full,
-	// sized, and thumbnail variants uniformly and handles the `sites/<n>/`
-	// multisite prefix that the exact-URL map below can never match.
+	// 0. Prefix swap: rewrite the source upload PATH to the dest upload
+	// baseurl. This is the primary URL fix — it rewrites full, sized, and
+	// thumbnail variants uniformly and handles the `sites/<n>/` multisite
+	// prefix that the exact-URL map below can never match.
+	//
+	// The swap is keyed on the source upload PATH, not the literal full
+	// baseurl: wp_get_upload_dir() builds URLs from the WP_CONTENT_URL
+	// constant, stamped from the bootstrap request's host, so under WP-CLI
+	// with `--url=<other site>` a subsite baseurl resolves onto the request
+	// host while stored content references the source site's own host — the
+	// literal swap matched nothing (issue #286). Matching ANY scheme+host,
+	// plus protocol-relative and root-relative forms, fixes that. Delimiter
+	// boundaries keep the match honest: the path must START a URL reference
+	// (so a foreign URL that merely ends in similar text is untouched) and
+	// the final path segment must END cleanly (so `sites/2` never matches
+	// `sites/23` or `2.jpg`), and a main-site (`/wp-content/uploads`)
+	// prefix never swallows a subsite's `/sites/<n>/` path.
 	if ( '' !== $source_baseurl && '' !== $dest_baseurl && $source_baseurl !== $dest_baseurl ) {
-		$content = str_replace( $source_baseurl, $dest_baseurl, $content );
+		$source_path = (string) wp_parse_url( $source_baseurl, PHP_URL_PATH );
+		if ( '' !== $source_path && '/' !== $source_path ) {
+			$pattern = '#'
+				. '(?:'
+				. '(?:(?:https?:)?//[a-z0-9][a-z0-9.\-]*(?::\d+)?)' // Absolute or protocol-relative host.
+				. '|'
+				. '(?<![a-z0-9._\-/:@])' // Root-relative: must start a URL reference.
+				. ')'
+				. preg_quote( $source_path, '#' )
+				. '(?!/sites/\d+(?![a-z0-9._\-]))' // Main-site prefix must not swallow /sites/<n> paths.
+				. '(?![a-z0-9._\-:@])' // Last path segment must end here (2 != 23, 2 != 2.jpg).
+				. '#i';
+
+			$swapped = preg_replace_callback(
+				$pattern,
+				static function () use ( $dest_baseurl ) {
+					return $dest_baseurl;
+				},
+				$content
+			);
+
+			// On a regex failure keep the original content; the post-migration
+			// verification reports any leftover source URLs.
+			if ( null !== $swapped ) {
+				$content = $swapped;
+			}
+		} else {
+			// Unusual upload path (or none): fall back to the historical
+			// literal full-baseurl swap.
+			$content = str_replace( $source_baseurl, $dest_baseurl, $content );
+		}
 	}
 
 	// 1. Raw URL replacement. Sort by descending length so a longer URL
@@ -708,6 +816,49 @@ function ec_migrate_rewrite_post_content( string $content, array $attachment_map
 	}
 
 	return $content;
+}
+
+/**
+ * Find URLs in content that still live under a blog's upload path.
+ *
+ * Pure string transformation (no DB access, blog switching, or file I/O).
+ * Post-migration verification uses this
+ * against the STORED dest content with the source blog's baseurl: any hit is
+ * a URL the rewrite missed, meaning the dest post still points at the source
+ * blog's media (issue #286). Uses the same URL-start rules as the rewrite
+ * swap — any scheme+host, protocol-relative, or a root-relative path that
+ * starts a URL reference — extended to capture the rest of the URL path so
+ * the report shows the full un-rewritten URL.
+ *
+ * @param string $content Content to scan.
+ * @param string $baseurl Blog upload baseurl (only its PATH drives matching).
+ * @return string[] Distinct leftover URLs (possibly empty).
+ */
+function ec_migrate_find_source_upload_urls( string $content, string $baseurl ): array {
+	if ( '' === $content || '' === $baseurl ) {
+		return array();
+	}
+
+	$path = (string) wp_parse_url( $baseurl, PHP_URL_PATH );
+	if ( '' === $path || '/' === $path ) {
+		return array();
+	}
+
+	$pattern = '#'
+		. '(?:'
+		. '(?:(?:https?:)?//[a-z0-9][a-z0-9.\-]*(?::\d+)?)' // Absolute or protocol-relative host.
+		. '|'
+		. '(?<![a-z0-9._\-/:@])' // Root-relative: must start a URL reference.
+		. ')'
+		. preg_quote( $path, '#' )
+		. '(?!/sites/\d+(?![a-z0-9._\-]))' // Main-site prefix must not swallow /sites/<n> paths.
+		. '(?![a-z0-9._\-:@])' // Last path segment must end here.
+		. '(?:/[^\s\'"<>\)\]\\\\]+)*' // Capture the remaining URL path for the report.
+		. '#i';
+
+	preg_match_all( $pattern, $content, $m );
+
+	return array_values( array_unique( array_filter( array_map( 'strval', (array) $m[0] ) ) ) );
 }
 
 /**
