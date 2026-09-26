@@ -285,11 +285,9 @@ if ( ! \ExtraChillEvents\Core\RsvpPassesTable::table_exists() ) {
 	throw new RuntimeException( 'The RSVP pass table does not exist on the events site; the rig activation step failed to fire extrachill-events\' activation hook.' );
 }
 
-if ( ! function_exists( 'extrachill_users_concert_tracking_table_name' ) ) {
-	require_once WP_PLUGIN_DIR . '/extrachill-users/inc/concert-tracking/db.php';
-}
 global $wpdb;
-$concert_table = extrachill_users_concert_tracking_table_name();
+// Mirrors extrachill_users_concert_tracking_table_name() (extrachill-users inc/concert-tracking/db.php).
+$concert_table = $wpdb->base_prefix . 'ec_concert_tracking';
 if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $concert_table ) ) !== $concert_table ) {
 	throw new RuntimeException( 'The concert-tracking table does not exist; every RSVP would silently no-op. The rig activation step failed to fire extrachill-users\' activation hook.' );
 }
@@ -387,12 +385,14 @@ update_term_meta( $venue_id, '_venue_website', 'https://lofibrewing.com' );
 // Location hierarchy matching production: US > SC > Charleston. The
 // `location` taxonomy itself is registered network-wide by extrachill-network.
 $usa        = wp_insert_term( 'United States', 'location', array( 'slug' => 'usa' ) );
-$usa_id     = is_wp_error( $usa ) ? (int) get_term_by( 'slug', 'usa', 'location' )->term_id : (int) $usa['term_id'];
+$usa_term   = get_term_by( 'slug', 'usa', 'location' );
+$usa_id     = is_wp_error( $usa ) ? ( $usa_term instanceof WP_Term ? (int) $usa_term->term_id : 0 ) : (int) $usa['term_id'];
 $sc         = wp_insert_term( 'South Carolina', 'location', array(
 	'slug'   => 'south-carolina',
 	'parent' => $usa_id,
 ) );
-$sc_id      = is_wp_error( $sc ) ? (int) get_term_by( 'slug', 'south-carolina', 'location' )->term_id : (int) $sc['term_id'];
+$sc_term    = get_term_by( 'slug', 'south-carolina', 'location' );
+$sc_id      = is_wp_error( $sc ) ? ( $sc_term instanceof WP_Term ? (int) $sc_term->term_id : 0 ) : (int) $sc['term_id'];
 $charleston = wp_insert_term( 'Charleston', 'location', array(
 	'slug'   => 'charleston',
 	'parent' => $sc_id,
@@ -445,4 +445,4 @@ update_option( 'ec_rig_journey_fixture_gardner_event_rsvp', $evidence, false );
 restore_current_blog();
 
 // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped,WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Machine-readable fixture evidence.
-printf( "EXTRACHILL_JOURNEY_FIXTURE:%s\n", base64_encode( wp_json_encode( $evidence ) ) );
+printf( "EXTRACHILL_JOURNEY_FIXTURE:%s\n", base64_encode( (string) wp_json_encode( $evidence ) ) );

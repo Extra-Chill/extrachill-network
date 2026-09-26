@@ -506,4 +506,4 @@ $result = array(
 );
 
 // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped,WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Machine-readable persona evidence.
-printf( "EXTRACHILL_JOURNEY_RESULT:%s\n", base64_encode( wp_json_encode( $result ) ) );
+printf( "EXTRACHILL_JOURNEY_RESULT:%s\n", base64_encode( (string) wp_json_encode( $result ) ) );
