@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.23.2] - 2026-09-26
+
+### Changed
+- assert the real deploy gate and its fixed bugs, not a stale marker
+
 ## [2.23.1] - 2026-09-26
 
 ### Fixed
