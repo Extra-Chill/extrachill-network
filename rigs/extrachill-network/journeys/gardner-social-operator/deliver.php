@@ -247,19 +247,17 @@ $owner_context          = array(
 		'agent_id' => 0,
 	),
 );
-$owner_input            = DelegatedCrossPostAction::normalize_input(
-	array(
-		'post_id'          => $publish_input['content_ref']['post_id'],
-		'source_url'       => $publish_input['content_ref']['source_url'],
-		'caption'          => $publish_input['content_ref']['caption'],
-		'content_hash'     => $publish_input['content_ref']['content_hash'],
-		'channels'         => $publish_input['target_policy']['channels'],
-		'media_kind'       => $publish_input['target_policy']['media_kind'],
-		'asset_refs'       => $publish_input['content_ref']['asset_refs'],
-		'attribution_post' => $publish_input['attribution_post'],
-	),
-	$owner_context
+$owner_raw_input        = array(
+	'post_id'          => $publish_input['content_ref']['post_id'],
+	'source_url'       => $publish_input['content_ref']['source_url'],
+	'caption'          => $publish_input['content_ref']['caption'],
+	'content_hash'     => $publish_input['content_ref']['content_hash'],
+	'channels'         => $publish_input['target_policy']['channels'],
+	'media_kind'       => $publish_input['target_policy']['media_kind'],
+	'asset_refs'       => $publish_input['content_ref']['asset_refs'],
+	'attribution_post' => $publish_input['attribution_post'],
 );
+$owner_input            = DelegatedCrossPostAction::normalize_input( $owner_raw_input, $owner_context );
 $owner_context['input'] = is_array( $owner_input ) ? $owner_input : array();
 $owner_policy           = is_array( $owner_input ) ? DelegatedCrossPostAction::authorize( $owner_context ) : $owner_input;
 $prepared               = is_array( $owner_input ) ? DelegatedCrossPostAction::prepare( $owner_input, $owner_context ) : $owner_input;
@@ -317,7 +315,14 @@ $raw_submit_diagnostic                        = $submit_ability
 	? $submit_ability->execute( array(
 		'action'       => DelegatedCrossPostAction::ACTION_ID,
 		'operation_id' => $publish_input['idempotency_key'],
-		'input'        => $owner_context['input'],
+		// Raw, pre-normalize_input() input -- the real ability calls
+		// normalize_input() itself internally. Passing the ALREADY
+		// normalized $owner_context['input'] here (which carries a
+		// post_site_id key normalize_input() itself adds) trips
+		// normalize_input()'s own "the canonical post site is
+		// owner-controlled" guard on re-entry -- a diagnostic-call bug,
+		// not the real submission path's behavior.
+		'input'        => $owner_raw_input,
 	) )
 	: new WP_Error( 'submit_ability_missing', 'datamachine/submit-delegated-operation is unavailable.' );
 $diagnostic['raw_submit_delegated_operation'] = is_wp_error( $raw_submit_diagnostic )
