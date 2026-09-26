@@ -1,0 +1,129 @@
+{
+  "schema": "extrachill-network/journey/v1",
+  "id": "near-me-and-my-shows",
+  "title": "Near-me geolocation resilience and My Shows anonymous registration",
+  "description": "Walks the real /near-me/ page under real granted/denied browser geolocation permission (wp-codebox's own geolocation environment, not a mocked navigator.geolocation), and walks an anonymous visitor from the real /my-shows/ marketing surface into the real cross-site registration redirect on extrachill.com. Ported from extrachill-events/tests/browser/near-me.evidence.js + near-me-fixture.html and tests/browser/my-shows-registration.evidence.js (extrachill-events#292). The near-me original mocked navigator.geolocation entirely on a static fixture page reproducing seven synthetic states (unresolved, unsupported, denied, timeout, lookup-failure, stalled, success); the my-shows original pointed at fake 'events.example'/'community.example' domains. See the journey README for what could and could not be ported for real.",
+  "origin": {
+    "repository": "Extra-Chill/extrachill-events",
+    "files": [
+      "tests/browser/near-me.evidence.js",
+      "tests/browser/near-me-fixture.html",
+      "tests/browser/my-shows-registration.evidence.js"
+    ]
+  },
+  "sites": ["events.extrachill.com", "extrachill.com"],
+  "runtimeEnv": {
+    "WP_AGENT_RUNTIME": "1"
+  },
+  "seed": { "codeFile": "seed.php", "timeoutMs": 120000 },
+  "steps": [
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "near-me-denied-permission-desktop" },
+      "args": [
+        "url=http://events.extrachill.com/near-me/",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "viewport=1280x900",
+        "permissions=geolocation",
+        "geolocation-latitude=32.7765",
+        "geolocation-longitude=-79.9311",
+        "geolocation-permission=denied",
+        "step-timeout=60s",
+        "timeout=150s",
+        "capture=steps,console,errors,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/near-me/\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\".near-me-detect\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"5000ms\"},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('.near-me-status')||{textContent:''}).textContent\"},{\"kind\":\"evaluate\",\"expression\":\"(()=>{const c=document.querySelector('.near-me-cities');return c?getComputedStyle(c).display:'missing';})()\"},{\"kind\":\"evaluate\",\"expression\":\"window.__wpCodeboxBrowserErrors?.length ?? 0\",\"assert\":0},{\"kind\":\"screenshot\",\"name\":\"near-me-denied-permission-desktop\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "near-me-denied-permission-mobile" },
+      "args": [
+        "url=http://events.extrachill.com/near-me/",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "viewport=390x844",
+        "permissions=geolocation",
+        "geolocation-latitude=32.7765",
+        "geolocation-longitude=-79.9311",
+        "geolocation-permission=denied",
+        "step-timeout=60s",
+        "timeout=150s",
+        "capture=steps,console,errors,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/near-me/\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"5000ms\"},{\"kind\":\"evaluate\",\"expression\":\"document.documentElement.scrollWidth <= document.documentElement.clientWidth + 4\",\"assert\":true},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('.near-me-status')||{textContent:''}).textContent\"},{\"kind\":\"screenshot\",\"name\":\"near-me-denied-permission-mobile\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "near-me-granted-permission-informational" },
+      "args": [
+        "url=http://events.extrachill.com/near-me/",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "permissions=geolocation",
+        "geolocation-latitude=32.7765",
+        "geolocation-longitude=-79.9311",
+        "geolocation-permission=granted",
+        "step-timeout=60s",
+        "timeout=150s",
+        "capture=steps,console,errors,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/near-me/\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"4000ms\"},{\"kind\":\"evaluate\",\"expression\":\"window.__wpCodeboxBrowserErrors?.length ?? 0\",\"assert\":0},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('.near-me-results')||{className:''}).className\"},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('.near-me-status')||{textContent:''}).textContent\"},{\"kind\":\"screenshot\",\"name\":\"near-me-granted-permission\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "my-shows-anonymous-registration-desktop" },
+      "args": [
+        "url=http://events.extrachill.com/my-shows/",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com,extrachill.com",
+        "viewport=1440x1000",
+        "step-timeout=60s",
+        "timeout=150s",
+        "capture=steps,console,errors,network,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/my-shows/\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\"a:has-text('Start My Shows')\"},{\"kind\":\"evaluate\",\"expression\":\"document.body.innerText.includes('Every show has a story. Keep yours.')\",\"assert\":true},{\"kind\":\"evaluate\",\"expression\":\"(Array.from(document.querySelectorAll('a')).find(el=>el.textContent.trim()==='Start My Shows')||{}).getAttribute('href').includes('extrachill.com/login/')\",\"assert\":true},{\"kind\":\"click\",\"selector\":\"a:has-text('Start My Shows')\"},{\"kind\":\"waitFor\",\"selector\":\"[data-ec-login-register-root]\",\"timeout\":\"45s\"},{\"kind\":\"evaluate\",\"expression\":\"window.location.hostname\",\"assert\":\"extrachill.com\"},{\"kind\":\"evaluate\",\"expression\":\"decodeURIComponent(window.location.search).includes('events.extrachill.com/my-shows')\",\"assert\":true},{\"kind\":\"evaluate\",\"expression\":\"window.location.hash\"},{\"kind\":\"screenshot\",\"name\":\"my-shows-registration-redirect\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "my-shows-anonymous-registration-mobile" },
+      "args": [
+        "url=http://events.extrachill.com/my-shows/",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com,extrachill.com",
+        "viewport=390x844",
+        "step-timeout=60s",
+        "timeout=150s",
+        "capture=steps,console,errors,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/my-shows/\",\"waitFor\":\"load\"},{\"kind\":\"evaluate\",\"expression\":\"document.documentElement.scrollWidth <= document.documentElement.clientWidth + 4\",\"assert\":true},{\"kind\":\"waitFor\",\"selector\":\"a:has-text('Create Free Account')\"},{\"kind\":\"click\",\"selector\":\"a:has-text('Create Free Account')\"},{\"kind\":\"waitFor\",\"selector\":\"[data-ec-login-register-root]\",\"timeout\":\"40s\"},{\"kind\":\"evaluate\",\"expression\":\"window.location.hostname\",\"assert\":\"extrachill.com\"},{\"kind\":\"screenshot\",\"name\":\"my-shows-registration-redirect-mobile\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "my-shows-logged-in-owner-view" },
+      "args": [
+        "url=http://events.extrachill.com/my-shows/",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "auth=wordpress-admin",
+        "auth-user-id=501",
+        "step-timeout=60s",
+        "timeout=150s",
+        "capture=steps,console,errors,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/my-shows/\",\"waitFor\":\"load\"},{\"kind\":\"evaluate\",\"expression\":\"document.body.innerText.includes('Every show has a story. Keep yours.')\",\"assert\":false},{\"kind\":\"screenshot\",\"name\":\"my-shows-logged-in-owner-view\"}]"
+      ]
+    }
+  ]
+}

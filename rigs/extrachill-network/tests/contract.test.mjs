@@ -194,6 +194,32 @@ try {
   await assert.rejects(validateJourneyDocument(doc({ steps: [{ command: 'wordpress.browser-actions', args: ['url=http://events.extrachill.com/', 'route-host=extrachill.com'] }] }), 'gardner-event-rsvp', topology), /route-host/);
   await assert.rejects(validateJourneyDocument(doc({ steps: [{ command: 'wordpress.browser-actions', metadata: { kind: 'baseline' }, args: [] }] }), 'gardner-event-rsvp', topology), /reserved metadata kind/);
 
+  // 8d. allow-host (and route-host) accept a comma-separated host list, but
+  // every listed host must still be a declared site -- a step may name more
+  // than one declared site (a real cross-site click-through), never widen
+  // beyond the journey's own sites.
+  await assert.doesNotReject(
+    validateJourneyDocument(
+      doc({
+        sites: ['events.extrachill.com', 'extrachill.com'],
+        steps: [{ command: 'wordpress.browser-actions', args: ['url=http://events.extrachill.com/', 'route-host=events.extrachill.com', 'allow-host=events.extrachill.com,extrachill.com'] }],
+      }),
+      'gardner-event-rsvp',
+      topology,
+    ),
+  );
+  await assert.rejects(
+    validateJourneyDocument(
+      doc({
+        sites: ['events.extrachill.com', 'extrachill.com'],
+        steps: [{ command: 'wordpress.browser-actions', args: ['url=http://events.extrachill.com/', 'route-host=events.extrachill.com', 'allow-host=events.extrachill.com,artist.extrachill.com'] }],
+      }),
+      'gardner-event-rsvp',
+      topology,
+    ),
+    /outside the journey's declared sites/,
+  );
+
   console.log('extrachill-network rig contract ok');
 } finally {
   delete process.env.HOMEBOY_ARTIFACT_ROOT;

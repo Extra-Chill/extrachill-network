@@ -1,0 +1,27 @@
+{
+  "schema": "extrachill-network/journey/v1",
+  "id": "gardner-venue-booking",
+  "title": "Gardner venue-booking operations: a Lo-Fi Brewing booking week",
+  "description": "Walks Chris Gardner through one realistic booking week for a two-space neighborhood venue -- reading a Monday inbox, moving a request forward, holding a date, emailing an offer, double-clicking send, reloading, and confirming a show -- then grades the run against the persona oracles. Ported from extrachill-events/tests/wp-codebox/gardner-venue-booking.json, -seed.php, -journey.php (extrachill-events#771/#292) onto the full 11-site network; every action Gardner takes runs through the real registered abilities. Complements journeys/booking-invariants, which proves the backend invariants (idempotency, concurrency, authorization, conversion) this journey does not re-prove.",
+  "origin": {
+    "repository": "Extra-Chill/extrachill-events",
+    "files": [
+      "tests/wp-codebox/gardner-venue-booking.json",
+      "tests/wp-codebox/gardner-venue-booking-seed.php",
+      "tests/wp-codebox/gardner-venue-booking-journey.php"
+    ],
+    "mergedIn": "extrachill-events#771 (fix), c85d235 (test)"
+  },
+  "persona": {
+    "id": "extra-chill-users/chris-gardner",
+    "version": "1.0.0",
+    "file": "gardner.v1.json"
+  },
+  "sites": ["events.extrachill.com"],
+  "runtimeEnv": {
+    "WP_AGENT_RUNTIME": "1"
+  },
+  "seed": { "codeFile": "seed.php", "timeoutMs": 180000 },
+  "grade": { "codeFile": "grade.php", "timeoutMs": 240000 },
+  "steps": []
+}

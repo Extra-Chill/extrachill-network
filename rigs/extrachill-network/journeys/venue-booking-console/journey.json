@@ -1,0 +1,123 @@
+{
+  "schema": "extrachill-network/journey/v1",
+  "id": "venue-booking-console",
+  "title": "Public booking inquiry form, operator console tabs, and the hosted embed",
+  "description": "Walks the real public venue-booking-inquiry form (dynamic fields, availability check, session-draft persistence, Turnstile gate), the real operator Venue Settings console's Booking Form tab (website-embed copy widget, preview-toggle responsiveness), and the real hosted booking-embed document's admission/CSP authorization. Ported from extrachill-events/tests/browser/{booking-inquiry,booking-correspondence,booking-form-preview,booking-setup-copy,booking-embed}.evidence.js (extrachill-events#292). The originals mounted the built React bundles against hand-authored static HTML fixtures with a fully mocked fetch/DOM (booking-inquiry, booking-correspondence, booking-form-preview, booking-setup-copy) or fake cross-origin domains intercepted by Playwright routes (booking-embed); this journey exercises the REAL rendered pages, REAL REST endpoints, and REAL embed admission/CSP logic (inc/Core/VenueBookingEmbed.php) on the network rig instead. See the journey README for what changed and what could not be exercised (Cloudflare Turnstile blocks a real automated submission, same finding as journeys/gardner-event-rsvp).",
+  "origin": {
+    "repository": "Extra-Chill/extrachill-events",
+    "files": [
+      "tests/browser/booking-inquiry.evidence.js",
+      "tests/browser/booking-correspondence.evidence.js",
+      "tests/browser/booking-form-preview.evidence.js",
+      "tests/browser/booking-setup-copy.evidence.js",
+      "tests/browser/booking-embed.evidence.js"
+    ]
+  },
+  "sites": ["events.extrachill.com"],
+  "runtimeEnv": {
+    "WP_AGENT_RUNTIME": "1"
+  },
+  "seed": { "codeFile": "seed.php", "timeoutMs": 180000 },
+  "grade": { "codeFile": "grade.php", "timeoutMs": 120000 },
+  "steps": [
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "public-inquiry-form-desktop" },
+      "args": [
+        "url=http://events.extrachill.com/venue/console-fixture-room/",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "viewport=1280x900",
+        "step-timeout=60s",
+        "timeout=180s",
+        "capture=steps,console,errors,network,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/venue/console-fixture-room/#booking-inquiry\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\"#booking-inquiry\"},{\"kind\":\"click\",\"selector\":\"#booking-inquiry button:has-text('Start a booking inquiry')\"},{\"kind\":\"waitFor\",\"selector\":\"input[type=\\\"date\\\"]\"},{\"kind\":\"evaluate\",\"expression\":\"document.querySelector('[data-booking-turnstile]') !== null\",\"assert\":true},{\"kind\":\"fill\",\"selector\":\"input[type=\\\"date\\\"]\",\"value\":\"2028-05-01\"},{\"kind\":\"click\",\"selector\":\"button:has-text('Check availability')\"},{\"kind\":\"evaluate\",\"expression\":\"document.body.innerText.includes('That date is unavailable')\",\"assert\":true},{\"kind\":\"fill\",\"selector\":\"input[type=\\\"date\\\"]\",\"value\":\"2028-05-08\"},{\"kind\":\"click\",\"selector\":\"button:has-text('Check availability')\"},{\"kind\":\"evaluate\",\"expression\":\"document.body.innerText.includes('That date is available')\",\"assert\":true},{\"kind\":\"waitFor\",\"selector\":\"label:has-text('Artist or band name')\"},{\"kind\":\"evaluate\",\"expression\":\"document.body.innerText.includes('Other event details')\",\"assert\":false},{\"kind\":\"evaluate\",\"expression\":\"(()=>{const select=Array.from(document.querySelectorAll('select')).find(s=>Array.from(s.options).some(o=>o.value==='Other'));if(!select)return 'no-select';select.value='Other';select.dispatchEvent(new Event('change',{bubbles:true}));return true;})()\",\"assert\":true},{\"kind\":\"evaluate\",\"expression\":\"document.body.innerText.includes('Other event details')\",\"assert\":true},{\"kind\":\"evaluate\",\"expression\":\"document.documentElement.scrollWidth <= document.documentElement.clientWidth + 4\",\"assert\":true},{\"kind\":\"screenshot\",\"name\":\"public-inquiry-form-desktop\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "public-inquiry-form-mobile-draft-persistence" },
+      "args": [
+        "url=http://events.extrachill.com/venue/console-fixture-room/",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "viewport=390x844",
+        "step-timeout=60s",
+        "timeout=180s",
+        "capture=steps,console,errors,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/venue/console-fixture-room/#booking-inquiry\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\"#booking-inquiry\"},{\"kind\":\"evaluate\",\"expression\":\"document.documentElement.scrollWidth <= document.documentElement.clientWidth + 4\",\"assert\":true},{\"kind\":\"click\",\"selector\":\"#booking-inquiry button:has-text('Start a booking inquiry')\"},{\"kind\":\"waitFor\",\"selector\":\"input[type=\\\"date\\\"]\"},{\"kind\":\"fill\",\"selector\":\"input[type=\\\"date\\\"]\",\"value\":\"2028-05-08\"},{\"kind\":\"click\",\"selector\":\"button:has-text('Check availability')\"},{\"kind\":\"waitFor\",\"selector\":\"label:has-text('Artist or band name')\"},{\"kind\":\"fill\",\"selector\":\"label:has-text('Artist or band name') >> input\",\"value\":\"Rig Proof Band\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"500ms\"},{\"kind\":\"evaluate\",\"expression\":\"sessionStorage.length > 0\",\"assert\":true},{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/venue/console-fixture-room/#booking-inquiry\",\"waitFor\":\"load\"},{\"kind\":\"click\",\"selector\":\"#booking-inquiry button:has-text('Start a booking inquiry')\"},{\"kind\":\"waitFor\",\"selector\":\"input[type=\\\"date\\\"]\"},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('input[type=\\\"date\\\"]')||{}).value\",\"assert\":\"2028-05-08\"},{\"kind\":\"screenshot\",\"name\":\"public-inquiry-form-mobile-restored-draft\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "console-booking-form-tab-desktop" },
+      "args": [
+        "url=http://events.extrachill.com/venue-settings/",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "auth=wordpress-admin",
+        "auth-user-id=401",
+        "viewport=1440x900",
+        "permissions=clipboard-read,clipboard-write",
+        "step-timeout=60s",
+        "timeout=180s",
+        "capture=steps,console,errors,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/venue-settings/\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\".ec-booking-console, [class*=venue-settings], main\"},{\"kind\":\"click\",\"selector\":\"button:has-text('Booking Form')\"},{\"kind\":\"waitFor\",\"selector\":\"button:has-text('Copy website code')\"},{\"kind\":\"evaluate\",\"expression\":\"document.body.innerText.includes('Put this booking form on your website')\"},{\"kind\":\"evaluate\",\"expression\":\"(()=>{const t=document.querySelector('.ec-booking-form-editor__preview-toggle');return t?getComputedStyle(t).display:'missing';})()\"},{\"kind\":\"screenshot\",\"name\":\"console-booking-form-tab-desktop\"},{\"kind\":\"click\",\"selector\":\"button:has-text('Copy website code')\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"500ms\"},{\"kind\":\"evaluate\",\"expression\":\"navigator.clipboard.readText()\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "console-booking-form-tab-mobile" },
+      "args": [
+        "url=http://events.extrachill.com/venue-settings/",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "auth=wordpress-admin",
+        "auth-user-id=401",
+        "viewport=390x844",
+        "step-timeout=60s",
+        "timeout=180s",
+        "capture=steps,console,errors,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/venue-settings/\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\".ec-booking-console, [class*=venue-settings], main\"},{\"kind\":\"click\",\"selector\":\"button:has-text('Booking Form')\"},{\"kind\":\"waitFor\",\"selector\":\"button:has-text('Copy website code')\"},{\"kind\":\"evaluate\",\"expression\":\"document.documentElement.scrollWidth <= document.documentElement.clientWidth + 4\",\"assert\":true},{\"kind\":\"screenshot\",\"name\":\"console-booking-form-tab-mobile\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "hosted-embed-allowed-origin" },
+      "args": [
+        "url=http://events.extrachill.com/venue/console-fixture-room/?booking-embed=1&parent-origin=https%3A%2F%2Fevents.extrachill.com",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "step-timeout=60s",
+        "timeout=150s",
+        "capture=steps,console,errors,network,html,screenshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/venue/console-fixture-room/?booking-embed=1&parent-origin=https%3A%2F%2Fevents.extrachill.com\",\"waitFor\":\"load\"},{\"kind\":\"evaluate\",\"expression\":\"document.querySelector('h1') ? document.querySelector('h1').textContent.trim().length > 0 : false\",\"assert\":true},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('a[href*=\\\"booking-inquiry\\\"]')||{textContent:''}).textContent.trim()\",\"assert\":\"Open this booking form on Extra Chill\"},{\"kind\":\"evaluate\",\"expression\":\"document.body.innerHTML.includes('extrachill:booking-height')\",\"assert\":true},{\"kind\":\"evaluate\",\"expression\":\"document.body.innerHTML.includes('events.extrachill.com')\",\"assert\":true},{\"kind\":\"screenshot\",\"name\":\"hosted-embed-allowed-origin\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "hosted-embed-denied-origin" },
+      "args": [
+        "url=http://events.extrachill.com/venue/console-fixture-room/?booking-embed=1&parent-origin=https%3A%2F%2Fnot-allowed.example.invalid",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "step-timeout=60s",
+        "timeout=150s",
+        "capture=steps,console,errors,network,html,screenshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/venue/console-fixture-room/?booking-embed=1&parent-origin=https%3A%2F%2Fnot-allowed.example.invalid\",\"waitFor\":\"load\"},{\"kind\":\"evaluate\",\"expression\":\"document.body.innerText.includes('Booking embed unavailable') || document.body.innerText.includes('not authorized for that website')\",\"assert\":true},{\"kind\":\"screenshot\",\"name\":\"hosted-embed-denied-origin\"}]"
+      ]
+    }
+  ]
+}
