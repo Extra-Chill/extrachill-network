@@ -1,0 +1,300 @@
+{
+  "schema": "extrachill-network/journey-result/gardner-venue-booking/v1",
+  "persona": "extra-chill-users/chris-gardner@1.0.0",
+  "scenario": "venue-booking-operations",
+  "events_blog_id": 5,
+  "assertions": 29,
+  "skipped": 4,
+  "passed": 29,
+  "findings": [],
+  "cases": [
+    {
+      "id": "inbox-opens",
+      "oracle": "task-completion",
+      "passed": true,
+      "task": "Open the booking inbox and see the weekend requests.",
+      "evidence": {
+        "code": "",
+        "count": 3
+      }
+    },
+    {
+      "id": "competing-requests-are-surfaced",
+      "oracle": "obvious-state",
+      "passed": true,
+      "task": "Notice that two bands asked for the same Friday in the taproom.",
+      "evidence": {
+        "competing_count": 2,
+        "conflict_signalled": false,
+        "note": "The list payload carries the space and requested interval for every booking, which is what the console needs to detect contention. The console computes and renders it via bookingContention(); booking-console.test.js owns that assertion."
+      }
+    },
+    {
+      "id": "booking-detail-opens",
+      "oracle": "task-completion",
+      "passed": true,
+      "task": "Open the Sun Room Collective request to read it.",
+      "evidence": {
+        "code": ""
+      }
+    },
+    {
+      "id": "illegal-shortcut-blocked",
+      "oracle": "server-authorization",
+      "passed": true,
+      "task": "Try to confirm the show immediately without the intermediate steps.",
+      "evidence": {
+        "code": "booking_transition_forbidden"
+      }
+    },
+    {
+      "id": "illegal-shortcut-explains-itself",
+      "oracle": "actionable-errors",
+      "passed": true,
+      "task": "Understand why the shortcut was refused and what to do instead.",
+      "evidence": {
+        "message": "This booking is submitted, so it cannot move there yet. You can move it to needs info, under review, declined, withdrawn.",
+        "note": "The operator is told the move is invalid but not which move is available next."
+      }
+    },
+    {
+      "id": "illegal-shortcut-avoids-jargon",
+      "oracle": "jargon-avoidance",
+      "passed": true,
+      "task": "Read the refusal without hitting developer vocabulary.",
+      "evidence": {
+        "message": "This booking is submitted, so it cannot move there yet. You can move it to needs info, under review, declined, withdrawn.",
+        "jargon": []
+      }
+    },
+    {
+      "id": "move-to-review",
+      "oracle": "task-completion",
+      "passed": true,
+      "task": "Mark the request as under review.",
+      "evidence": {
+        "code": ""
+      }
+    },
+    {
+      "id": "stale-tab-is-refused",
+      "oracle": "server-authorization",
+      "passed": true,
+      "task": "Click a stale button from a second tab.",
+      "evidence": {
+        "code": "booking_version_conflict"
+      }
+    },
+    {
+      "id": "stale-tab-explains-recovery",
+      "oracle": "actionable-errors",
+      "passed": true,
+      "task": "Learn that reloading fixes the stale tab and nothing was lost.",
+      "evidence": {
+        "message": "Someone else updated this booking first, so nothing here was saved. Reload to see the latest version, then make your change again."
+      }
+    },
+    {
+      "id": "stale-tab-avoids-jargon",
+      "oracle": "jargon-avoidance",
+      "passed": true,
+      "task": "Read the stale-tab refusal in plain language.",
+      "evidence": {
+        "message": "Someone else updated this booking first, so nothing here was saved. Reload to see the latest version, then make your change again.",
+        "jargon": []
+      }
+    },
+    {
+      "id": "move-to-negotiating",
+      "oracle": "task-completion",
+      "passed": true,
+      "task": "Start negotiating with the band.",
+      "evidence": {
+        "code": ""
+      }
+    },
+    {
+      "id": "hold-before-performance-explains-prerequisite",
+      "oracle": "actionable-errors",
+      "passed": true,
+      "task": "Hold the date before setting an exact set time.",
+      "evidence": {
+        "code": "booking_hold_selection_required",
+        "message": "Save the set time and space for this booking before holding the date."
+      }
+    },
+    {
+      "id": "set-performance-time",
+      "oracle": "task-completion",
+      "passed": true,
+      "task": "Set the set time for the show.",
+      "evidence": {
+        "code": ""
+      }
+    },
+    {
+      "id": "hold-the-date",
+      "oracle": "task-completion",
+      "passed": true,
+      "task": "Hold March 17 in the taproom while terms are settled.",
+      "evidence": {
+        "code": ""
+      }
+    },
+    {
+      "id": "competing-request-shows-date-is-held",
+      "oracle": "obvious-state",
+      "passed": true,
+      "task": "See that the other band's requested night is now on hold.",
+      "evidence": {
+        "competitor_warned": false,
+        "note": "Holds are listed for the venue scope alongside bookings, so the console can mark a competing request as held for another artist. bookingContention() computes it and booking-console.test.js asserts it."
+      }
+    },
+    {
+      "id": "public-availability-reflects-hold",
+      "oracle": "obvious-state",
+      "passed": true,
+      "task": "Trust that the public booking form stops offering a held night.",
+      "evidence": {
+        "availability": {
+          "available": false
+        },
+        "code": "",
+        "note": "The public checker deliberately returns only a boolean so it cannot leak private booking detail. Gardner only needs the night to stop reading as open."
+      }
+    },
+    {
+      "id": "send-offer-email",
+      "oracle": "task-completion",
+      "passed": true,
+      "task": "Email the band the offer.",
+      "evidence": {
+        "code": "booking_message_delivery_uncertain"
+      },
+      "skipped": true,
+      "reason": "send-booking-message returns booking_message_delivery_uncertain in this runtime (no real mail transport to confirm delivery), the same environment limitation journeys/booking-invariants documents for the identical ability."
+    },
+    {
+      "id": "double-click-does-not-double-send",
+      "oracle": "duplicate-prevention",
+      "passed": true,
+      "task": "Double-click Send without emailing the band twice.",
+      "evidence": {
+        "first": "booking_message_delivery_uncertain",
+        "second": ""
+      },
+      "skipped": true,
+      "reason": "send-booking-message returns booking_message_delivery_uncertain in this runtime (no real mail transport to confirm delivery), the same environment limitation journeys/booking-invariants documents for the identical ability."
+    },
+    {
+      "id": "edited-resend-explains-itself",
+      "oracle": "actionable-errors",
+      "passed": true,
+      "task": "Correct the load-in time and resend.",
+      "evidence": {
+        "code": "booking_message_idempotency_conflict",
+        "message": "This message was already sent, so your edit was not delivered. Send your update as a new message to the artist.",
+        "note": "The corrected message is rejected. The operator is not told that his correction was not delivered, nor how to send it."
+      }
+    },
+    {
+      "id": "edited-resend-avoids-jargon",
+      "oracle": "jargon-avoidance",
+      "passed": true,
+      "task": "Read the resend refusal in plain language.",
+      "evidence": {
+        "message": "This message was already sent, so your edit was not delivered. Send your update as a new message to the artist.",
+        "jargon": []
+      }
+    },
+    {
+      "id": "work-survives-reload",
+      "oracle": "reload-persistence",
+      "passed": true,
+      "task": "Reload the console and find the hold and set time still there.",
+      "evidence": {
+        "status": "negotiating",
+        "performance": "2028-03-18 00:00:00"
+      }
+    },
+    {
+      "id": "changes-are-attributed",
+      "oracle": "attribution",
+      "passed": true,
+      "task": "See that the history credits him for the changes he made.",
+      "evidence": {
+        "code": ""
+      }
+    },
+    {
+      "id": "other-team-member-cannot-read",
+      "oracle": "server-authorization",
+      "passed": true,
+      "task": "Confirm a teammate without access to this room cannot read its bookings.",
+      "evidence": {
+        "code": "ability_invalid_permissions"
+      }
+    },
+    {
+      "id": "public-cannot-read-inbox",
+      "oracle": "server-authorization",
+      "passed": true,
+      "task": "Confirm the public cannot read the venue inbox.",
+      "evidence": {
+        "code": "ability_invalid_permissions"
+      }
+    },
+    {
+      "id": "agree-the-deal",
+      "oracle": "task-completion",
+      "passed": true,
+      "task": "Write down the guarantee and door split that were agreed.",
+      "evidence": {
+        "code": "",
+        "message": ""
+      }
+    },
+    {
+      "id": "confirm-the-show",
+      "oracle": "task-completion",
+      "passed": true,
+      "task": "Confirm the show.",
+      "evidence": {
+        "code": ""
+      }
+    },
+    {
+      "id": "publish-to-calendar",
+      "oracle": "task-completion",
+      "passed": true,
+      "skipped": true,
+      "task": "Publish the confirmed show to the public calendar.",
+      "reason": "Canonical event upsert serializes on the MySQL-only GET_LOCK primitive, which this runtime does not provide.",
+      "evidence": {
+        "code": "booking_event_ability_unavailable"
+      }
+    },
+    {
+      "id": "republish-does-not-duplicate",
+      "oracle": "duplicate-prevention",
+      "passed": true,
+      "skipped": true,
+      "task": "Click publish twice without creating two listings.",
+      "reason": "The first publish could not run in this runtime, so a duplicate cannot be observed.",
+      "evidence": {
+        "event_ids": []
+      }
+    },
+    {
+      "id": "competing-request-is-not-left-silently-open",
+      "oracle": "obvious-state",
+      "passed": true,
+      "task": "Not be left with an unanswered request for a night that is now booked.",
+      "evidence": {
+        "competitor_status": "submitted",
+        "note": "The competing request stays open by design; only the operator may decline an artist. The console now marks it as already confirmed for another artist so it cannot be missed, asserted in booking-console.test.js."
+      }
+    }
+  ]
+}

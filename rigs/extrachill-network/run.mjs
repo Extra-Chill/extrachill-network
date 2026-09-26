@@ -231,8 +231,21 @@ function assertJourneyStepScoping(id, journey) {
     }
     for (const argKey of ['route-host', 'allow-host']) {
       const value = args.find((arg) => arg.startsWith(`${argKey}=`));
-      if (value && !allowed.has(value.slice(argKey.length + 1))) {
-        throw new Error(`Journey '${id}' step ${index} sets ${argKey} to '${value.slice(argKey.length + 1)}', outside the journey's declared sites.`);
+      if (!value) {
+        continue;
+      }
+      // allow-host (and, forward-compatibly, route-host) accept a
+      // comma-separated host list at the wp-codebox layer -- a single
+      // browser step legitimately click-throughs across two declared sites
+      // (e.g. a real cross-site registration redirect). Every listed host
+      // must still be one of the journey's own declared sites; this does
+      // not widen what a journey step may reach, it only lets it name more
+      // than one declared site in the same step.
+      const hosts = value.slice(argKey.length + 1).split(',');
+      for (const host of hosts) {
+        if (!allowed.has(host)) {
+          throw new Error(`Journey '${id}' step ${index} sets ${argKey} to '${host}', outside the journey's declared sites (${[...allowed].join(', ')}).`);
+        }
       }
     }
     if (step.metadata?.kind !== undefined && step.metadata.kind !== 'journey-browser-step') {
