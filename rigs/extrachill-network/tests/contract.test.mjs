@@ -61,6 +61,7 @@ try {
     );
   }
   assert.match(muSource, /WP_INSTALLING/, 'mu-plugin must skip while installing');
+  assert.match(muSource, /function_exists\( ?'get_sites' ?\)/, 'mu-plugin must skip requests where the multisite API is not loaded yet');
 
   // 1c. domainIdsMuPluginSource refuses a topology that dropped a mapped domain.
   assert.throws(

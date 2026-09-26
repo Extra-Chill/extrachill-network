@@ -87,14 +87,15 @@ export function domainIdsMuPluginSource(topology) {
  * if(!defined()) guards in blog-ids.php exist precisely so an earlier
  * definition wins; mu-plugins load before regular plugins.
  *
- * Skipped while WP_INSTALLING (no sites exist yet on the first request) and
- * for any domain that has no site row yet; the production defaults then apply
- * harmlessly until the topology is bootstrapped.
+ * Skipped while WP_INSTALLING and on any request where the multisite API is
+ * not loaded yet (the install-time blueprint request runs mu-plugins before
+ * ms-blogs.php) -- the production defaults then apply harmlessly and later
+ * requests resolve by domain.
  *
  * @package ExtraChillNetwork
  */
 
-if ( defined( 'WP_INSTALLING' ) && WP_INSTALLING ) {
+if ( ( defined( 'WP_INSTALLING' ) && WP_INSTALLING ) || ! function_exists( 'get_sites' ) ) {
 \treturn;
 }
 
