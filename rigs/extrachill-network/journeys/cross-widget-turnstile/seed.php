@@ -133,6 +133,13 @@ $body = $widget_one . "\n" . $widget_two
 	. "\n<script>\n" . $boot_js . "\n</script>"
 	. "\n<script>\n" . $boot_runner_js . "\n</script>";
 
+// wp_insert_post() runs its content through wp_filter_kses() (which strips
+// <script> tags) unless the acting user has unfiltered_html -- this page's
+// entire contract is running real inline <script> content, so seed as the
+// admin user, matching the pattern every other journey's seed already uses
+// for its own admin-authored fixture content.
+wp_set_current_user( 1 );
+
 $existing = get_page_by_path( 'ec-turnstile-cross-widget-smoke' );
 $postarr  = array(
 	'post_title'   => 'EC Turnstile Cross-Widget Smoke',

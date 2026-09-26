@@ -64,13 +64,17 @@ ec_rig_cross_widget_case(
 	)
 );
 
-$content      = $smoke_page instanceof WP_Post ? (string) $smoke_page->post_content : '';
-$widget_count = substr_count( $content, 'cf-turnstile' );
+$content = $smoke_page instanceof WP_Post ? (string) $smoke_page->post_content : '';
+// Count actual widget elements (class="cf-turnstile ...") specifically --
+// not every substring occurrence of "cf-turnstile", which also appears
+// several times inside the embedded stub/boot-script JS as CSS selector
+// strings (e.g. querySelectorAll('.cf-turnstile[...]')).
+$widget_count = substr_count( $content, 'class="cf-turnstile' );
 ec_rig_cross_widget_case(
 	'two-widgets-present',
 	2 === $widget_count,
 	'Both Turnstile widgets (the broken one and its good sibling) are present on the page.',
-	array( 'cf_turnstile_occurrences' => $widget_count )
+	array( 'cf_turnstile_widget_elements' => $widget_count )
 );
 
 ec_rig_cross_widget_case(

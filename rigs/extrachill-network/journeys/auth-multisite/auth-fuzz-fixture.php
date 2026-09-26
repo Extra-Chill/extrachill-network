@@ -7,14 +7,61 @@
  * production because it only exists as a mount inside this journey's own
  * disposable boot. Ported from extrachill-users
  * tests/e2e/auth-multisite/fixture/auth-fuzz-fixture.php
- * (extrachill-network#293); the rate-limit-store overrides that file also
- * carried were dropped -- this journey exercises Extra Chill Users' REAL
- * default rate-limit implementation (extrachill_users_admit_registration_attempt,
- * ec_login_rate_limit_cache_operation) rather than substituting a bespoke
- * store, which is a truer test of production behavior.
+ * (extrachill-network#293); Extra Chill Users' OWN rate-limit stores
+ * (extrachill_users_admit_registration_attempt, ec_login_rate_limit_cache_operation)
+ * are used as-is unmodified -- they are transient-backed and need no
+ * override.
+ *
+ * extrachill-api's public-write admission gate
+ * (inc/middleware/public-write-admission.php) is a DIFFERENT store, and it
+ * is not optional here: its default implementation
+ * (extrachill_api_atomic_rate_limit_cache_increment()) hard-requires a real
+ * persistent external object cache (`wp_using_ext_object_cache()`) and
+ * fails closed with a 503 otherwise -- this rig's own README already
+ * documents `redis-cache` as an excluded component (no Redis server in the
+ * disposable sandbox), so EVERY public-write REST call (register, login,
+ * refresh, ...) 503s without a substitute store. This is the rig's Redis
+ * gap wearing a different name, not a rate-limiting behavior this journey
+ * is choosing to fake.
  *
  * @package ExtraChillNetwork
  */
+
+/**
+ * Site-option-backed substitute for extrachill-api's atomic public-write
+ * admission counter, used only because no external object cache exists in
+ * this disposable sandbox. Not a claim of atomicity under real concurrency
+ * (a single PHP process handles this journey's requests sequentially) --
+ * purely a stand-in for the missing Redis/Memcached dependency.
+ *
+ * @param string $key Stable opaque counter key.
+ * @param int    $ttl Remaining fixed-window lifetime in seconds.
+ * @return int
+ */
+function ec_rig_auth_multisite_rate_limit_store( $key, $ttl ) {
+	$state = get_site_option( 'ec_rig_auth_multisite_rate_limits', array() );
+	$now   = time();
+	$entry = $state[ $key ] ?? array(
+		'count'   => 0,
+		'expires' => $now + max( 1, (int) $ttl ),
+	);
+	if ( $entry['expires'] <= $now ) {
+		$entry = array(
+			'count'   => 0,
+			'expires' => $now + max( 1, (int) $ttl ),
+		);
+	}
+	++$entry['count'];
+	$state[ $key ] = $entry;
+	update_site_option( 'ec_rig_auth_multisite_rate_limits', $state );
+	return (int) $entry['count'];
+}
+add_filter(
+	'extrachill_api_rate_limit_store',
+	static function () {
+		return 'ec_rig_auth_multisite_rate_limit_store';
+	}
+);
 
 // Cloudflare Turnstile requires solving a live, real widget challenge that no
 // automated browser session can pass (see extrachill-network#295's Gardner
