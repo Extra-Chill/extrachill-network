@@ -1,0 +1,425 @@
+{
+  "schema": "extrachill-network/journey-result/auth-multisite/v1",
+  "scenario": "auth-multisite",
+  "seed": "extrachill-network-auth-multisite-default-seed",
+  "assertions": 35,
+  "passed": 21,
+  "findings": [
+    {
+      "id": "valid-registration-creates-exactly-one-user",
+      "passed": false,
+      "task": "A valid registration succeeds and creates exactly one network user.",
+      "evidence": {
+        "status": 503,
+        "user_id": 0
+      },
+      "status": "open"
+    },
+    {
+      "id": "registered-user-joins-community",
+      "passed": false,
+      "task": "A newly-registered user is a member of the community site.",
+      "evidence": {
+        "user_id": 0
+      },
+      "status": "open"
+    },
+    {
+      "id": "duplicate-registration-rejected",
+      "passed": false,
+      "task": "Registering the same email twice fails cleanly and creates no second account.",
+      "evidence": {
+        "status": 503
+      },
+      "status": "open"
+    },
+    {
+      "id": "existing-persona-authenticates-directly",
+      "passed": false,
+      "task": "The pre-seeded existing persona's stored credentials authenticate.",
+      "evidence": {
+        "ok": false
+      },
+      "status": "open"
+    },
+    {
+      "id": "login-succeeds-with-username",
+      "passed": false,
+      "task": "Logging in with a username resolves the right network identity.",
+      "evidence": {
+        "status": 401
+      },
+      "status": "open"
+    },
+    {
+      "id": "login-succeeds-with-email",
+      "passed": false,
+      "task": "Logging in with a email address resolves the right network identity.",
+      "evidence": {
+        "status": 401
+      },
+      "status": "open"
+    },
+    {
+      "id": "non-community-user-denied",
+      "passed": false,
+      "task": "A network user who is not a community member cannot log into the community-facing app surface.",
+      "evidence": {
+        "status": 401
+      },
+      "status": "open"
+    },
+    {
+      "id": "moderation-email-does-not-crash-on-a-queue-error",
+      "passed": false,
+      "task": "A moderator applying a ban should never trigger an uncaught fatal error just because the notification email could not be queued.",
+      "evidence": {
+        "crash": "Cannot use object of type WP_Error as array"
+      },
+      "status": "open"
+    },
+    {
+      "id": "refresh-token-scoped-to-its-device-and-rotates",
+      "passed": false,
+      "task": "A refresh token only works on the device it was issued to, and rotates on each use.",
+      "evidence": {
+        "wrong_device_status": 400,
+        "rotated_status": 400
+      },
+      "status": "open"
+    },
+    {
+      "id": "superseded-refresh-token-replay-detected",
+      "passed": false,
+      "task": "Replaying a superseded (already-rotated) refresh token is detected and rejected.",
+      "evidence": {
+        "status": 400,
+        "code": "missing_refresh_credentials"
+      },
+      "status": "open"
+    },
+    {
+      "id": "replay-burns-the-whole-token-family",
+      "passed": false,
+      "task": "Detecting a replay burns the entire refresh-token family, not just the reused token.",
+      "evidence": {
+        "status": 400
+      },
+      "status": "open"
+    },
+    {
+      "id": "one-user-cannot-revoke-anothers-session",
+      "passed": false,
+      "task": "One authenticated user cannot log out a different user's device by guessing its device ID.",
+      "evidence": {
+        "logout_status": 200,
+        "victim_refresh_status": 400
+      },
+      "status": "open"
+    },
+    {
+      "id": "browser-registration-created-the-network-user",
+      "passed": false,
+      "task": "The real browser registration form actually created a network user.",
+      "evidence": {
+        "found": false
+      },
+      "status": "open"
+    },
+    {
+      "id": "cross-site-continuity-mechanism-available",
+      "passed": false,
+      "task": "extrachill_users_create_browser_handoff_token() is unavailable or the browser registration did not produce a user; cross-site continuity could not be exercised.",
+      "evidence": [],
+      "status": "open"
+    }
+  ],
+  "cases": [
+    {
+      "id": "community-login-page-has-block",
+      "passed": true,
+      "task": "A visitor can reach a real login/register page on the community site.",
+      "evidence": {
+        "found": true
+      }
+    },
+    {
+      "id": "community-onboarding-page-has-block",
+      "passed": true,
+      "task": "A newly-registered visitor can reach a real onboarding page on the community site.",
+      "evidence": {
+        "found": true
+      }
+    },
+    {
+      "id": "invalid-registration-rejected-invalid-email",
+      "passed": true,
+      "task": "An invalid registration attempt (invalid-email) is rejected and never mutates the network user count.",
+      "evidence": {
+        "status": 400
+      }
+    },
+    {
+      "id": "invalid-registration-rejected-password-mismatch",
+      "passed": true,
+      "task": "An invalid registration attempt (password-mismatch) is rejected and never mutates the network user count.",
+      "evidence": {
+        "status": 503
+      }
+    },
+    {
+      "id": "invalid-registration-rejected-short-password",
+      "passed": true,
+      "task": "An invalid registration attempt (short-password) is rejected and never mutates the network user count.",
+      "evidence": {
+        "status": 503
+      }
+    },
+    {
+      "id": "invalid-registration-rejected-invalid-device",
+      "passed": true,
+      "task": "An invalid registration attempt (invalid-device) is rejected and never mutates the network user count.",
+      "evidence": {
+        "status": 400
+      }
+    },
+    {
+      "id": "invalid-registration-rejected-null-password",
+      "passed": true,
+      "task": "An invalid registration attempt (null-password) is rejected and never mutates the network user count.",
+      "evidence": {
+        "status": 503
+      }
+    },
+    {
+      "id": "invalid-registration-rejected-oversized-email",
+      "passed": true,
+      "task": "An invalid registration attempt (oversized-email) is rejected and never mutates the network user count.",
+      "evidence": {
+        "status": 400
+      }
+    },
+    {
+      "id": "valid-registration-creates-exactly-one-user",
+      "passed": false,
+      "task": "A valid registration succeeds and creates exactly one network user.",
+      "evidence": {
+        "status": 503,
+        "user_id": 0
+      }
+    },
+    {
+      "id": "registered-user-joins-community",
+      "passed": false,
+      "task": "A newly-registered user is a member of the community site.",
+      "evidence": {
+        "user_id": 0
+      }
+    },
+    {
+      "id": "duplicate-registration-rejected",
+      "passed": false,
+      "task": "Registering the same email twice fails cleanly and creates no second account.",
+      "evidence": {
+        "status": 503
+      }
+    },
+    {
+      "id": "existing-persona-authenticates-directly",
+      "passed": false,
+      "task": "The pre-seeded existing persona's stored credentials authenticate.",
+      "evidence": {
+        "ok": false
+      }
+    },
+    {
+      "id": "login-succeeds-with-username",
+      "passed": false,
+      "task": "Logging in with a username resolves the right network identity.",
+      "evidence": {
+        "status": 401
+      }
+    },
+    {
+      "id": "login-succeeds-with-email",
+      "passed": false,
+      "task": "Logging in with a email address resolves the right network identity.",
+      "evidence": {
+        "status": 401
+      }
+    },
+    {
+      "id": "login-does-not-enumerate-accounts",
+      "passed": true,
+      "task": "A bad password on an unknown identifier looks identical to a bad password on a real one, so an attacker cannot tell which accounts exist.",
+      "evidence": {
+        "unknown_status": 401,
+        "known_status": 401
+      }
+    },
+    {
+      "id": "non-community-user-denied",
+      "passed": false,
+      "task": "A network user who is not a community member cannot log into the community-facing app surface.",
+      "evidence": {
+        "status": 401
+      }
+    },
+    {
+      "id": "moderated-user-cannot-obtain-tokens",
+      "passed": true,
+      "task": "A moderated (banned) user cannot obtain a session, even with correct credentials.",
+      "evidence": {
+        "status": 401
+      }
+    },
+    {
+      "id": "moderation-email-does-not-crash-on-a-queue-error",
+      "passed": false,
+      "task": "A moderator applying a ban should never trigger an uncaught fatal error just because the notification email could not be queued.",
+      "evidence": {
+        "crash": "Cannot use object of type WP_Error as array"
+      }
+    },
+    {
+      "id": "anonymous-cannot-call-authenticated-routes",
+      "passed": true,
+      "task": "A logged-out visitor is refused by every authenticated-only route (me, logout, browser-handoff).",
+      "evidence": {
+        "me": 401,
+        "logout": 401,
+        "handoff": 401
+      }
+    },
+    {
+      "id": "handoff-rejects-unsafe-redirect-1acda378502351572180751ae6108152",
+      "passed": true,
+      "task": "A browser-handoff request pointed at an unsafe destination (https://outside.example/escape) is rejected.",
+      "evidence": {
+        "status": 400
+      }
+    },
+    {
+      "id": "handoff-rejects-unsafe-redirect-f901f7924128267ceecba179671ed3ce",
+      "passed": true,
+      "task": "A browser-handoff request pointed at an unsafe destination (https://extrachill.com.outside.example/escape) is rejected.",
+      "evidence": {
+        "status": 400
+      }
+    },
+    {
+      "id": "handoff-rejects-unsafe-redirect-d8f8298b918f8304f570376c094aef1a",
+      "passed": true,
+      "task": "A browser-handoff request pointed at an unsafe destination (https://extrachill.link/escape) is rejected.",
+      "evidence": {
+        "status": 400
+      }
+    },
+    {
+      "id": "handoff-rejects-unsafe-redirect-3b16869bb69d252b01f498020c3a0e05",
+      "passed": true,
+      "task": "A browser-handoff request pointed at an unsafe destination (//community.extrachill.com/relative) is rejected.",
+      "evidence": {
+        "status": 400
+      }
+    },
+    {
+      "id": "handoff-rejects-unsafe-redirect-a20542972231390ec76ca06f060adb6d",
+      "passed": true,
+      "task": "A browser-handoff request pointed at an unsafe destination (javascript:alert(1)) is rejected.",
+      "evidence": {
+        "status": 400
+      }
+    },
+    {
+      "id": "refresh-token-scoped-to-its-device-and-rotates",
+      "passed": false,
+      "task": "A refresh token only works on the device it was issued to, and rotates on each use.",
+      "evidence": {
+        "wrong_device_status": 400,
+        "rotated_status": 400
+      }
+    },
+    {
+      "id": "superseded-refresh-token-replay-detected",
+      "passed": false,
+      "task": "Replaying a superseded (already-rotated) refresh token is detected and rejected.",
+      "evidence": {
+        "status": 400,
+        "code": "missing_refresh_credentials"
+      }
+    },
+    {
+      "id": "replay-burns-the-whole-token-family",
+      "passed": false,
+      "task": "Detecting a replay burns the entire refresh-token family, not just the reused token.",
+      "evidence": {
+        "status": 400
+      }
+    },
+    {
+      "id": "one-user-cannot-revoke-anothers-session",
+      "passed": false,
+      "task": "One authenticated user cannot log out a different user's device by guessing its device ID.",
+      "evidence": {
+        "logout_status": 200,
+        "victim_refresh_status": 400
+      }
+    },
+    {
+      "id": "invalid-onboarding-usernames-rejected",
+      "passed": true,
+      "task": "Reserved/invalid onboarding usernames are all rejected without mutating completion state.",
+      "evidence": {
+        "usernames_tried": 5
+      }
+    },
+    {
+      "id": "onboarding-is-scoped-to-the-authenticated-user",
+      "passed": true,
+      "task": "A user completing onboarding while passing another user's ID cannot rename that other user.",
+      "evidence": {
+        "status": 200
+      }
+    },
+    {
+      "id": "duplicate-onboarding-rejected",
+      "passed": true,
+      "task": "Completing onboarding twice is rejected the second time.",
+      "evidence": {
+        "status": 400
+      }
+    },
+    {
+      "id": "login-redirect-cannot-escape-the-network",
+      "passed": true,
+      "task": "A login redirect_to parameter can never send a user off the Extra Chill network.",
+      "evidence": {
+        "cases_tried": 7
+      }
+    },
+    {
+      "id": "login-rate-limit-engages-and-covers-email-alias",
+      "passed": true,
+      "task": "Five bad-password attempts trip the real rate limiter, and the limit cannot be bypassed by logging in with the account's email instead of its username.",
+      "evidence": {
+        "rate_limited": true,
+        "alias_bypass_status": 401
+      }
+    },
+    {
+      "id": "browser-registration-created-the-network-user",
+      "passed": false,
+      "task": "The real browser registration form actually created a network user.",
+      "evidence": {
+        "found": false
+      }
+    },
+    {
+      "id": "cross-site-continuity-mechanism-available",
+      "passed": false,
+      "task": "extrachill_users_create_browser_handoff_token() is unavailable or the browser registration did not produce a user; cross-site continuity could not be exercised.",
+      "evidence": []
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "schema": "extrachill-network/journey-result/gardner-social-operator/v1",
+  "scenario": "gardner-social-operator",
+  "status": "incomplete-with-findings",
+  "blocking_error": {
+    "index": 18,
+    "metadata": {
+      "kind": "journey-browser-step",
+      "journey": "gardner-social-operator"
+    },
+    "message": "Recipe workflow steps[18] failed: wordpress.run-php crashed before producing a structured response\nfailureClassification=runtime-worker-failure\n\nPHP.run() failed with exit code 255. \n\n=== Stdout ===\n <br />\n<b>Fatal error</b>:  Uncaught RuntimeException: Operator oracle failed: one opaque delegated receipt is stored (job=null, handoff_retries=[{&amp;quot;success&amp;quot;:false,&amp;quot;error&amp;quot;:{&amp;quot;code&amp;quot;:&amp;quot;social_publish_scheduler_unavailable&amp;quot;,&amp;quot;message&amp;quot;:&amp;quot;The social delivery could not be scheduled.&amp;quot;,&amp;quot;retryable&amp;quot;:true}},{&amp;quot;success&amp;quot;:false,&amp;quot;error&amp;quot;:{&amp;quot;code&amp;quot;:&amp;quot;social_publish_scheduler_unavailable&amp;quot;,&amp;quot;message&amp;quot;:&amp;quot;The social delivery could not be scheduled.&amp;quot;,&amp;quot;retryable&amp;quot;:true}},{&amp;quot;success&amp;quot;:false,&amp;quot;error&amp;quot;:{&amp;quot;code&amp;quot;:&amp;quot;social_publish_scheduler_unavailable&amp;quot;,&amp;quot;message&amp;quot;:&amp;quot;The social delivery could not be scheduled.&amp;quot;,&amp;quot;retryable&amp;quot;:true}}], raw_submit={&amp;quot;success&amp;quot;:false,&amp;quot;error_code&amp;quot;:&amp;quot;delegated_operation_persist_failed&amp;quot;,&amp;quot;error&amp;quot;:&amp;quot;The delegated operation could not be persisted.&amp;quot;,&amp;quot;retryable&amp;quot;:true}, action_scheduler=loaded) in /internal/eval.php:127\nStack trace:\n#0 /internal/eval.php(421): ec_studio_operator_assert(false, 'one opaque dele...')\n#1 {main}\n  thrown in <b>/internal/eval.php</b> on line <b>127</b><br />\n\nWP_CODEBOX_PHP_FATAL_DIAGNOSTIC:[redacted]\n\n\n=== Stderr ===\n \n\n--- Playground worker error ---\nname=Error\nmessage=PHP.run() failed with exit code 255. \n\n=== Stdout ===\n <br />\n<b>Fatal error</b>:  Uncaught RuntimeException: Operator oracle failed: one opaque delegated receipt is stored (job=null, handoff_retries=[{&amp;quot;success&amp;quot;:false"
+  }
+}

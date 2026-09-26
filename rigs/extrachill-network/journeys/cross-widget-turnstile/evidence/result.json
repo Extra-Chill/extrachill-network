@@ -1,0 +1,62 @@
+{
+  "schema": "extrachill-network/journey-result/cross-widget-turnstile/v1",
+  "scenario": "cross-widget-turnstile",
+  "page_id": 9,
+  "url": "http://extrachill.com/ec-turnstile-cross-widget-smoke/",
+  "assertions": 5,
+  "passed": 4,
+  "findings": [
+    {
+      "id": "uses-the-real-shipped-boot-script",
+      "passed": false,
+      "task": "The page runs the plugin's ACTUAL assets/js/turnstile-boot.js, never a reimplementation of it.",
+      "evidence": {
+        "boot_script_bytes": 4915
+      },
+      "status": "open"
+    }
+  ],
+  "cases": [
+    {
+      "id": "seeded-page-exists",
+      "passed": true,
+      "task": "The smoke page the browser step navigates to actually exists and is published.",
+      "evidence": {
+        "page_id": 9,
+        "status": "publish"
+      }
+    },
+    {
+      "id": "two-widgets-present",
+      "passed": true,
+      "task": "Both Turnstile widgets (the broken one and its good sibling) are present on the page.",
+      "evidence": {
+        "cf_turnstile_widget_elements": 2
+      }
+    },
+    {
+      "id": "broken-widget-declares-dangling-callback",
+      "passed": true,
+      "task": "The first widget still declares the dangling data-callback that reproduces the lackey bug class.",
+      "evidence": {
+        "has_callback_attribute": true
+      }
+    },
+    {
+      "id": "uses-the-real-shipped-boot-script",
+      "passed": false,
+      "task": "The page runs the plugin's ACTUAL assets/js/turnstile-boot.js, never a reimplementation of it.",
+      "evidence": {
+        "boot_script_bytes": 4915
+      }
+    },
+    {
+      "id": "turnstile-configured-with-documented-test-keys-only",
+      "passed": true,
+      "task": "Only Cloudflare's documented always-pass TEST site key is configured in this disposable sandbox, never a real key.",
+      "evidence": {
+        "site_key": "1x00000000000000000000AA"
+      }
+    }
+  ]
+}
