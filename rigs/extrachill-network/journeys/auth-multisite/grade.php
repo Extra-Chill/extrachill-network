@@ -113,6 +113,15 @@ function ec_rig_auth_multisite_require_user( int $user_id ): WP_User {
 	return $user;
 }
 
+// WordPress.run-php's eval context is not a real HTTP request, so
+// $_SERVER['REMOTE_ADDR'] is unset. extrachill-api's public-write/read
+// admission gate (inc/middleware/public-write-admission.php) fails closed
+// with a 503 when it cannot resolve a valid client IP for its rate-limit
+// key -- a real security requirement, not something worth bypassing, so
+// this seeds a fixed, obviously-synthetic local address instead of
+// disabling the check.
+$_SERVER['REMOTE_ADDR'] = '127.0.0.250';
+
 $fixture = get_site_option( 'ec_rig_auth_multisite_fixture', array() );
 $plan    = get_site_option( 'ec_rig_auth_multisite_plan', array() );
 if ( ! is_array( $fixture ) || empty( $fixture['community_blog_id'] ) || ! is_array( $plan ) || empty( $plan['seed'] ) ) {
