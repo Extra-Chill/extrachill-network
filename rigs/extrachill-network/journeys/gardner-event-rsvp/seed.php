@@ -19,7 +19,7 @@
  *   depends on and fails loudly if one is missing: that is a rig regression,
  *   not a journey concern.
  *
- * One thing the network boot genuinely adds: wordpress.run-php steps execute
+ * One thing the network boot genuinely adds: WordPress.run-php steps execute
  * against the primary site, where the per-site plugins (data-machine-events,
  * extrachill-events) are NOT loaded -- switch_to_blog() swaps the DB context
  * but never loads plugin code. The seed therefore bootstraps the events
@@ -180,11 +180,11 @@ $events_blog_id = ec_rig_journey_site_id( 'events.extrachill.com' );
 $main_blog_id   = ec_rig_journey_site_id( 'extrachill.com' );
 
 $evidence = array(
-	'schema'            => 'extrachill-network/journey-fixture/gardner-event-rsvp/v1',
-	'persona'           => 'extra-chill-users/chris-gardner@1.0.0',
-	'events_blog_id'    => $events_blog_id,
-	'main_blog_id'      => $main_blog_id,
-	'steps'             => array(),
+	'schema'         => 'extrachill-network/journey-fixture/gardner-event-rsvp/v1',
+	'persona'        => 'extra-chill-users/chris-gardner@1.0.0',
+	'events_blog_id' => $events_blog_id,
+	'main_blog_id'   => $main_blog_id,
+	'steps'          => array(),
 );
 
 /*
@@ -296,8 +296,8 @@ if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $concert_table ) ) !
 
 $description = "Join us at Lo-Fi Brewing on Wednesday, October 21st from 6:30 to 9pm for a free gathering of the creative community focused on building your online presence in the AI era. This is an official WordPress meetup, hosted by Chris Huber, the founder of Extra Chill, who now works as an engineer at Automattic. However, you don't have to use WordPress or even know what it is to find value in this event.\n\nMusicians, writers, photographers, developers, small business owners, whether you have a website or just an Instagram. All experience levels are welcome.\n\nWe'll go behind the scenes of Extra Chill, showcasing our fully automated international concert calendar, artist platform, and community, all built on open source software. Other creatives will also be invited to share what they are building. At this event we will discuss AI, including both the challenges it presents to the creative community, and how it can be used to empower your own process. Bring your objections and your ideas, that's what this event is all about.\n\nMark yourself as Going on this page or the Meetup.com event and your first beer is on Extra Chill.";
 
-$paragraphs  = explode( "\n\n", $description );
-$block_inner = implode(
+$paragraphs   = explode( "\n\n", $description );
+$block_inner  = implode(
 	"\n\n",
 	array_map(
 		static function ( $paragraph ) {
@@ -306,7 +306,7 @@ $block_inner = implode(
 		$paragraphs
 	)
 );
-$block_attrs = wp_json_encode(
+$block_attrs  = wp_json_encode(
 	array(
 		'startDate'    => '2026-10-21',
 		'endDate'      => '2026-10-21',
@@ -325,9 +325,12 @@ $post_content = "<!-- wp:data-machine-events/event-details {$block_attrs} -->\n"
 $existing = get_page_by_path( 'wordpress-meetup-charleston-october-2026', OBJECT, 'data_machine_events' );
 if ( $existing instanceof WP_Post ) {
 	$event_id                        = (int) $existing->ID;
-	$evidence['steps']['event_post'] = array( 'ok' => true, 'reused' => true );
+	$evidence['steps']['event_post'] = array(
+		'ok'     => true,
+		'reused' => true,
+	);
 } else {
-	$event_id = wp_insert_post(
+	$event_id                        = wp_insert_post(
 		array(
 			'post_type'    => 'data_machine_events',
 			'post_status'  => 'publish',
@@ -383,13 +386,13 @@ update_term_meta( $venue_id, '_venue_website', 'https://lofibrewing.com' );
 
 // Location hierarchy matching production: US > SC > Charleston. The
 // `location` taxonomy itself is registered network-wide by extrachill-network.
-$usa    = wp_insert_term( 'United States', 'location', array( 'slug' => 'usa' ) );
-$usa_id = is_wp_error( $usa ) ? (int) get_term_by( 'slug', 'usa', 'location' )->term_id : (int) $usa['term_id'];
-$sc     = wp_insert_term( 'South Carolina', 'location', array(
+$usa        = wp_insert_term( 'United States', 'location', array( 'slug' => 'usa' ) );
+$usa_id     = is_wp_error( $usa ) ? (int) get_term_by( 'slug', 'usa', 'location' )->term_id : (int) $usa['term_id'];
+$sc         = wp_insert_term( 'South Carolina', 'location', array(
 	'slug'   => 'south-carolina',
 	'parent' => $usa_id,
 ) );
-$sc_id  = is_wp_error( $sc ) ? (int) get_term_by( 'slug', 'south-carolina', 'location' )->term_id : (int) $sc['term_id'];
+$sc_id      = is_wp_error( $sc ) ? (int) get_term_by( 'slug', 'south-carolina', 'location' )->term_id : (int) $sc['term_id'];
 $charleston = wp_insert_term( 'Charleston', 'location', array(
 	'slug'   => 'charleston',
 	'parent' => $sc_id,
@@ -411,7 +414,7 @@ wp_set_object_terms( $event_id, 'Other', 'event_type', false );
 
 // Priority-event flag drives the promoted-event callout on the Charleston
 // location archive, through its own ability.
-$priority = ec_rig_journey_execute(
+$priority                            = ec_rig_journey_execute(
 	'extrachill/set-priority-event',
 	array(
 		'event'    => (string) $event_id,
@@ -424,7 +427,7 @@ if ( is_wp_error( $priority ) ) {
 	$evidence['steps']['priority_event']['fallback'] = true;
 }
 
-$dates_row = \DataMachineEvents\Core\EventDatesTable::get( $event_id );
+$dates_row                        = \DataMachineEvents\Core\EventDatesTable::get( $event_id );
 $evidence['steps']['event_dates'] = array(
 	'ok'    => null !== $dates_row,
 	'start' => $dates_row->start_datetime ?? null,

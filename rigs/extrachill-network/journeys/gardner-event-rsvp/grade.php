@@ -112,7 +112,7 @@ $findings = array();
  */
 function ec_rig_grade_case( string $id, string $oracle, bool $passed, string $task, array $evidence = array() ): void {
 	global $cases, $findings;
-	$record = array(
+	$record  = array(
 		'id'       => $id,
 		'oracle'   => $oracle,
 		'passed'   => $passed,
@@ -196,9 +196,9 @@ ec_rig_grade_case(
 	is_array( $pass ) && '' !== $pass_code,
 	'Get something he can actually show at the door to claim the free beer promised in the event description.',
 	array(
-		'pass_found'       => is_array( $pass ),
-		'status'           => is_array( $pass ) ? (string) $pass['status'] : null,
-		'code_length'      => strlen( $pass_code ),
+		'pass_found'  => is_array( $pass ),
+		'status'      => is_array( $pass ) ? (string) $pass['status'] : null,
+		'code_length' => strlen( $pass_code ),
 	)
 );
 
@@ -231,7 +231,7 @@ ec_rig_grade_case(
 // event). The browser step already clicked the door-list redeem control;
 // this confirms the server state and the safe double-redeem behavior.
 wp_set_current_user( 1 );
-$redeem = ec_rig_grade_execute(
+$redeem         = ec_rig_grade_execute(
 	'extrachill/redeem-event-pass',
 	array(
 		'event_id' => $event_id,
@@ -243,7 +243,7 @@ $redeem_outcome = array(
 	'already_redeemed' => is_array( $redeem ) ? (bool) ( $redeem['already_redeemed'] ?? false ) : null,
 	'error'            => is_wp_error( $redeem ) ? $redeem->get_error_message() : null,
 );
-$pass_after = class_exists( '\\ExtraChillEvents\\Core\\RsvpPassesTable' )
+$pass_after     = class_exists( '\\ExtraChillEvents\\Core\\RsvpPassesTable' )
 	? \ExtraChillEvents\Core\RsvpPassesTable::find_for_user_event( $event_id, $gardner_id )
 	: null;
 restore_current_blog();
@@ -375,7 +375,10 @@ ec_rig_grade_case(
 switch_to_blog( $events_blog_id );
 $login_url = home_url( '/login/' );
 restore_current_blog();
-$login_response   = wp_remote_get( $login_url, array( 'timeout' => 20, 'sslverify' => false ) );
+$login_response   = wp_remote_get( $login_url, array(
+	'timeout'   => 20,
+	'sslverify' => false,
+) );
 $login_status     = is_wp_error( $login_response ) ? $login_response->get_error_message() : wp_remote_retrieve_response_code( $login_response );
 $login_body_start = is_wp_error( $login_response ) ? '' : substr( (string) wp_remote_retrieve_body( $login_response ), 0, 400 );
 ec_rig_grade_case(
@@ -384,10 +387,10 @@ ec_rig_grade_case(
 	! is_wp_error( $login_response ) && 200 === (int) $login_status,
 	'Click Going while logged out and reach a working sign-in page.',
 	array(
-		'login_url'     => $login_url,
-		'status'        => $login_status,
-		'body_start'    => $login_body_start,
-		'note'          => 'Diagnostic for the register->RSVP loop: a non-200 or error here means the loop failure is the login page, not the registration form.',
+		'login_url'  => $login_url,
+		'status'     => $login_status,
+		'body_start' => $login_body_start,
+		'note'       => 'Diagnostic for the register->RSVP loop: a non-200 or error here means the loop failure is the login page, not the registration form.',
 	)
 );
 
@@ -403,7 +406,10 @@ if ( '' === $event_url ) {
 	$event_url = get_permalink( $event_id );
 	restore_current_blog();
 }
-$render_response = wp_remote_get( $event_url, array( 'timeout' => 30, 'sslverify' => false ) );
+$render_response = wp_remote_get( $event_url, array(
+	'timeout'   => 30,
+	'sslverify' => false,
+) );
 $rendered_html   = is_wp_error( $render_response ) ? '' : (string) wp_remote_retrieve_body( $render_response );
 
 // data-machine-events#860 shipped an end-time render (fixed in v0.64.7);
@@ -455,8 +461,8 @@ $count_request->set_query_params(
 );
 $count_response = rest_do_request( $count_request );
 restore_current_blog();
-$upcoming   = $count_response->is_error() ? null : $count_response->get_data();
-$first_market = is_array( $upcoming ) && ! empty( $upcoming[0] ) ? $upcoming[0] : null;
+$upcoming         = $count_response->is_error() ? null : $count_response->get_data();
+$first_market     = is_array( $upcoming ) && ! empty( $upcoming[0] ) ? $upcoming[0] : null;
 $charleston_first = is_array( $first_market ) && 'charleston' === ( $first_market['slug'] ?? '' );
 ec_rig_grade_case(
 	'local-scene-card-prioritizes-saved-market',
