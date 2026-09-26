@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.23.1] - 2026-09-26
+
+### Fixed
+- rewrite migrate_post image URLs host-agnostically, gate --delete-source on unrewritten URLs
+
 ## [2.23.0] - 2026-09-25
 
 ### Added
