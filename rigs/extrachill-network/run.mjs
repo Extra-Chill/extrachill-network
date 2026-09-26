@@ -263,6 +263,37 @@ function journeyPhaseStep(journey, dir, phase) {
   };
 }
 
+/**
+ * wp-codebox's wordpress.run-php always bootstraps every request with the
+ * SAME simulated identity -- HTTP_HOST/REQUEST_URI copied from wp-config.php's
+ * DOMAIN_CURRENT_SITE/PATH_CURRENT_SITE (see
+ * @automattic/wp-codebox-playground's multisiteRequestBootstrapPhp()), i.e.
+ * every single run-php call looks identical to an anonymous GET of the
+ * primary site's homepage. extrachill-cache's advanced-cache.php drop-in
+ * (correctly, for a real front-end request) serves a stored page for that
+ * exact identity and exits before WordPress finishes loading -- BEFORE our
+ * injected eval code ever runs -- the moment any earlier step (a baseline
+ * browser-probe, a journey browser-action) has actually visited that
+ * homepage as a real anonymous visitor and warmed the cache. That produces a
+ * run-php step wp-codebox itself reports as "succeeded" while our PHP never
+ * executed at all: this rig hit it for real (the journey's seed AND grade
+ * run-php steps both silently returned cached homepage HTML, evidenced by an
+ * identical "Cached by Extra Chill Cache" timestamp on both). Filed upstream
+ * at Automattic/wp-codebox with a minimal repro; wp-cli's own bootstrap
+ * (wp-cli-command-handlers.js) never sets $_SERVER['REQUEST_METHOD'], so
+ * advanced-cache.php's "only GET requests can hit the anonymous cache" gate
+ * returns immediately and lets WordPress load for real -- purging through
+ * wordpress.wp-cli, not wordpress.run-php, is what actually reaches the
+ * plugin's own `wp extrachill-cache purge --all` command.
+ */
+function cachePurgeStep(journeyId, phase) {
+  return {
+    command: 'wordpress.wp-cli',
+    args: ['command=extrachill-cache purge --all'],
+    metadata: { kind: `journey-${phase}-cache-purge`, journey: journeyId },
+  };
+}
+
 export async function buildJourneys(settings, topology) {
   const ids = journeySelection(settings);
   const known = await availableJourneys();
@@ -326,15 +357,23 @@ export async function buildRecipe(settings = {}, cwd = process.cwd()) {
     Object.assign(runtimeEnv, journey.runtimeEnv ?? {});
   }
 
+  const cacheActive = activePlugins.some((component) => component.slug === 'extrachill-cache');
+
   const journeySteps = [];
   for (const { journey, dir } of journeys) {
     const seed = journeyPhaseStep(journey, dir, 'seed');
     if (seed) {
+      if (cacheActive) {
+        journeySteps.push(cachePurgeStep(journey.id, 'seed'));
+      }
       journeySteps.push(seed);
     }
     journeySteps.push(...journey.steps.map((step) => journeyStep(journey, dir, step)));
     const grade = journeyPhaseStep(journey, dir, 'grade');
     if (grade) {
+      if (cacheActive) {
+        journeySteps.push(cachePurgeStep(journey.id, 'grade'));
+      }
       journeySteps.push(grade);
     }
   }
@@ -515,6 +554,31 @@ if (!is_array($matrix)) {
 }
 
 /**
+ * A plugin's own activation hook can legitimately call wp_die() to hard-fail
+ * an unmet requirement (extrachill-events-network-blocks does exactly this
+ * when it is not being network-activated). This step batches every
+ * network-wide AND per-site activation into ONE PHP process; an uncaught
+ * wp_die() from any single plugin's hook -- fired with hooks enabled since
+ * this step deliberately activates with $silent=false -- kills that whole
+ * process, leaving every plugin queued after it in $matrix['network'] with
+ * NO activation attempt at all and no evidence recorded. That is exactly
+ * what produced "16 of 17 network plugins inactive, empty evidence" during
+ * this rig's own bring-up: the JSON-declaration-order boundary matched
+ * precisely where the first hard-failing hook's wp_die() aborted the batch.
+ * Convert wp_die() into a catchable exception for the lifetime of this step
+ * so one plugin's hard-fail becomes a normal, retried per-plugin activation
+ * error in the evidence -- never a silent abort of every plugin after it.
+ */
+class Extrachill_Network_Rig_Activation_Die extends RuntimeException {}
+add_filter('wp_die_handler', function () {
+    return function ($message, $title = '', $args = array()) {
+        unset($args);
+        $text = is_wp_error($message) ? $message->get_error_message() : (is_string($message) ? $message : wp_json_encode($message));
+        throw new Extrachill_Network_Rig_Activation_Die(trim($text . ($title !== '' ? " ({$title})" : '')));
+    };
+}, PHP_INT_MAX);
+
+/**
  * components.json lists plugins independent of each other's "Requires
  * Plugins" headers or runtime dependency checks (WooCommerce before
  * extrachill-shop, etc.). Rather than hand-order every entry (fragile as
@@ -538,8 +602,36 @@ function extrachill_network_activate_with_retries($plugin_files, $network_wide, 
                 $activated_this_pass++;
                 continue;
             }
-            $result = activate_plugin($plugin_file, '', $network_wide, false);
+            try {
+                $result = activate_plugin($plugin_file, '', $network_wide, false);
+            } catch (Extrachill_Network_Rig_Activation_Die $e) {
+                $last_errors[$plugin_file] = 'wp_die: ' . $e->getMessage();
+                $evidence_errors[$plugin_file] = 'wp_die: ' . $e->getMessage();
+                $still_pending[] = $plugin_file;
+                continue;
+            }
             if (is_wp_error($result)) {
+                /**
+                 * Core's own activate_plugin() (wp-admin/includes/plugin.php)
+                 * commits the active-plugin option write BEFORE its trailing
+                 * ob_get_length() > 0 check -- an 'unexpected_output' WP_Error
+                 * means some stray warning/notice leaked into the output
+                 * buffer during the plugin's own load or activation hook, NOT
+                 * that activation failed. Re-check the real activation state
+                 * rather than trusting the WP_Error at face value: this rig
+                 * hit that exact combination activating WooCommerce (a PHP
+                 * 8.4 deprecation notice leaks into the buffer that WP core
+                 * itself already tolerates as an activated-but-noisy plugin).
+                 * Retrying it forever as though it never activated is wrong
+                 * and, worse, permanently blocks anything depending on it
+                 * from ever making progress.
+                 */
+                $now_active = $network_wide ? is_plugin_active_for_network($plugin_file) : is_plugin_active($plugin_file);
+                if ($now_active && $result->get_error_code() === 'unexpected_output') {
+                    $evidence_errors[$plugin_file] = 'ok (activated with unexpected_output tolerated: ' . $result->get_error_message() . ')';
+                    $activated_this_pass++;
+                    continue;
+                }
                 $last_errors[$plugin_file] = $result->get_error_message();
                 $evidence_errors[$plugin_file] = $result->get_error_code() . ': ' . $result->get_error_message();
                 $still_pending[] = $plugin_file;
@@ -556,6 +648,61 @@ function extrachill_network_activate_with_retries($plugin_files, $network_wide, 
             throw new RuntimeException('extrachill-network: could not activate (dependency ordering or a real failure): ' . implode('; ', $details));
         }
         $pending = $still_pending;
+    }
+}
+
+/**
+ * Known per-site tables whose owning plugin's activation hook can report a
+ * clean, hook-fired success (activate_plugin() returns null, no WP_Error, no
+ * buffered output, did_action() > 0) while the table itself is still missing
+ * immediately afterward, in the SAME request and blog context. Instrumented
+ * live during this rig's own bring-up for data-machine-events specifically:
+ * its activation hook's own EventDatesTable::create_table() call left the
+ * table missing right after activation, and re-firing the WHOLE activation
+ * hook a second time did not reliably fix it either (still reproduced on a
+ * later run) -- only calling create_table() again, directly, did. The root
+ * cause is unconfirmed (a Playground/SQLite dbDelta timing quirk under this
+ * rig's own heavy switch_to_blog() + repeated-activation churn is the
+ * leading theory; production activates each plugin in its own request and
+ * never exercises this path) and is filed upstream with the evidence
+ * gathered here. This list is the explicit, named, evidence-logged safety
+ * net -- not a silent workaround: it only repairs a table for a plugin this
+ * step already verified is genuinely active, and it always records what it
+ * found in $activation_errors so the run's evidence shows exactly what
+ * happened. See components.json's activationHookExceptions for the parallel
+ * "expected, named, reasoned" pattern this follows for whole-plugin gaps.
+ *
+ * @param string $plugin_file    Basename the table's owning plugin activates as.
+ * @param string $table_exists_callable PHP callable string, e.g. "Class::method".
+ * @param string $create_callable      PHP callable string, e.g. "Class::method".
+ */
+function extrachill_network_repair_known_table($plugin_file, $table_exists_callable, $create_callable, $site_domain, &$evidence_errors) {
+    if (!is_callable($table_exists_callable) || !is_callable($create_callable)) {
+        return;
+    }
+    if (call_user_func($table_exists_callable)) {
+        return;
+    }
+    call_user_func($create_callable);
+    $now_exists = call_user_func($table_exists_callable);
+    $evidence_errors[$plugin_file . '@' . $site_domain . '@table-repair'] = $now_exists
+        ? 'repaired: table missing immediately after a clean activation-hook fire; direct ' . $create_callable . '() call created it'
+        : 'UNRESOLVED: table still missing after a direct ' . $create_callable . '() repair attempt';
+}
+
+function extrachill_network_repair_known_tables($active_plugin_files, $site_domain, &$evidence_errors) {
+    $known = array(
+        array(
+            'pluginFile' => 'data-machine-events/data-machine-events.php',
+            'tableExists' => 'DataMachineEvents\\Core\\EventDatesTable::table_exists',
+            'create' => 'DataMachineEvents\\Core\\EventDatesTable::create_table',
+        ),
+    );
+    foreach ($known as $entry) {
+        if (!in_array($entry['pluginFile'], $active_plugin_files, true)) {
+            continue;
+        }
+        extrachill_network_repair_known_table($entry['pluginFile'], $entry['tableExists'], $entry['create'], $site_domain, $evidence_errors);
     }
 }
 
@@ -594,7 +741,14 @@ foreach (get_sites(array('number' => 0)) as $site) {
             if (!file_exists(WP_PLUGIN_DIR . '/' . $network_plugin_file)) {
                 continue;
             }
-            do_action('activate_' . $network_plugin_file, false);
+            try {
+                do_action('activate_' . $network_plugin_file, false);
+            } catch (Extrachill_Network_Rig_Activation_Die $e) {
+                // Same wp_die-to-exception protection as the network-wide
+                // pass: a per-site re-fire hard-failing must not abort setup
+                // for every other plugin on this site (or every later site).
+                $activation_errors[$network_plugin_file . '@' . $site->domain] = 'wp_die on per-site re-fire: ' . $e->getMessage();
+            }
         }
         $plugin_files = $matrix['perDomain'][$site->domain] ?? array();
         try {
@@ -602,6 +756,7 @@ foreach (get_sites(array('number' => 0)) as $site) {
         } catch (RuntimeException $e) {
             throw new RuntimeException($site->domain . ': ' . $e->getMessage());
         }
+        extrachill_network_repair_known_tables($plugin_files, $site->domain, $activation_errors);
     } finally {
         restore_current_blog();
     }
