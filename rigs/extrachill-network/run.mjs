@@ -316,7 +316,8 @@ export async function buildRecipe(settings = {}, cwd = process.cwd()) {
 
   const journeys = await buildJourneys(settings, topology);
 
-  const activationMatrix = buildActivationMatrix(topology, activePlugins, components.excludedComponents);
+  const activationHookExceptions = (components.activationHookExceptions ?? []).map((entry) => entry.pluginFile);
+  const activationMatrix = buildActivationMatrix(topology, activePlugins, components.excludedComponents, activationHookExceptions);
 
   const muPluginPath = await writeDomainIdsMuPlugin(artifactsRoot(cwd), topology);
 
@@ -484,7 +485,7 @@ foreach ( get_sites( array( 'number' => 0, 'fields' => 'ids' ) ) as $site_id ) {
 }
 
 /** @returns {{ network: string[], perDomain: Record<string, string[]> }} */
-function buildActivationMatrix(topology, activePlugins, excludedComponents) {
+function buildActivationMatrix(topology, activePlugins, excludedComponents, activationHookExceptions) {
   const network = [];
   const perDomain = Object.fromEntries(topology.sites.map((site) => [site.domain, []]));
   for (const component of activePlugins) {
@@ -501,7 +502,7 @@ function buildActivationMatrix(topology, activePlugins, excludedComponents) {
       }
     }
   }
-  return { network, perDomain, excludedComponents };
+  return { network, perDomain, excludedComponents, activationHookExceptions };
 }
 
 function activatePluginsStep(matrix) {
@@ -605,7 +606,13 @@ foreach (get_sites(array('number' => 0)) as $site) {
         restore_current_blog();
     }
 }
-update_site_option('ec_rig_activation_report', array('errors' => $activation_errors, 'selfDeactivatedNetwork' => $self_deactivated_network, 'finalNetworkActive' => array_keys(get_site_option('active_sitewide_plugins', array()))), false);
+$final_per_domain = array();
+foreach (get_sites(array('number' => 0)) as $site) {
+    switch_to_blog((int) $site->blog_id);
+    $final_per_domain[$site->domain] = get_option('active_plugins', array());
+    restore_current_blog();
+}
+update_site_option('ec_rig_activation_report', array('errors' => $activation_errors, 'selfDeactivatedNetwork' => $self_deactivated_network, 'finalNetworkActive' => array_keys(get_site_option('active_sitewide_plugins', array())), 'finalPerDomain' => $final_per_domain), false);
 echo wp_json_encode(array('activated' => true, 'selfDeactivatedNetwork' => $self_deactivated_network, 'activationErrors' => $activation_errors));`;
   return { command: 'wordpress.run-php', args: [`code=${code}`], metadata: { kind: 'extrachill-network-activation' } };
 }
@@ -616,17 +623,13 @@ function activationAssertionStep(topology, matrix, excludedComponents, includeEx
     network: matrix.network,
     perDomain: matrix.perDomain,
     excludedComponents: excludedSlugs,
+    activationHookExceptions: matrix.activationHookExceptions ?? [],
     expectedHomepageStatus: Object.fromEntries(topology.sites.map((site) => [site.domain, site.expectedHomepageStatus ?? [200]])),
   };
   const encoded = Buffer.from(JSON.stringify(expected), 'utf8').toString('base64');
   const code = `require_once ABSPATH . 'wp-admin/includes/plugin.php';
 $expected = json_decode(base64_decode('${encoded}'), true);
 $report = array('sites' => array(), 'network' => array(), 'excludedComponents' => $expected['excludedComponents']);
-$self_deactivated = get_site_option('ec_rig_self_deactivated_network', array());
-if (!is_array($self_deactivated)) {
-    $self_deactivated = array();
-}
-$report['environmentDeactivated'] = array('network' => array_values($self_deactivated), 'note' => 'Plugins whose own activation hook deactivated them again because a backing service the sandbox lacks is required; hooks fired, plugin re-marked active without hooks for code-path parity.');
 $activation_report = get_site_option('ec_rig_activation_report', array());
 if (is_array($activation_report)) {
     $report['activationDiagnostics'] = $activation_report;
@@ -635,7 +638,7 @@ $active_network = array_keys(get_site_option('active_sitewide_plugins', array())
 sort($active_network);
 $expected_network = $expected['network'];
 sort($expected_network);
-$tolerated_network = array_values(array_intersect($self_deactivated, array_diff($expected_network, $active_network)));
+$tolerated_network = array_values(array_intersect($expected['activationHookExceptions'], array_diff($expected_network, $active_network)));
 $report['network'] = array(
     'expected' => $expected_network,
     'actual' => $active_network,
@@ -645,7 +648,15 @@ $report['network'] = array(
 );
 $hard_missing_network = array_values(array_diff($report['network']['missing'], $tolerated_network));
 if (!empty($hard_missing_network)) {
-    throw new RuntimeException('extrachill-network: network plugins not active after setup: ' . implode(', ', $hard_missing_network));
+    $diag = '';
+    if (is_array($activation_report) && !empty($activation_report['errors'])) {
+        $lines = array();
+        foreach ($activation_report['errors'] as $plugin_file => $outcome) {
+            $lines[] = $plugin_file . ' => ' . $outcome;
+        }
+        $diag = ' | activation evidence: ' . implode('; ', $lines);
+    }
+    throw new RuntimeException('extrachill-network: network plugins not active after setup: ' . implode(', ', $hard_missing_network) . $diag);
 }
 foreach (get_sites(array('number' => 0)) as $site) {
     switch_to_blog((int) $site->blog_id);
