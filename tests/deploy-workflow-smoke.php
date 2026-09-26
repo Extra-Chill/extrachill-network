@@ -133,7 +133,19 @@ dws_assert(
 dws_assert( str_contains( $yaml, 'commands_ok=false' ), 'the notification reads Homeboy own per-command success, not just job status' );
 dws_assert( str_contains( $yaml, 'secrets.DISCORD_DEPLOY_WEBHOOK' ), 'the webhook comes from a secret, never a literal' );
 dws_assert( ! preg_match( '#discord\.com/api/webhooks/[0-9]#', $yaml ), 'no webhook URL is hardcoded in the workflow' );
-dws_assert( str_contains( $yaml, 'GATE(extrachill-network#223)' ), 'rig gate placeholder present' );
+// Network rig pre-deploy gate (#264). Assert the real gate, not a comment
+// marker: the placeholder this used to check was replaced by a working step,
+// and the marker number moved with it (#288).
+dws_assert( str_contains( $yaml, '- name: Network rig gate' ), 'the network rig gate step exists' );
+dws_assert( str_contains( $yaml, 'homeboy rig up extrachill-network' ), 'the gate boots the extrachill-network rig' );
+dws_assert( str_contains( $yaml, 'skip_network_gate' ), 'the gate has a logged emergency bypass input' );
+// Regression: resolution must never be able to deploy. It previously appended
+// --dry-run only when dry_run != "true", so a manual dry-run dispatch resolved
+// with a real deploy (#271).
+dws_assert( str_contains( $yaml, 'resolve_command="${command} --dry-run"' ), 'gate resolution is unconditionally a dry run' );
+// Regression: dry-run resolve results are reported as "planned", never
+// "deployed". Counting only "deployed" made the gate skip every run (#272).
+dws_assert( str_contains( $yaml, 'select(.status == "planned" or .status == "deployed")' ), 'the gate counts planned resolve results' );
 
 // Checked-in Homeboy config.
 dws_assert( is_file( $project ), 'project config exists' );
