@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.24.0] - 2026-09-26
+
+### Added
+- journey contract + Gardner Oct 21 event-RSVP journey on the full network
+
 ## [2.23.2] - 2026-09-26
 
 ### Changed
