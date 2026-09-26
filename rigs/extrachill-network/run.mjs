@@ -143,6 +143,33 @@ export function journeySelection(settings) {
   return value.map((id) => id.trim());
 }
 
+/**
+ * `extrachill_journey_seed`: an optional, generic deterministic string a
+ * journey's own seed.php may read back (via
+ * `get_site_option('ec_rig_journey_seed', ...)`) to build a replayable,
+ * seeded case plan. The rig treats it as an opaque string; it never inspects
+ * or names what any journey does with it.
+ */
+export function journeySeedSetting(settings) {
+  if (settings.extrachill_journey_seed === undefined) {
+    return undefined;
+  }
+  const value = settings.extrachill_journey_seed;
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new Error('extrachill_journey_seed must be a non-empty string.');
+  }
+  return value;
+}
+
+function journeySeedStep(seed) {
+  const encoded = Buffer.from(JSON.stringify(seed)).toString('base64');
+  return {
+    command: 'wordpress.run-php',
+    args: [`code=update_site_option( 'ec_rig_journey_seed', json_decode( base64_decode( '${encoded}' ) ) );`],
+    metadata: { kind: 'journey-seed-setting' },
+  };
+}
+
 export async function availableJourneys() {
   const root = path.join(packageRoot, 'journeys');
   try {
@@ -210,6 +237,16 @@ export async function validateJourneyDocument(journey, id, topology, personaExis
       throw new Error(`Journey '${id}' ${phase}.codeFile '${journey[phase].codeFile}' does not exist in journeys/${id}/.`);
     }
   }
+  if (journey.fixtureMuPlugins !== undefined) {
+    if (!Array.isArray(journey.fixtureMuPlugins) || journey.fixtureMuPlugins.length === 0 || journey.fixtureMuPlugins.some((file) => typeof file !== 'string' || file.trim() === '')) {
+      throw new Error(`Journey '${id}' fixtureMuPlugins must be a non-empty array of non-empty file names relative to journeys/${id}/.`);
+    }
+    for (const file of journey.fixtureMuPlugins) {
+      if (!(await codeFileExists(file))) {
+        throw new Error(`Journey '${id}' fixtureMuPlugins entry '${file}' does not exist in journeys/${id}/.`);
+      }
+    }
+  }
   assertJourneyStepScoping(id, journey);
 }
 
@@ -230,9 +267,20 @@ function assertJourneyStepScoping(id, journey) {
       }
     }
     for (const argKey of ['route-host', 'allow-host']) {
-      const value = args.find((arg) => arg.startsWith(`${argKey}=`));
-      if (value && !allowed.has(value.slice(argKey.length + 1))) {
-        throw new Error(`Journey '${id}' step ${index} sets ${argKey} to '${value.slice(argKey.length + 1)}', outside the journey's declared sites.`);
+      // Both args are wp-codebox "repeatable" hostnames (route-host also
+      // accepts one comma-separated value): a journey step driving a real
+      // cross-site flow (e.g. a browser-handoff redirect) legitimately
+      // declares more than one. Every declared host -- not just the first
+      // occurrence -- must stay inside the journey's declared sites.
+      const hosts = args
+        .filter((arg) => arg.startsWith(`${argKey}=`))
+        .flatMap((arg) => arg.slice(argKey.length + 1).split(','))
+        .map((host) => host.trim())
+        .filter((host) => host !== '');
+      for (const host of hosts) {
+        if (!allowed.has(host)) {
+          throw new Error(`Journey '${id}' step ${index} sets ${argKey} to '${host}', outside the journey's declared sites.`);
+        }
       }
     }
     if (step.metadata?.kind !== undefined && step.metadata.kind !== 'journey-browser-step') {
@@ -359,7 +407,38 @@ export async function buildRecipe(settings = {}, cwd = process.cwd()) {
 
   const cacheActive = activePlugins.some((component) => component.slug === 'extrachill-cache');
 
+  // Journey fixture mu-plugins (extrachill-network/journey/v1's optional
+  // "fixtureMuPlugins"): journey-owned PHP files that must run on EVERY
+  // request for the lifetime of the boot, not just inside one run-php
+  // step's own process (e.g. a persistent add_filter() a browser-driven
+  // registration/delivery flow needs live while it makes its own separate
+  // HTTP requests). Generic rig mounting; the vendor-specific content (a
+  // Turnstile bypass filter, a provider HTTP stub, ...) lives entirely
+  // inside the journey's own file, never in this rig.
+  const journeyFixtureMuPluginMounts = [];
+  for (const { journey, dir } of journeys) {
+    for (const file of journey.fixtureMuPlugins ?? []) {
+      journeyFixtureMuPluginMounts.push({
+        type: 'file',
+        source: path.join(dir, file),
+        target: `/wordpress/wp-content/mu-plugins/journey-${journey.id}-${path.basename(file)}`,
+        mode: 'readonly',
+        metadata: { kind: 'journey-fixture-mu-plugin', journey: journey.id, file },
+      });
+    }
+  }
+
+  // extrachill_journey_seed: one optional, generic deterministic seed string
+  // any journey's own seed.php may read (get_site_option('ec_rig_journey_seed', ...))
+  // to build a replayable, seeded case plan (e.g. a fuzz campaign's generated
+  // email/device IDs). The rig only carries the opaque string through; it
+  // has no idea what a journey does with it.
+  const journeySeed = journeySeedSetting(settings);
+
   const journeySteps = [];
+  if (journeys.length > 0 && journeySeed !== undefined) {
+    journeySteps.push(journeySeedStep(journeySeed));
+  }
   for (const { journey, dir } of journeys) {
     const seed = journeyPhaseStep(journey, dir, 'seed');
     if (seed) {
@@ -410,6 +489,7 @@ export async function buildRecipe(settings = {}, cwd = process.cwd()) {
           metadata: { kind: 'extrachill-network-domain-ids', generated: true, note: 'Resolves EC_BLOG_ID_* constants from the actual sites table by domain; see run.mjs EC_DOMAIN_TO_BLOG_ID_CONSTANT.' },
         },
         ...(theme.mounts ? theme.mounts : []),
+        ...journeyFixtureMuPluginMounts,
       ],
       siteSeeds: [{
         type: 'parent_site',

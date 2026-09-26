@@ -34,7 +34,8 @@
       "node tests/ExperimentAssignmentJsTest.js",
       "php tests/deploy-workflow-smoke.php",
       "php tests/media-webp-smoke.php",
-      "node rigs/extrachill-network/tests/contract.test.mjs"
+      "node rigs/extrachill-network/tests/contract.test.mjs",
+      "node rigs/extrachill-network/tests/gardner-persona-contract.test.mjs"
     ]
   },
   "version_targets": [

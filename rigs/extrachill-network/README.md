@@ -82,6 +82,7 @@ this is a local checkout path today, not a release zip.
 | --- | --- |
 | `extrachill_theme_source` | Absolute local theme checkout path, or (forward-compatible only, see below) an `https://…zip` URL. Required for a real `up`. |
 | `extrachill_journeys` | Array of journey IDs from `journeys/` to run after the baseline, e.g. `["gardner-event-rsvp"]`. Unknown IDs, wrong schemas, undeclared site domains, or missing persona files fail recipe validation loudly. |
+| `extrachill_journey_seed` | Optional deterministic seed string, passed through opaquely as `get_site_option('ec_rig_journey_seed')` for any selected journey's `seed.php` to consume when it needs a replayable, seeded case plan (e.g. `auth-multisite`'s fuzz plan). The rig never inspects or names what a journey does with it. |
 | `extrachill_component_source_overrides` | `{ "<slug>": "<local path or URL>" }`. Overrides one component's mount source, e.g. to test an unreleased branch of `extrachill-network` itself. |
 | `extrachill_release_set` | `{ "<slug>": { "ref": "<tag>" } }`. Pins a GitHub-hosted component to an explicit release tag instead of `latest`. There is no resolver that turns a `homeboy/release-set/v1` manifest into these entries yet -- a caller wanting deploy-parity pinning composes this map itself (see extrachill-network#223's spike notes on why `release-set/v1` is a gate, not a resolver). |
 | `extrachill_include_excluded_components` | Array of slugs from `components.json`'s `excludedComponents` list to force-include; requires a matching `extrachill_component_source_overrides` entry (no default source exists for those). |
@@ -129,6 +130,16 @@ Contract rules enforced by `run.mjs` and `tests/contract.test.mjs`:
 - `runtimeEnv` entries (e.g. `WP_AGENT_RUNTIME=1`, which forces Data
   Machine's full runtime -- and abilities registration -- on front-end
   requests) merge into the recipe inputs when the journey is selected.
+- `fixtureMuPlugins` (optional): an array of journey-owned PHP files, mounted
+  into `mu-plugins/` for the lifetime of the boot when that journey is
+  selected. Use this when a journey needs a filter or stub active on EVERY
+  request -- not just the process a single `seed`/`grade` run-php step
+  runs in -- because a browser-driven flow (registration, delivery, ...)
+  makes its own separate HTTP requests against the boot. The rig only
+  mounts the file generically; the vendor-specific content (a Turnstile
+  bypass filter, a provider HTTP stub, ...) lives entirely inside the
+  journey's own file (`auth-multisite`'s Turnstile bypass,
+  `gardner-social-operator`'s provider stub), never in this rig.
 - Steps run **after the full baseline** (activation, per-site assertion, and
   every site's anonymous browser probe), in the order the setting lists
   them; consumer `wordpress_runtime_post_steps` still run last.

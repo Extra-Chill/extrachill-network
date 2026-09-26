@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { buildRecipe, domainIdsMuPluginSource, DOMAIN_IDS_MU_PLUGIN_FILENAME, journeySelection, validateJourneyDocument } from '../run.mjs';
+import { buildRecipe, domainIdsMuPluginSource, DOMAIN_IDS_MU_PLUGIN_FILENAME, journeySeedSetting, journeySelection, validateJourneyDocument } from '../run.mjs';
 
 const packageRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const topology = JSON.parse(await readFile(path.join(packageRoot, 'network-topology.json'), 'utf8'));
@@ -192,7 +192,46 @@ try {
   await assert.rejects(validateJourneyDocument(doc({ steps: [{ command: 'wordpress.browser-actions', args: ['url=/events/x'] }] }), 'gardner-event-rsvp', topology), /non-absolute url/);
   await assert.rejects(validateJourneyDocument(doc({ steps: [{ command: 'wordpress.browser-actions', args: ['url=http://artist.extrachill.com/'] }] }), 'gardner-event-rsvp', topology), /outside the journey's declared sites/);
   await assert.rejects(validateJourneyDocument(doc({ steps: [{ command: 'wordpress.browser-actions', args: ['url=http://events.extrachill.com/', 'route-host=extrachill.com'] }] }), 'gardner-event-rsvp', topology), /route-host/);
+
+  // Repeatable allow-host/route-host (a journey step driving a real
+  // cross-site flow, e.g. a browser-handoff redirect, legitimately declares
+  // more than one host): every declared host is checked, not just the first.
+  const multiHostDoc = {
+    schema: 'extrachill-network/journey/v1',
+    id: 'gardner-event-rsvp',
+    sites: ['events.extrachill.com', 'extrachill.com'],
+    steps: [{ command: 'wordpress.browser-actions', args: ['url=http://events.extrachill.com/', 'route-host=events.extrachill.com', 'allow-host=events.extrachill.com', 'allow-host=extrachill.com'] }],
+  };
+  await validateJourneyDocument(multiHostDoc, 'gardner-event-rsvp', topology);
+  await assert.rejects(
+    validateJourneyDocument({ ...multiHostDoc, steps: [{ ...multiHostDoc.steps[0], args: [...multiHostDoc.steps[0].args, 'allow-host=outside.example'] }] }, 'gardner-event-rsvp', topology),
+    /allow-host to 'outside\.example'/,
+  );
   await assert.rejects(validateJourneyDocument(doc({ steps: [{ command: 'wordpress.browser-actions', metadata: { kind: 'baseline' }, args: [] }] }), 'gardner-event-rsvp', topology), /reserved metadata kind/);
+
+  // 8d. fixtureMuPlugins: journey-owned files mount into mu-plugins/ under a
+  // journey-namespaced target, generically -- the rig never inspects their
+  // content -- and a missing file fails validation loudly.
+  await assert.rejects(
+    validateJourneyDocument(doc({ fixtureMuPlugins: ['missing.php'] }), 'gardner-event-rsvp', topology, async () => true, async () => false),
+    /fixtureMuPlugins entry 'missing\.php' does not exist/,
+  );
+  await assert.rejects(
+    validateJourneyDocument(doc({ fixtureMuPlugins: [] }), 'gardner-event-rsvp', topology),
+    /fixtureMuPlugins must be a non-empty array/,
+  );
+
+  // 9. journeySeedSetting: opaque passthrough, validated shape only.
+  assert.equal(journeySeedSetting({}), undefined);
+  assert.equal(journeySeedSetting({ extrachill_journey_seed: 'campaign-001' }), 'campaign-001');
+  assert.throws(() => journeySeedSetting({ extrachill_journey_seed: '' }), /non-empty string/);
+  assert.throws(() => journeySeedSetting({ extrachill_journey_seed: 42 }), /non-empty string/);
+
+  const withSeed = await buildRecipe({ extrachill_journeys: ['gardner-event-rsvp'], extrachill_journey_seed: 'campaign-001' }, packageRoot);
+  const seedStepIndex = withSeed.workflow.steps.findIndex((step) => step.metadata?.kind === 'journey-seed-setting');
+  assert.ok(seedStepIndex > -1, 'a journey seed is selected passes through as one generic run-php step');
+  assert.ok(seedStepIndex < withSeed.workflow.steps.findIndex((step) => step.metadata?.kind === 'journey-seed'), 'the seed-setting step runs before any journey seed step');
+  assert.equal(withoutTheme.workflow.steps.some((step) => step.metadata?.kind === 'journey-seed-setting'), false, 'no journey selected means no seed-setting step');
 
   console.log('extrachill-network rig contract ok');
 } finally {
