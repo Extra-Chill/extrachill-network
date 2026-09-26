@@ -61,7 +61,7 @@ function font_path( string $filename ): ?string {
  */
 function main_site_upload_path( string $relative_path ): ?string {
 	$main_site_id = is_multisite() ? get_main_site_id() : get_current_blog_id();
-	$switched     = is_multisite() && $main_site_id !== get_current_blog_id();
+	$switched     = is_multisite() && get_current_blog_id() !== $main_site_id;
 
 	if ( $switched ) {
 		switch_to_blog( $main_site_id );
