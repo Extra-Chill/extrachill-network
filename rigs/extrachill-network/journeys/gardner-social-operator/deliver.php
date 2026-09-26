@@ -61,10 +61,28 @@ function ec_studio_operator_execute_job( array $job ): array {
 	return is_array( $result ) ? $result : array();
 }
 
+/**
+ * Resolve the studio site by domain, never by blog ID -- this run-php
+ * process starts on the primary site, so the fixture (written to studio's
+ * OWN options table by the seed step, inside its own switch_to_blog()) is
+ * unreadable via a plain get_option() until we are on that blog too.
+ *
+ * @return int Blog ID of studio.extrachill.com.
+ */
+function ec_rig_social_operator_deliver_studio_blog_id(): int {
+	$sites = get_sites( array(
+		'domain' => 'studio.extrachill.com',
+		'number' => 1,
+	) );
+	if ( empty( $sites ) ) {
+		throw new RuntimeException( 'Journey deliver step could not resolve studio.extrachill.com by domain.' );
+	}
+	return (int) $sites[0]->blog_id;
+}
+
+switch_to_blog( ec_rig_social_operator_deliver_studio_blog_id() );
 $fixture = get_option( 'ec_rig_journey_fixture_gardner_social_operator', array() );
 ec_studio_operator_assert( is_array( $fixture ) && ! empty( $fixture['studio_blog_id'] ), 'persisted seed fixture reloads' );
-
-switch_to_blog( (int) $fixture['studio_blog_id'] );
 require_once WP_PLUGIN_DIR . '/extrachill-studio/extrachill-studio.php';
 if ( function_exists( 'datamachine_register_core_actions' ) ) {
 	datamachine_register_core_actions();

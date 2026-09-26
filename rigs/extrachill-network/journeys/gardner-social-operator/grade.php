@@ -57,12 +57,31 @@ function ec_rig_social_operator_count_calls( array $ledger, string $provider_cal
 	return count( array_filter( $ledger, static fn( $entry ) => ( $entry['provider_call'] ?? '' ) === $provider_call ) );
 }
 
-$fixture = get_option( 'ec_rig_journey_fixture_gardner_social_operator', array() );
-if ( ! is_array( $fixture ) || empty( $fixture['studio_blog_id'] ) ) {
-	throw new RuntimeException( 'The gardner-social-operator fixture is missing; the seed step did not run or failed.' );
+/**
+ * Resolve the studio site by domain, never by blog ID -- this run-php
+ * process starts on the primary site, so the fixture (written to studio's
+ * OWN options table by the seed step, inside its own switch_to_blog()) is
+ * unreadable via a plain get_option() until we are on that blog too.
+ *
+ * @return int Blog ID of studio.extrachill.com.
+ */
+function ec_rig_social_operator_grade_studio_blog_id(): int {
+	$sites = get_sites( array(
+		'domain' => 'studio.extrachill.com',
+		'number' => 1,
+	) );
+	if ( empty( $sites ) ) {
+		throw new RuntimeException( 'Journey grade step could not resolve studio.extrachill.com by domain.' );
+	}
+	return (int) $sites[0]->blog_id;
 }
 
-switch_to_blog( (int) $fixture['studio_blog_id'] );
+switch_to_blog( ec_rig_social_operator_grade_studio_blog_id() );
+$fixture = get_option( 'ec_rig_journey_fixture_gardner_social_operator', array() );
+if ( ! is_array( $fixture ) || empty( $fixture['studio_blog_id'] ) ) {
+	restore_current_blog();
+	throw new RuntimeException( 'The gardner-social-operator fixture is missing; the seed step did not run or failed.' );
+}
 require_once WP_PLUGIN_DIR . '/extrachill-studio/extrachill-studio.php';
 if ( function_exists( 'datamachine_register_core_actions' ) ) {
 	datamachine_register_core_actions();
