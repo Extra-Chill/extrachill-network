@@ -283,11 +283,11 @@ function ec_send_email( array $args ) {
 	// treats it accordingly (flag introduced by data-machine#3534). WP-CLI is
 	// excluded: it already passes the legacy-sender check through the CLI
 	// permission bypass.
-	$principal_less = ! ( defined( 'WP_CLI' ) && (bool) constant( 'WP_CLI' ) )
-		&& empty( $args['auth_ref'] )
-		&& class_exists( '\DataMachine\Abilities\PermissionHelper' )
-		&& \DataMachine\Abilities\PermissionHelper::acting_user_id() <= 0
-		&& ! \DataMachine\Abilities\PermissionHelper::in_agent_context();
+	$principal_less = false;
+	$permission     = '\DataMachine\Abilities\PermissionHelper';
+	if ( ! defined( 'WP_CLI' ) && empty( $args['auth_ref'] ) && class_exists( $permission ) ) {
+		$principal_less = $permission::acting_user_id() <= 0 && ! $permission::in_agent_context();
+	}
 
 	if ( $principal_less ) {
 		$args['system'] = true;
