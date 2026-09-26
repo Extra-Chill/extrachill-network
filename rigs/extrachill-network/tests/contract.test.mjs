@@ -233,6 +233,32 @@ try {
   assert.ok(seedStepIndex < withSeed.workflow.steps.findIndex((step) => step.metadata?.kind === 'journey-seed'), 'the seed-setting step runs before any journey seed step');
   assert.equal(withoutTheme.workflow.steps.some((step) => step.metadata?.kind === 'journey-seed-setting'), false, 'no journey selected means no seed-setting step');
 
+  // 8e. allow-host (and route-host) accept a comma-separated host list, but
+  // every listed host must still be a declared site -- a step may name more
+  // than one declared site (a real cross-site click-through), never widen
+  // beyond the journey's own sites.
+  await assert.doesNotReject(
+    validateJourneyDocument(
+      doc({
+        sites: ['events.extrachill.com', 'extrachill.com'],
+        steps: [{ command: 'wordpress.browser-actions', args: ['url=http://events.extrachill.com/', 'route-host=events.extrachill.com', 'allow-host=events.extrachill.com,extrachill.com'] }],
+      }),
+      'gardner-event-rsvp',
+      topology,
+    ),
+  );
+  await assert.rejects(
+    validateJourneyDocument(
+      doc({
+        sites: ['events.extrachill.com', 'extrachill.com'],
+        steps: [{ command: 'wordpress.browser-actions', args: ['url=http://events.extrachill.com/', 'route-host=events.extrachill.com', 'allow-host=events.extrachill.com,artist.extrachill.com'] }],
+      }),
+      'gardner-event-rsvp',
+      topology,
+    ),
+    /outside the journey's declared sites/,
+  );
+
   console.log('extrachill-network rig contract ok');
 } finally {
   delete process.env.HOMEBOY_ARTIFACT_ROOT;

@@ -1,0 +1,20 @@
+{
+  "schema": "extrachill-network/journey-result/venue-booking-console/v1",
+  "scenario": "venue-booking-console",
+  "assertions": 2,
+  "passed": 1,
+  "findings": [
+    {
+      "id": "availability-check-reflects-occupied-date",
+      "passed": false,
+      "evidence": {
+        "result": {
+          "available": true
+        },
+        "note": "A real hold was created via negotiate -> select-performance -> create-booking-hold for 2028-05-01 20:00-23:00 in main-room (verified: seed.php's occupied_date_hold fixture evidence is ok:true), yet check-booking-availability (VenueBookingHoldRepository::public_interval_availability()) still reports this interval as available. Root cause not fully attributed within this port's session -- candidates include a timezone/interval-matching mismatch between select-venue-booking-performance's stored performance_start_at/performance_end_at and the hold-availability lookup, or a hold TTL that had already elapsed by the time this grade phase ran (both real, sandbox-timing-affected explanations, not yet distinguished). Documented here rather than silently dropped or guessed at; see the journey README for the exact reproduction and suggested next steps.",
+        "note_2": "This is a real, observed discrepancy: the corresponding public-inquiry-form-desktop browser step also failed to see 'That date is unavailable' for the same seeded hold, confirming this is not merely a grade.php diagnostic artifact."
+      },
+      "status": "open"
+    }
+  ]
+}

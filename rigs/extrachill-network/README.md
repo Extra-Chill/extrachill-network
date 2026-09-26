@@ -172,6 +172,51 @@ rule from the events repo journeys: a **finding** is a real product defect,
 a **skip** is a runtime that could not fairly judge the case, and neither is
 ever silently converted into a pass.
 
+### Journeys ported from extrachill-events (extrachill-network#292)
+
+The Events repo's entire `tests/wp-codebox/`, `tests/NetworkE2E/`, and
+`tests/browser/*.evidence.js` E2E harnesses moved here and were deleted from
+that repo, per this rig being the only home for network boot / E2E
+user-journey harnesses (extrachill-network#291):
+
+| Journey | Ported from (extrachill-events) |
+| --- | --- |
+| `gardner-venue-booking` | `tests/wp-codebox/gardner-venue-booking.json`, `-seed.php`, `-journey.php` |
+| `booking-invariants` | `tests/NetworkE2E/booking/{topology.php,assert.php,run.mjs,action-model.json}`, `.github/workflows/booking-network-e2e.yml`, `docs/booking-network-e2e.md` |
+| `venue-booking-console` | `tests/browser/{booking-inquiry,booking-correspondence,booking-form-preview,booking-setup-copy,booking-embed}.evidence.js` |
+| `venue-claim-and-discovery` | `tests/browser/venue-claim-acquisition.evidence.js` + `venue-claim-archive-fixture.php`, `tests/browser/city-calendar-priority.evidence.js` |
+| `near-me-and-my-shows` | `tests/browser/near-me.evidence.js` + `near-me-fixture.html`, `tests/browser/my-shows-registration.evidence.js` |
+
+Every one of these originals ran against a mocked WordPress runtime, a
+hand-authored static HTML fixture, or fake domains intercepted by Playwright
+routes — none of them ever exercised a real WordPress request. See each
+journey's own README for exactly what changed, what could not be ported for
+real (Cloudflare Turnstile is unconfigured on this rig by default, so widget
+children never render; SQLite has no real multi-connection race primitive;
+canonical event conversion's MySQL-only `GET_LOCK` primitive is unavailable),
+and what real product findings the port surfaced.
+
+### Testing an unreleased extrachill-events branch against these journeys
+
+extrachill-events keeps no scenarios, runners, personas, or bespoke E2E
+workflows of its own (see "The journey contract" above) — a developer or CI
+job on that repo runs this rig with `extrachill_component_source_overrides`
+pointed at their checkout and `extrachill_journeys` selecting the Events
+journeys that exercise their change:
+
+```bash
+HOMEBOY_SETTINGS_JSON='{
+  "extrachill_theme_source": "/path/to/extrachill-theme-checkout",
+  "extrachill_journeys": ["gardner-venue-booking", "booking-invariants", "venue-booking-console", "venue-claim-and-discovery", "near-me-and-my-shows"],
+  "extrachill_component_source_overrides": { "extrachill-events": "/abs/path/to/your/extrachill-events/checkout" }
+}' homeboy rig up extrachill-network
+```
+
+From extrachill-events' own CI, the reusable `homeboy-action` rig workflow
+(already used by every other component's Homeboy-based gate) is the
+~10-line integration point — call it with this rig's ID and the settings
+above rather than adding a new bespoke workflow file.
+
 The old "consumer-owned scenario" pattern (a consumer repo layering its own
 `wordpress_runtime_post_steps` browser scenario onto this baseline) is
 superseded: `wordpress_runtime_prepare_steps` / `wordpress_runtime_post_steps`
