@@ -11,10 +11,20 @@
  *   network-topology.json's domain (events.extrachill.com) at runtime, and the
  *   rig's generated ec-network-domain-ids.php mu-plugin aligns the
  *   EC_BLOG_ID_* constants with the fresh install's actual blog IDs by domain.
- * - Table creation: plugins are activated through real activate_plugin() calls
- *   in this rig, so register_activation_hook callbacks fire and create their
- *   own tables. This seed only VERIFIES the tables it depends on and fails
- *   loudly if one is missing -- it no longer unconditionally creates them.
+ * - No unconditional table creation: plugins are activated through real
+ *   activate_plugin() calls in this rig, so register_activation_hook callbacks
+ *   fire and create their own tables. This seed only VERIFIES the tables it
+ *   depends on and fails loudly if one is missing, recording any case where
+ *   the hook path did not run.
+ *
+ * One thing the network boot genuinely adds: wordpress.run-php steps execute
+ * against the primary site, where the per-site plugins (data-machine-events,
+ * extrachill-events) are NOT loaded -- switch_to_blog() swaps the DB context
+ * but never loads plugin code. The seed therefore bootstraps the events
+ * site's own plugin context explicitly (require + re-run the init callbacks
+ * that already fired), exactly the constraint extrachill-api's own
+ * upcoming-counts route documents. Every write still goes through the real
+ * plugin functions -- no direct SQL, no duplicated row shapes.
  *
  * The event reproduces PUBLIC production content only (title, description,
  * dates, venue, ticket URL) from events.extrachill.com post 486727 -- slug
@@ -45,6 +55,51 @@ function ec_rig_journey_site_id( string $domain ): int {
 		throw new RuntimeException( esc_html( 'Journey seed could not resolve site by domain: ' . $domain ) );
 	}
 	return (int) $sites[0]->blog_id;
+}
+
+/**
+ * Bootstrap the events site's per-site plugin context.
+ *
+ * run-php executes on the primary site; per-site plugins never load there.
+ * Requiring their main files gives the classes, and re-running the init
+ * callbacks (idempotent: each registration guards with taxonomy_exists /
+ * post_type_exists / its own static flag) reproduces the context a real
+ * front-end request on the events site has.
+ *
+ * @return array Evidence of what the bootstrap had to do.
+ */
+function ec_rig_journey_bootstrap_events_plugins(): array {
+	$done = array();
+
+	require_once WP_PLUGIN_DIR . '/data-machine-events/data-machine-events.php';
+	$done['data_machine_events_required'] = true;
+
+	if ( ! post_type_exists( 'data_machine_events' ) && class_exists( '\\DataMachineEvents\\Core\\Event_Post_Type' ) ) {
+		\DataMachineEvents\Core\Event_Post_Type::register();
+		$done['cpt_registered'] = true;
+	}
+	foreach ( array( 'Venue_Taxonomy', 'Promoter_Taxonomy', 'Event_Type_Taxonomy' ) as $taxonomy_class ) {
+		$fqcn = "\\DataMachineEvents\\Core\\{$taxonomy_class}";
+		if ( class_exists( $fqcn ) ) {
+			$fqcn::register();
+		}
+	}
+	$done['dme_taxonomies_registered'] = true;
+
+	require_once WP_PLUGIN_DIR . '/extrachill-events/extrachill-events.php';
+	$done['extrachill_events_required'] = true;
+
+	if ( function_exists( 'extrachill_events_register_taxonomies' ) ) {
+		extrachill_events_register_taxonomies();
+		$done['event_taxonomies_attached'] = true;
+	}
+
+	if ( class_exists( '\\ExtraChillEvents\\Providers\\AbilitiesProvider' ) ) {
+		\ExtraChillEvents\Providers\AbilitiesProvider::initialize();
+		$done['events_abilities_initialized'] = true;
+	}
+
+	return $done;
 }
 
 /**
@@ -123,58 +178,20 @@ $events_blog_id = ec_rig_journey_site_id( 'events.extrachill.com' );
 $main_blog_id   = ec_rig_journey_site_id( 'extrachill.com' );
 
 $evidence = array(
-	'schema'           => 'extrachill-network/journey-fixture/gardner-event-rsvp/v1',
-	'persona'          => 'extra-chill-users/chris-gardner@1.0.0',
-	'events_blog_id'   => $events_blog_id,
-	'main_blog_id'     => $main_blog_id,
-	'steps'            => array(),
+	'schema'            => 'extrachill-network/journey-fixture/gardner-event-rsvp/v1',
+	'persona'           => 'extra-chill-users/chris-gardner@1.0.0',
+	'events_blog_id'    => $events_blog_id,
+	'main_blog_id'      => $main_blog_id,
+	'steps'             => array(),
 	'tables_precreated' => array(),
 );
 
 /*
  * ---------------------------------------------------------------------------
- * Table verification (not creation): on this rig, plugins reach activation
- * through real activate_plugin() calls, so activation hooks fire. Verify the
- * two tables the journey depends on and fail loudly if either is missing;
- * record -- but do not hide -- any case where the hook path did not run.
- * ---------------------------------------------------------------------------
- */
-if ( ! class_exists( '\\DataMachineEvents\\Core\\EventDatesTable' ) ) {
-	throw new RuntimeException( 'EventDatesTable is unavailable; data-machine-events did not load.' );
-}
-if ( ! \DataMachineEvents\Core\EventDatesTable::table_exists() ) {
-	\DataMachineEvents\Core\EventDatesTable::create_table();
-	$evidence['tables_precreated'][] = 'datamachine_event_dates';
-	if ( ! \DataMachineEvents\Core\EventDatesTable::table_exists() ) {
-		throw new RuntimeException( 'The event-dates table did not install on the events site.' );
-	}
-}
-
-if ( ! class_exists( '\\ExtraChillEvents\\Core\\RsvpPassesTable' ) ) {
-	throw new RuntimeException( 'RsvpPassesTable is unavailable; extrachill-events did not load.' );
-}
-if ( ! \ExtraChillEvents\Core\RsvpPassesTable::table_exists() ) {
-	\ExtraChillEvents\Core\RsvpPassesTable::create_table();
-	$evidence['tables_precreated'][] = 'extrachill_rsvp_passes';
-}
-
-switch_to_blog( $events_blog_id );
-if ( ! class_exists( '\\ExtraChillEvents\\Core\\RsvpPassesTable' ) || ! \ExtraChillEvents\Core\RsvpPassesTable::table_exists() ) {
-	\ExtraChillEvents\Core\RsvpPassesTable::create_table();
-	$evidence['tables_precreated'][] = 'extrachill_rsvp_passes (events site)';
-	if ( ! \ExtraChillEvents\Core\RsvpPassesTable::table_exists() ) {
-		throw new RuntimeException( 'The RSVP pass table did not install on the events site; perk passes cannot be graded.' );
-	}
-}
-restore_current_blog();
-
-switch_to_blog( $events_blog_id );
-
-/*
- * ---------------------------------------------------------------------------
  * Fixture users. Forced IDs so the recipe's browser steps can authenticate
  * statically (auth-user-id). Fields for Gardner match the pinned
- * personas/gardner.v1.json fixture_identity exactly.
+ * personas/gardner.v1.json fixture_identity exactly. No plugin context
+ * needed: users, roles, and site membership are core multisite.
  * ---------------------------------------------------------------------------
  */
 const GARDNER_USER_ID              = 201;
@@ -186,8 +203,7 @@ if ( function_exists( 'ec_users_register_team_role' ) ) {
 	ec_users_register_team_role();
 }
 foreach ( array( $events_blog_id, $main_blog_id ) as $member_blog_id ) {
-	$member = is_user_member_of_blog( GARDNER_USER_ID, $member_blog_id );
-	if ( ! $member ) {
+	if ( ! is_user_member_of_blog( GARDNER_USER_ID, $member_blog_id ) ) {
 		add_user_to_blog( $member_blog_id, GARDNER_USER_ID, 'extra_chill_team' );
 	}
 }
@@ -236,17 +252,36 @@ if ( ! in_array( get_site_option( 'registration' ), array( 'user', 'all' ), true
 
 /*
  * ---------------------------------------------------------------------------
- * The event, on the events site by domain. Reproduced from PUBLIC production
- * content (see file header). Seeded directly rather than through
- * data-machine-events/upsert-event: that ability serializes on a MySQL-only
- * GET_LOCK primitive this WordPress runtime's database layer does not provide
- * -- the same already-documented limitation the single-site journey hit
- * (extrachill-events tests/wp-codebox README, "Runtime boundary"). The
- * real save_post hook still populates the event-dates table, and every
- * action the JOURNEY takes runs through the real registered abilities.
+ * The event, on the events site by domain.
  * ---------------------------------------------------------------------------
  */
 wp_set_current_user( 1 );
+
+switch_to_blog( $events_blog_id );
+
+$evidence['steps']['bootstrap'] = ec_rig_journey_bootstrap_events_plugins();
+
+if ( ! class_exists( '\\DataMachineEvents\\Core\\EventDatesTable' ) ) {
+	throw new RuntimeException( 'EventDatesTable is unavailable after bootstrapping data-machine-events.' );
+}
+if ( ! \DataMachineEvents\Core\EventDatesTable::table_exists() ) {
+	\DataMachineEvents\Core\EventDatesTable::create_table();
+	$evidence['tables_precreated'][] = 'datamachine_event_dates';
+	if ( ! \DataMachineEvents\Core\EventDatesTable::table_exists() ) {
+		throw new RuntimeException( 'The event-dates table did not install on the events site.' );
+	}
+}
+
+if ( ! class_exists( '\\ExtraChillEvents\\Core\\RsvpPassesTable' ) ) {
+	throw new RuntimeException( 'RsvpPassesTable is unavailable after bootstrapping extrachill-events.' );
+}
+if ( ! \ExtraChillEvents\Core\RsvpPassesTable::table_exists() ) {
+	\ExtraChillEvents\Core\RsvpPassesTable::create_table();
+	$evidence['tables_precreated'][] = 'extrachill_rsvp_passes';
+	if ( ! \ExtraChillEvents\Core\RsvpPassesTable::table_exists() ) {
+		throw new RuntimeException( 'The RSVP pass table did not install on the events site; perk passes cannot be graded.' );
+	}
+}
 
 $description = "Join us at Lo-Fi Brewing on Wednesday, October 21st from 6:30 to 9pm for a free gathering of the creative community focused on building your online presence in the AI era. This is an official WordPress meetup, hosted by Chris Huber, the founder of Extra Chill, who now works as an engineer at Automattic. However, you don't have to use WordPress or even know what it is to find value in this event.\n\nMusicians, writers, photographers, developers, small business owners, whether you have a website or just an Instagram. All experience levels are welcome.\n\nWe'll go behind the scenes of Extra Chill, showcasing our fully automated international concert calendar, artist platform, and community, all built on open source software. Other creatives will also be invited to share what they are building. At this event we will discuss AI, including both the challenges it presents to the creative community, and how it can be used to empower your own process. Bring your objections and your ideas, that's what this event is all about.\n\nMark yourself as Going on this page or the Meetup.com event and your first beer is on Extra Chill.";
 
@@ -278,7 +313,7 @@ $post_content = "<!-- wp:data-machine-events/event-details {$block_attrs} -->\n"
 
 $existing = get_page_by_path( 'wordpress-meetup-charleston-october-2026', OBJECT, 'data_machine_events' );
 if ( $existing instanceof WP_Post ) {
-	$event_id = (int) $existing->ID;
+	$event_id                        = (int) $existing->ID;
 	$evidence['steps']['event_post'] = array( 'ok' => true, 'reused' => true );
 } else {
 	$event_id = wp_insert_post(
@@ -297,6 +332,15 @@ if ( $existing instanceof WP_Post ) {
 		throw new RuntimeException( esc_html( 'Could not seed the event post: ' . $event_id->get_error_message() ) );
 	}
 	$event_id = (int) $event_id;
+
+	// The event-dates row is written by the real save_post hook
+	// (data_machine_events_sync_datetime_meta). This request loaded the
+	// plugin AFTER init, so the hook is not registered here -- invoke the
+	// exact same function the hook would invoke, never a reimplementation.
+	if ( function_exists( 'data_machine_events_sync_datetime_meta' ) ) {
+		data_machine_events_sync_datetime_meta( $event_id, get_post( $event_id ), false );
+		$evidence['steps']['event_dates_sync'] = 'invoked directly (post-init bootstrap)';
+	}
 }
 
 // The RSVP perk the event's real-world copy promises ("first beer is on
@@ -326,7 +370,8 @@ update_term_meta( $venue_id, '_venue_coordinates', '32.8337927,-79.9536861' );
 update_term_meta( $venue_id, '_venue_timezone', 'America/New_York' );
 update_term_meta( $venue_id, '_venue_website', 'https://lofibrewing.com' );
 
-// Location hierarchy matching production: US > SC > Charleston.
+// Location hierarchy matching production: US > SC > Charleston. The
+// `location` taxonomy itself is registered network-wide by extrachill-network.
 $usa    = wp_insert_term( 'United States', 'location', array( 'slug' => 'usa' ) );
 $usa_id = is_wp_error( $usa ) ? (int) get_term_by( 'slug', 'usa', 'location' )->term_id : (int) $usa['term_id'];
 $sc     = wp_insert_term( 'South Carolina', 'location', array(

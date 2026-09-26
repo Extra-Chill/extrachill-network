@@ -11,6 +11,13 @@
  * registered ability, and direct table reads of the exact tables the
  * product wrote during the browser interactions.
  *
+ * run-php executes against the primary site; per-site plugins never load
+ * there (switch_to_blog swaps DB context only). Like the seed, this file
+ * bootstraps the events site's plugin context explicitly, exactly the
+ * constraint extrachill-api's own upcoming-counts route documents. The
+ * rendered-page checks read the REAL anonymous front-end render over
+ * wp_remote_get instead of simulating rendering in this request.
+ *
  * Consumed oracles from personas/gardner.v1.json (pinned copy of
  * extra-chill-users/chris-gardner@1.0.0): task-completion, obvious-state,
  * reload-persistence, safe-retry, duplicate-prevention, attribution,
@@ -41,6 +48,24 @@ function ec_rig_grade_site_id( string $domain ): int {
 }
 
 /**
+ * Bootstrap the events site's per-site plugin context (see the seed for the
+ * full rationale; the registrations are idempotent).
+ */
+function ec_rig_grade_bootstrap_events_plugins(): void {
+	require_once WP_PLUGIN_DIR . '/data-machine-events/data-machine-events.php';
+	require_once WP_PLUGIN_DIR . '/extrachill-events/extrachill-events.php';
+	if ( ! post_type_exists( 'data_machine_events' ) && class_exists( '\\DataMachineEvents\\Core\\Event_Post_Type' ) ) {
+		\DataMachineEvents\Core\Event_Post_Type::register();
+	}
+	if ( function_exists( 'extrachill_events_register_taxonomies' ) ) {
+		extrachill_events_register_taxonomies();
+	}
+	if ( class_exists( '\\ExtraChillEvents\\Providers\\AbilitiesProvider' ) ) {
+		\ExtraChillEvents\Providers\AbilitiesProvider::initialize();
+	}
+}
+
+/**
  * Execute a registered ability without bypassing its contract.
  *
  * @param string $name  Ability name.
@@ -55,11 +80,13 @@ function ec_rig_grade_execute( string $name, array $input ) {
 	return $ability->execute( $input );
 }
 
+$events_blog_id = ec_rig_grade_site_id( 'events.extrachill.com' );
+$main_blog_id   = ec_rig_grade_site_id( 'extrachill.com' );
+
 $fixture = get_option( 'ec_rig_journey_fixture_gardner_event_rsvp', array() );
 if ( ! is_array( $fixture ) || empty( $fixture['event_id'] ) ) {
 	// The seed stores the fixture on the events site.
-	$events_blog_for_fixture = ec_rig_grade_site_id( 'events.extrachill.com' );
-	switch_to_blog( $events_blog_for_fixture );
+	switch_to_blog( $events_blog_id );
 	$fixture = get_option( 'ec_rig_journey_fixture_gardner_event_rsvp', array() );
 	restore_current_blog();
 }
@@ -70,8 +97,6 @@ if ( ! is_array( $fixture ) || empty( $fixture['event_id'] ) ) {
 $event_id                = (int) $fixture['event_id'];
 $gardner_id              = (int) $fixture['gardner_id'];
 $returning_subscriber_id = (int) $fixture['returning_subscriber_id'];
-$events_blog_id          = (int) ( $fixture['events_blog_id'] ?? ec_rig_grade_site_id( 'events.extrachill.com' ) );
-$main_blog_id            = (int) ( $fixture['main_blog_id'] ?? ec_rig_grade_site_id( 'extrachill.com' ) );
 
 $cases    = array();
 $findings = array();
@@ -100,28 +125,6 @@ function ec_rig_grade_case( string $id, string $oracle, bool $passed, string $ta
 	}
 }
 
-/**
- * Record an observation the runtime could not fairly evaluate.
- *
- * @param string $id       Stable case ID.
- * @param string $oracle   Oracle ID.
- * @param string $task     What the persona was trying to do.
- * @param string $reason   Why the runtime could not judge it.
- * @param array  $evidence Supporting evidence.
- */
-function ec_rig_grade_skip( string $id, string $oracle, string $task, string $reason, array $evidence = array() ): void {
-	global $cases;
-	$cases[] = array(
-		'id'       => $id,
-		'oracle'   => $oracle,
-		'passed'   => true,
-		'skipped'  => true,
-		'task'     => $task,
-		'reason'   => $reason,
-		'evidence' => $evidence,
-	);
-}
-
 global $wpdb;
 
 /*
@@ -138,7 +141,7 @@ ec_rig_grade_case(
 	array( 'marked' => $gardner_marked )
 );
 
-$concert_table = extrachill_users_concert_tracking_table_name();
+$concert_table = function_exists( 'extrachill_users_concert_tracking_table_name' ) ? extrachill_users_concert_tracking_table_name() : "{$wpdb->base_prefix}ec_concert_tracking";
 $gardner_rows  = (int) $wpdb->get_var(
 	$wpdb->prepare(
 		"SELECT COUNT(*) FROM {$concert_table} WHERE user_id = %d AND event_id = %d AND blog_id = %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a trusted WordPress table identifier.
@@ -155,8 +158,8 @@ ec_rig_grade_case(
 	array( 'rows' => $gardner_rows )
 );
 
-$notif_table    = extrachill_users_notifications_table_name();
-$milestone_row  = $wpdb->get_row(
+$notif_table   = function_exists( 'extrachill_users_notifications_table_name' ) ? extrachill_users_notifications_table_name() : "{$wpdb->base_prefix}ec_notifications";
+$milestone_row = $wpdb->get_row(
 	$wpdb->prepare(
 		"SELECT * FROM {$notif_table} WHERE user_id = %d AND type = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		$gardner_id,
@@ -179,13 +182,12 @@ ec_rig_grade_case(
  * the server-side truth.
  * ---------------------------------------------------------------------------
  */
-$pass          = null;
-$pass_row_note = '';
 switch_to_blog( $events_blog_id );
+ec_rig_grade_bootstrap_events_plugins();
+
+$pass = null;
 if ( class_exists( '\\ExtraChillEvents\\Core\\RsvpPassesTable' ) ) {
 	$pass = \ExtraChillEvents\Core\RsvpPassesTable::find_for_user_event( $event_id, $gardner_id );
-} else {
-	$pass_row_note = 'RsvpPassesTable unavailable';
 }
 $pass_code = is_array( $pass ) ? (string) $pass['code'] : '';
 ec_rig_grade_case(
@@ -194,10 +196,9 @@ ec_rig_grade_case(
 	is_array( $pass ) && '' !== $pass_code,
 	'Get something he can actually show at the door to claim the free beer promised in the event description.',
 	array(
-		'pass_found'     => is_array( $pass ),
-		'status'         => is_array( $pass ) ? (string) $pass['status'] : null,
-		'code_length'    => strlen( $pass_code ),
-		'pass_row_note'  => $pass_row_note,
+		'pass_found'       => is_array( $pass ),
+		'status'           => is_array( $pass ) ? (string) $pass['status'] : null,
+		'code_length'      => strlen( $pass_code ),
 		'tables_precreated' => $fixture['tables_precreated'] ?? array(),
 	)
 );
@@ -206,7 +207,7 @@ ec_rig_grade_case(
 // Scheduler). Whether it actually SENT is not attributable in this runtime
 // (no real SMTP); that a queued send for the pass exists is.
 $email_action_count = null;
-$as_actions_table   = $wpdb->prefix . 'actionscheduler_actions';
+$as_actions_table   = $wpdb->base_prefix . 'actionscheduler_actions';
 $as_exists          = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $as_actions_table ) );
 if ( $as_exists === $as_actions_table ) {
 	$email_action_count = (int) $wpdb->get_var(
@@ -231,7 +232,6 @@ ec_rig_grade_case(
 // event). The browser step already clicked the door-list redeem control;
 // this confirms the server state and the safe double-redeem behavior.
 wp_set_current_user( 1 );
-switch_to_blog( $events_blog_id );
 $redeem = ec_rig_grade_execute(
 	'extrachill/redeem-event-pass',
 	array(
@@ -244,13 +244,11 @@ $redeem_outcome = array(
 	'already_redeemed' => is_array( $redeem ) ? (bool) ( $redeem['already_redeemed'] ?? false ) : null,
 	'error'            => is_wp_error( $redeem ) ? $redeem->get_error_message() : null,
 );
+$pass_after = class_exists( '\\ExtraChillEvents\\Core\\RsvpPassesTable' )
+	? \ExtraChillEvents\Core\RsvpPassesTable::find_for_user_event( $event_id, $gardner_id )
+	: null;
 restore_current_blog();
-$pass_after = null;
-switch_to_blog( $events_blog_id );
-if ( class_exists( '\\ExtraChillEvents\\Core\\RsvpPassesTable' ) ) {
-	$pass_after = \ExtraChillEvents\Core\RsvpPassesTable::find_for_user_event( $event_id, $gardner_id );
-}
-restore_current_blog();
+
 $redeemed = is_array( $pass_after )
 	&& ( ! empty( $pass_after['redeemed_at'] ) || ( is_array( $redeem ) && (bool) ( $redeem['already_redeemed'] ?? false ) ) );
 ec_rig_grade_case(
@@ -365,25 +363,30 @@ ec_rig_grade_case(
 	$new_creative_marked,
 	'Come back to the event after registering and mark himself Going without starting over.',
 	array(
-		'marked'          => $new_creative_marked,
-		'member_of_site'  => $new_creative_member,
+		'marked'         => $new_creative_marked,
+		'member_of_site' => $new_creative_member,
 	)
 );
 
 /*
  * ---------------------------------------------------------------------------
- * Comprehension, verified at the PHP level against the real rendered content.
- * The browser steps assert the same surfaces in the DOM; these confirm them
- * independently of any JS behavior.
+ * Comprehension, verified against the REAL anonymous front-end render (an
+ * actual HTTP render on the events site, not a simulated one).
  * ---------------------------------------------------------------------------
  */
-switch_to_blog( $events_blog_id );
-$rendered_html = apply_filters( 'the_content', get_post_field( 'post_content', $event_id ) );
-restore_current_blog();
+$event_url = $fixture['event_url'] ?? '';
+if ( '' === $event_url ) {
+	switch_to_blog( $events_blog_id );
+	$event_url = get_permalink( $event_id );
+	restore_current_blog();
+}
+$render_response = wp_remote_get( $event_url, array( 'timeout' => 30, 'sslverify' => false ) );
+$rendered_html   = is_wp_error( $render_response ) ? '' : (string) wp_remote_retrieve_body( $render_response );
 
 // data-machine-events#860 shipped an end-time render (fixed in v0.64.7);
 // this now expects the fix to be live on the booted releases.
-$end_time_visible = false !== stripos( $rendered_html, '9:00' ) || false !== stripos( $rendered_html, '9 pm' ) || false !== stripos( $rendered_html, '9pm' );
+$end_time_visible = '' !== $rendered_html
+	&& ( false !== stripos( $rendered_html, '9:00' ) || false !== stripos( $rendered_html, '9 pm' ) || false !== stripos( $rendered_html, '9pm' ) );
 ec_rig_grade_case(
 	'event-end-time-now-visible',
 	'obvious-state',
@@ -391,14 +394,16 @@ ec_rig_grade_case(
 	'Know what time the event actually ends without reading the whole description.',
 	array(
 		'end_time_visible' => $end_time_visible,
+		'html_len'         => strlen( $rendered_html ),
 		'note'             => 'data-machine-events#860 was fixed in v0.64.7; this case flipped from recorded-finding to pass-expectation.',
 	)
 );
 
 // data-machine-events#861 (free indicator) is still open; expected to fail
 // until that ships, and recorded as a finding each run until it does.
-$free_indicator_visible = preg_match( '/event-price[^>]*>\s*(free|no cover|\$0)/i', $rendered_html ) === 1
-	|| false !== stripos( $rendered_html, 'this event is free' );
+$free_indicator_visible = '' !== $rendered_html
+	&& ( preg_match( '/event-price[^>]*>\s*(free|no cover|\$0)/i', $rendered_html ) === 1
+		|| false !== stripos( $rendered_html, 'this event is free' ) );
 ec_rig_grade_case(
 	'free-events-show-a-free-indicator',
 	'obvious-state',
@@ -412,24 +417,22 @@ ec_rig_grade_case(
 
 /*
  * ---------------------------------------------------------------------------
- * The Local Scene card on the main site: Gardner's saved scene should put
- * Charleston first in the "Top Event Markets" card (browser step
- * local-scene-card-main-site asserts the DOM; this verifies the cross-site
- * data path the card is built on).
+ * The Local Scene card on the main site: the same internal REST dispatch the
+ * card itself makes (rest_do_request on the main site; the network's
+ * ability-affinity layer resolves it against the events site).
  * ---------------------------------------------------------------------------
  */
 switch_to_blog( $main_blog_id );
-$counts_ability = function_exists( 'wp_has_ability' ) && wp_has_ability( 'extrachill/events-upcoming-counts' );
-$upcoming       = $counts_ability
-	? ec_rig_grade_execute(
-		'extrachill/events-upcoming-counts',
-		array(
-			'taxonomy' => 'location',
-			'limit'    => 8,
-		)
+$count_request = new WP_REST_Request( 'GET', '/extrachill/v1/events/upcoming-counts' );
+$count_request->set_query_params(
+	array(
+		'taxonomy' => 'location',
+		'limit'    => 8,
 	)
-	: new WP_Error( 'ec_rig_grade_ability_missing', 'extrachill/events-upcoming-counts' );
+);
+$count_response = rest_do_request( $count_request );
 restore_current_blog();
+$upcoming   = $count_response->is_error() ? null : $count_response->get_data();
 $first_market = is_array( $upcoming ) && ! empty( $upcoming[0] ) ? $upcoming[0] : null;
 $charleston_first = is_array( $first_market ) && 'charleston' === ( $first_market['slug'] ?? '' );
 ec_rig_grade_case(
@@ -440,19 +443,20 @@ ec_rig_grade_case(
 	array(
 		'first_market' => $first_market,
 		'markets'      => is_array( $upcoming ) ? count( $upcoming ) : null,
-		'note'         => 'Gardner seeded with _extrachill_local_scene=charleston; the card reorders via extrachill/get-user-settings + the events upcoming-counts contract.',
+		'error'        => $count_response->is_error() ? $count_response->as_error()->get_error_message() : null,
+		'note'         => 'Gardner seeded with _extrachill_local_scene=charleston; the browser step asserts the card DOM, this verifies the cross-site data path it renders from.',
 	)
 );
 
 $result = array(
-	'schema'     => 'extrachill-network/journey-result/gardner-event-rsvp/v1',
-	'persona'    => 'extra-chill-users/chris-gardner@1.0.0',
-	'scenario'   => 'gardner-event-rsvp',
-	'event_id'   => $event_id,
-	'event_url'  => $fixture['event_url'] ?? '',
+	'schema'         => 'extrachill-network/journey-result/gardner-event-rsvp/v1',
+	'persona'        => 'extra-chill-users/chris-gardner@1.0.0',
+	'scenario'       => 'gardner-event-rsvp',
+	'event_id'       => $event_id,
+	'event_url'      => $event_url,
 	'events_blog_id' => $events_blog_id,
-	'assertions' => count( $cases ),
-	'skipped'    => count(
+	'assertions'     => count( $cases ),
+	'skipped'        => count(
 		array_filter(
 			$cases,
 			static function ( $entry ) {
@@ -460,7 +464,7 @@ $result = array(
 			}
 		)
 	),
-	'passed'     => count(
+	'passed'         => count(
 		array_filter(
 			$cases,
 			static function ( $entry ) {
@@ -468,8 +472,8 @@ $result = array(
 			}
 		)
 	),
-	'findings'   => $findings,
-	'cases'      => $cases,
+	'findings'       => $findings,
+	'cases'          => $cases,
 );
 
 // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped,WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Machine-readable persona evidence.
