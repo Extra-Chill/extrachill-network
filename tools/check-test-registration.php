@@ -20,10 +20,10 @@
  *      exec()'d from bootstrap-architecture-smoke.php), not a standalone
  *      top-level entry point.
  *
- * Scope is intentionally the flat tests/*.php directory, not recursive:
- * subdirectories such as tests/browser/ hold Playground browser-session
- * fixtures invoked manually through wp-codebox tooling, not files that
- * ever run through a `homeboy review test` gate at all.
+ * Scope is intentionally the flat tests/*.php directory, not recursive: a
+ * subdirectory could hold fixtures invoked manually through separate
+ * tooling (e.g. rigs/extrachill-network/journeys/, wp-codebox recipes),
+ * never through a `homeboy review test` gate at all.
  *
  * Run: php tools/check-test-registration.php
  *

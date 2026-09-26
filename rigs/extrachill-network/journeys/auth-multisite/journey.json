@@ -1,0 +1,62 @@
+{
+  "schema": "extrachill-network/journey/v1",
+  "id": "auth-multisite",
+  "title": "Extra Chill authentication multisite campaign",
+  "description": "Composes real Extra Chill Users/API/wp-native-auth authentication components on the real 11-site domain-based network: seeds a replayable REST invariant case plan, registers and onboards a user through the rendered block in a real browser, and verifies real cross-site session continuity through the production browser-handoff mechanism -- not a faked shared cookie. Ported from extrachill-users tests/e2e/auth-multisite/ (its own bespoke runner composing the generic path-based wordpress-multisite-e2e rig) onto this rig's journey contract (extrachill-network#293); its own runner, settings builder, path-based topology bootstrap, and component-manifest plumbing are all dropped -- this rig already boots every one of those components as real, network-active network plugins.",
+  "origin": {
+    "repository": "Extra-Chill/extrachill-users",
+    "files": [
+      "tests/e2e/auth-multisite/run.mjs",
+      "tests/e2e/auth-multisite/settings.mjs",
+      "tests/e2e/auth-multisite/topology.php",
+      "tests/e2e/auth-multisite/seed.php",
+      "tests/e2e/auth-multisite/assert.php",
+      "tests/e2e/auth-multisite/post-assert.php",
+      "tests/e2e/auth-multisite/activate.php",
+      "tests/e2e/auth-multisite/cases.mjs",
+      "tests/e2e/auth-multisite/browser-anonymous.json",
+      "tests/e2e/auth-multisite/browser-registration.json",
+      "tests/e2e/auth-multisite/fixture/auth-fuzz-fixture.php",
+      "tests/e2e/auth-multisite/validate.mjs",
+      "tests/e2e/auth-multisite/components.example.json",
+      "tests/e2e/auth-multisite/README.md"
+    ],
+    "mergedIn": "extrachill-network#293"
+  },
+  "sites": ["community.extrachill.com", "artist.extrachill.com", "events.extrachill.com"],
+  "fixtureMuPlugins": ["auth-fuzz-fixture.php"],
+  "seed": { "codeFile": "seed.php", "timeoutMs": 60000 },
+  "grade": { "codeFile": "grade.php", "timeoutMs": 120000 },
+  "steps": [
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "anonymous-mismatched-password-validation" },
+      "args": [
+        "url=http://community.extrachill.com/login/",
+        "route-host=community.extrachill.com",
+        "network-policy=block",
+        "allow-host=community.extrachill.com",
+        "step-timeout=30s",
+        "timeout=90s",
+        "capture=steps,console,errors,html,network,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://community.extrachill.com/login/\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\"[data-ec-login-register-root]\"},{\"kind\":\"expect\",\"selector\":\"#loginform\",\"state\":\"visible\"},{\"kind\":\"click\",\"selector\":\"a[href='#tab-register']\"},{\"kind\":\"expect\",\"selector\":\"#extrachill_email\",\"state\":\"visible\"},{\"kind\":\"fill\",\"selector\":\"#extrachill_email\",\"value\":\"mismatch-browser-auth-fuzz@example.test\"},{\"kind\":\"fill\",\"selector\":\"#extrachill_password\",\"value\":\"valid-pass-248\"},{\"kind\":\"fill\",\"selector\":\"#extrachill_password_confirm\",\"value\":\"different-pass-248\"},{\"kind\":\"click\",\"selector\":\"input[name='extrachill_register']\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"3000ms\"},{\"kind\":\"expect\",\"selector\":\"#extrachill_email\",\"state\":\"visible\"},{\"kind\":\"screenshot\",\"name\":\"anonymous-mismatched-password-blocked\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "real-registration-and-onboarding" },
+      "args": [
+        "url=http://community.extrachill.com/login/",
+        "route-host=community.extrachill.com",
+        "network-policy=block",
+        "allow-host=community.extrachill.com",
+        "step-timeout=30s",
+        "timeout=120s",
+        "capture=steps,console,errors,html,network,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://community.extrachill.com/login/\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\"[data-ec-login-register-root]\"},{\"kind\":\"click\",\"selector\":\"a[href='#tab-register']\"},{\"kind\":\"expect\",\"selector\":\"#extrachill_email\",\"state\":\"visible\"},{\"kind\":\"fill\",\"selector\":\"#extrachill_email\",\"value\":\"browser-auth-fuzz@example.test\"},{\"kind\":\"fill\",\"selector\":\"#extrachill_password\",\"value\":\"browser-pass-248\"},{\"kind\":\"fill\",\"selector\":\"#extrachill_password_confirm\",\"value\":\"browser-pass-248\"},{\"kind\":\"screenshot\",\"name\":\"registration-form-filled\"},{\"kind\":\"click\",\"selector\":\"input[name='extrachill_register']\"},{\"kind\":\"waitFor\",\"selector\":\"body.logged-in\",\"timeout\":\"30s\"},{\"kind\":\"screenshot\",\"name\":\"registration-succeeded-logged-in\"},{\"kind\":\"navigate\",\"url\":\"http://community.extrachill.com/onboarding/\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\"#extrachill-onboarding-form\",\"timeout\":\"15s\"},{\"kind\":\"fill\",\"selector\":\"#onboarding-username\",\"value\":\"traveler_auth_fuzz\"},{\"kind\":\"click\",\"selector\":\"#onboarding-submit\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"4000ms\"},{\"kind\":\"screenshot\",\"name\":\"onboarding-completed\"}]"
+      ]
+    }
+  ]
+}

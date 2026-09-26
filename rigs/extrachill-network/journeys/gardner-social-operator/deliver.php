@@ -1,0 +1,452 @@
+<?php
+/**
+ * Schedule the approved draft, cross the due-cron boundary, and retain
+ * partial delivery.
+ *
+ * Ported from extrachill-studio tests/wp-codebox/chris-gardner-social-operator-deliver.php
+ * (extrachill-network#293) onto the network rig's journey contract. Runs on
+ * the real studio.extrachill.com site (switch_to_blog + the same per-site
+ * plugin bootstrap the seed step documents) instead of a single-site
+ * `wp core multisite-convert` sandbox. The `ec_get_blog_id()` single-site
+ * stub the old file carried is removed entirely: the real function
+ * (extrachill-network, network-active) is already loaded.
+ *
+ * @package ExtraChillNetwork
+ */
+
+use DataMachine\Core\Database\Jobs\Jobs;
+use DataMachine\Abilities\StepTypeAbilities;
+use DataMachine\Core\Steps\WorkflowConfigFactory;
+use DataMachine\Core\Steps\WorkflowSpecValidator;
+use DataMachine\Engine\ExecutionPlan;
+use DataMachine\Engine\Tasks\TaskRegistry;
+use DataMachineSocials\Operations\DelegatedCrossPostAction;
+
+/**
+ * Read the canonical article's diagnostic fields from its OWN site -- it
+ * lives on the main site, never on studio's own blog.
+ *
+ * @param int $site_id   Blog ID the article actually lives on.
+ * @param int $post_id   Article post ID.
+ * @return array{id:int,status:string,url:string}
+ */
+function ec_studio_operator_source_post_diagnostic( int $site_id, int $post_id ): array {
+	switch_to_blog( $site_id );
+	try {
+		return array(
+			'id'     => $post_id,
+			'status' => (string) get_post_status( $post_id ),
+			'url'    => (string) get_permalink( $post_id ),
+		);
+	} finally {
+		restore_current_blog();
+	}
+}
+
+/**
+ * Fail the deterministic journey with an actionable oracle name.
+ *
+ * @param bool   $condition Condition that must hold.
+ * @param string $oracle    Oracle name for the failure message.
+ */
+function ec_studio_operator_assert( bool $condition, string $oracle ): void {
+	if ( ! $condition ) {
+		throw new RuntimeException( esc_html( 'Operator oracle failed: ' . $oracle ) );
+	}
+}
+
+/**
+ * Execute the current committed direct-operation generation synchronously.
+ *
+ * @param array $job Job row.
+ * @return array Ability result.
+ */
+function ec_studio_operator_execute_job( array $job ): array {
+	$ability = wp_get_ability( 'datamachine/execute-step' );
+	ec_studio_operator_assert( (bool) $ability, 'real execute-step ability exists' );
+	$acting_user_id = get_current_user_id();
+	wp_set_current_user( (int) $job['user_id'] );
+	try {
+		$result = $ability->execute(
+			array(
+				'job_id'                => (int) $job['job_id'],
+				'flow_step_id'          => (string) $job['operation_step_id'],
+				'operation_generation'  => (int) $job['operation_generation'],
+				'operation_claim_token' => (string) $job['operation_claim_token'],
+			)
+		);
+	} finally {
+		wp_set_current_user( $acting_user_id );
+	}
+	ec_studio_operator_assert( ! is_wp_error( $result ), 'delegated operation executes without runtime error' . ( is_wp_error( $result ) ? ' (' . $result->get_error_code() . ': ' . $result->get_error_message() . ')' : '' ) );
+	return is_array( $result ) ? $result : array();
+}
+
+/**
+ * Resolve a rig site by domain, never by blog ID -- this run-php process
+ * starts on the primary site, so the fixture (written to studio's OWN
+ * options table by the seed step, inside its own switch_to_blog()) is
+ * unreadable via a plain get_option() until we are on that blog too.
+ *
+ * @param string $domain Site domain.
+ * @return int Blog ID.
+ */
+function ec_rig_social_operator_deliver_site_id( string $domain ): int {
+	$sites = get_sites( array(
+		'domain' => $domain,
+		'number' => 1,
+	) );
+	if ( empty( $sites ) ) {
+		throw new RuntimeException( esc_html( 'Journey deliver step could not resolve ' . $domain . ' by domain.' ) );
+	}
+	return (int) $sites[0]->blog_id;
+}
+
+switch_to_blog( ec_rig_social_operator_deliver_site_id( 'studio.extrachill.com' ) );
+$fixture = get_option( 'ec_rig_journey_fixture_gardner_social_operator', array() );
+ec_studio_operator_assert( is_array( $fixture ) && ! empty( $fixture['studio_blog_id'] ), 'persisted seed fixture reloads' );
+require_once WP_PLUGIN_DIR . '/extrachill-studio/extrachill-studio.php';
+if ( function_exists( 'datamachine_register_core_actions' ) ) {
+	datamachine_register_core_actions();
+}
+new \DataMachine\Core\Steps\SystemTask\SystemTaskStep();
+if ( function_exists( 'datamachine_socials_bootstrap' ) ) {
+	datamachine_socials_bootstrap();
+}
+TaskRegistry::reset();
+
+$draft_id         = (int) $fixture['draft_id'];
+$article_id       = (int) $fixture['article_id'];
+$gardner_id       = (int) $fixture['gardner_user_id'];
+$ordinary_id      = (int) $fixture['ordinary_user_id'];
+$approved_caption = (string) $fixture['approved_caption'];
+$approved_media   = $fixture['media'][1];
+// The article lives on the REAL main site, never on studio's own blog --
+// get_current_blog_id() here would be studio, which fails
+// DelegatedCrossPostAction's own attribution_post site validation.
+$article_site_id = ec_rig_social_operator_deliver_site_id( 'extrachill.com' );
+
+ec_studio_operator_assert( 'pending' === get_post_status( $draft_id ), 'draft begins pending review' );
+ec_studio_operator_assert( get_post_meta( $draft_id, '_studio_social_caption', true ) === $approved_caption, 'pre-approval caption edit is canonical' );
+ec_studio_operator_assert( array( $approved_media ) === get_post_meta( $draft_id, '_studio_social_images', true ), 'pre-approval media edit is canonical' );
+
+$publish_input = array(
+	'content_ref'      => array(
+		'post_id'      => $draft_id,
+		'source_url'   => get_permalink( $draft_id ),
+		'caption'      => $approved_caption,
+		'content_hash' => hash( 'sha256', $approved_caption ),
+		'asset_refs'   => array(
+			array(
+				'source_id' => $approved_media['source_id'],
+				'role'      => 'image',
+			),
+		),
+	),
+	'target_policy'    => array(
+		'channels'   => array( 'instagram', 'bluesky' ),
+		'media_kind' => 'image',
+	),
+	'idempotency_key'  => 'studio-social-publish:' . get_current_blog_id() . ':' . $draft_id,
+	'attribution_post' => array(
+		'site_id' => $article_site_id,
+		'post_id' => $article_id,
+	),
+);
+
+// Ordinary team users fail at the real custom REST and durable ability boundaries.
+wp_set_current_user( $ordinary_id );
+$request = new WP_REST_Request( 'POST', '/datamachine/v1/socials/post' );
+$request->set_header( 'content-type', 'application/json' );
+$request->set_body(
+	wp_json_encode(
+		array(
+			'platforms'  => array( 'instagram' ),
+			'caption'    => 'Unauthorized direct REST attempt.',
+			'images'     => array( array( 'url' => $approved_media['url'] ) ),
+			'media_kind' => 'image',
+		)
+	)
+);
+$rest_response = rest_do_request( $request );
+ec_studio_operator_assert( 403 === $rest_response->get_status(), 'ordinary team custom REST denial' );
+$enqueue_ability = wp_get_ability( 'datamachine/enqueue-social-publish' );
+ec_studio_operator_assert( (bool) $enqueue_ability, 'real durable publish ability exists' );
+$permission = $enqueue_ability->check_permissions( $publish_input );
+ec_studio_operator_assert( false === $permission || is_wp_error( $permission ), 'ordinary team durable ability denial' );
+
+wp_set_current_user( $gardner_id );
+ec_studio_operator_assert( true === $enqueue_ability->check_permissions( $publish_input ), 'Gardner durable ability grant' );
+
+$future_gmt   = gmdate( 'Y-m-d H:i:s', time() + DAY_IN_SECONDS );
+$future_local = get_date_from_gmt( $future_gmt );
+wp_set_current_user( (int) $fixture['execution_owner_user_id'] );
+$scheduled        = wp_update_post(
+	array(
+		'ID'            => $draft_id,
+		'edit_date'     => true,
+		'post_status'   => 'publish',
+		'post_date'     => $future_local,
+		'post_date_gmt' => $future_gmt,
+	),
+	true
+);
+$scheduled_status = (string) get_post_status( $draft_id );
+ec_studio_operator_assert(
+	! is_wp_error( $scheduled ) && 'future' === $scheduled_status,
+	'WordPress Core future status schedules draft (result=' . ( is_wp_error( $scheduled ) ? $scheduled->get_error_code() : (string) $scheduled ) . ', status=' . $scheduled_status . ')'
+);
+ec_studio_operator_assert( (bool) wp_next_scheduled( 'publish_future_post', array( $draft_id ) ), 'Core publish_future_post event exists' );
+$pre_due_calls   = get_option( 'ec_studio_operator_provider_ledger', array() );
+$pre_due_effects = array_filter(
+	is_array( $pre_due_calls ) ? $pre_due_calls : array(),
+	static fn( $entry ) => in_array( $entry['provider_call'] ?? '', array( 'instagram.publish-effect', 'bluesky.publish-effect' ), true )
+);
+ec_studio_operator_assert( 0 === count( $pre_due_effects ), 'zero provider effects before due time' );
+ec_studio_operator_assert( '' === get_post_meta( $draft_id, '_studio_social_delivery_ref', true ), 'zero owner receipts before due time' );
+
+// Same-status save while future must not enqueue.
+wp_update_post( array(
+	'ID'          => $draft_id,
+	'post_status' => 'future',
+	'post_title'  => 'Gardner scheduled social review',
+) );
+$same_status_calls   = get_option( 'ec_studio_operator_provider_ledger', array() );
+$same_status_effects = array_filter(
+	is_array( $same_status_calls ) ? $same_status_calls : array(),
+	static fn( $entry ) => in_array( $entry['provider_call'] ?? '', array( 'instagram.publish-effect', 'bluesky.publish-effect' ), true )
+);
+ec_studio_operator_assert( 0 === count( $same_status_effects ), 'same-status schedule update has zero effects' );
+wp_set_current_user( $gardner_id );
+
+global $wpdb;
+$past_gmt   = gmdate( 'Y-m-d H:i:s', time() - MINUTE_IN_SECONDS );
+$past_local = get_date_from_gmt( $past_gmt );
+$wpdb->update(
+	$wpdb->posts,
+	array(
+		'post_date'     => $past_local,
+		'post_date_gmt' => $past_gmt,
+	),
+	array( 'ID' => $draft_id ),
+	array( '%s', '%s' ),
+	array( '%d' )
+);
+clean_post_cache( $draft_id );
+do_action( 'publish_future_post', $draft_id );
+ec_studio_operator_assert( 'publish' === get_post_status( $draft_id ), 'due cron transitions future to publish' );
+$publish_input['content_ref']['source_url'] = get_permalink( $draft_id );
+
+$owner_context          = array(
+	'phase'         => 'submit',
+	'action'        => DelegatedCrossPostAction::ACTION_ID,
+	'operation_id'  => $publish_input['idempotency_key'],
+	'operation_ref' => 'dop_' . str_repeat( 'a', 64 ),
+	'actor'         => array(
+		'user_id'  => get_current_user_id(),
+		'agent_id' => 0,
+	),
+);
+$owner_raw_input        = array(
+	'post_id'          => $publish_input['content_ref']['post_id'],
+	'source_url'       => $publish_input['content_ref']['source_url'],
+	'caption'          => $publish_input['content_ref']['caption'],
+	'content_hash'     => $publish_input['content_ref']['content_hash'],
+	'channels'         => $publish_input['target_policy']['channels'],
+	'media_kind'       => $publish_input['target_policy']['media_kind'],
+	'asset_refs'       => $publish_input['content_ref']['asset_refs'],
+	'attribution_post' => $publish_input['attribution_post'],
+);
+$owner_input            = DelegatedCrossPostAction::normalize_input( $owner_raw_input, $owner_context );
+$owner_context['input'] = is_array( $owner_input ) ? $owner_input : array();
+$owner_policy           = is_array( $owner_input ) ? DelegatedCrossPostAction::authorize( $owner_context ) : $owner_input;
+$prepared               = is_array( $owner_input ) ? DelegatedCrossPostAction::prepare( $owner_input, $owner_context ) : $owner_input;
+$prepared_workflow      = is_array( $prepared ) ? ( $prepared['workflow'] ?? null ) : null;
+$workflow_validation    = WorkflowSpecValidator::validate( $prepared_workflow );
+$execution_plan         = array(
+	'valid'         => false,
+	'first_step_id' => null,
+	'error'         => null,
+);
+if ( ! empty( $workflow_validation['valid'] ) ) {
+	try {
+		$configs                         = WorkflowConfigFactory::buildEphemeralConfigs( $prepared_workflow );
+		$execution_plan['first_step_id'] = ExecutionPlan::from_flow_config( $configs['flow_config'] )->first_step_id();
+		$execution_plan['valid']         = ! empty( $execution_plan['first_step_id'] );
+	} catch ( Throwable $exception ) {
+		$execution_plan['error'] = $exception->getMessage();
+	}
+}
+$diagnostic = array(
+	'blog_id'                  => get_current_blog_id(),
+	'multisite'                => is_multisite(),
+	'acting_user_id'           => get_current_user_id(),
+	'execution_owner_user_id'  => $fixture['execution_owner_user_id'],
+	'execution_owner_agent_id' => $fixture['execution_owner_agent_id'],
+	'source_post'              => ec_studio_operator_source_post_diagnostic( $article_site_id, $article_id ),
+	'draft_post'               => array(
+		'id'           => $draft_id,
+		'status'       => get_post_status( $draft_id ),
+		'platforms'    => get_post_meta( $draft_id, '_studio_social_platforms', true ),
+		'caption_hash' => hash( 'sha256', (string) get_post_meta( $draft_id, '_studio_social_caption', true ) ),
+	),
+	'operation_id'             => $publish_input['idempotency_key'],
+	'operation_fingerprint'    => hash( 'sha256', (string) wp_json_encode( $publish_input ) ),
+	'step_types'               => array_keys( ( new StepTypeAbilities() )->getAllStepTypes() ),
+	'task_handlers'            => array_keys( TaskRegistry::getHandlers() ),
+	'owner_policy'             => true === $owner_policy ? 'authorized' : ( is_wp_error( $owner_policy ) ? $owner_policy->get_error_code() : 'denied' ),
+	'workflow_validation'      => $workflow_validation,
+	'execution_plan'           => $execution_plan,
+	'delegated_submit_ability' => wp_get_ability( 'datamachine/submit-delegated-operation' ) ? 'available' : 'missing',
+	'action_scheduler_loaded'  => function_exists( 'as_schedule_single_action' ) ? 'loaded' : 'missing',
+);
+
+// Diagnostic-only: capture the RAW datamachine/submit-delegated-operation
+// error code before Studio's own SocialPublishAbility::normalizeResult()
+// collapses several distinct underlying failures (delegated_enqueue_failed,
+// delegated_operation_create_failed, delegated_operation_persist_failed,
+// delegated_operation_load_failed, delegated_ability_unavailable,
+// delegated_response_invalid) into one generic
+// social_publish_scheduler_unavailable. Uses the SAME action/operation_id
+// the real submission uses, so this IS the real first attempt, not a
+// parallel one -- the retry loop below sees it as already_exists.
+$submit_ability                               = wp_get_ability( 'datamachine/submit-delegated-operation' );
+$raw_submit_diagnostic                        = $submit_ability
+	? $submit_ability->execute( array(
+		'action'       => DelegatedCrossPostAction::ACTION_ID,
+		'operation_id' => $publish_input['idempotency_key'],
+		// Raw, pre-normalize_input() input -- the real ability calls
+		// normalize_input() itself internally. Passing the ALREADY
+		// normalized $owner_context['input'] here (which carries a
+		// post_site_id key normalize_input() itself adds) trips
+		// normalize_input()'s own "the canonical post site is
+		// owner-controlled" guard on re-entry -- a diagnostic-call bug,
+		// not the real submission path's behavior.
+		'input'        => $owner_raw_input,
+	) )
+	: new WP_Error( 'submit_ability_missing', 'datamachine/submit-delegated-operation is unavailable.' );
+$diagnostic['raw_submit_delegated_operation'] = is_wp_error( $raw_submit_diagnostic )
+	? array(
+		'code'    => $raw_submit_diagnostic->get_error_code(),
+		'message' => $raw_submit_diagnostic->get_error_message(),
+		'data'    => $raw_submit_diagnostic->get_error_data(),
+	)
+	: $raw_submit_diagnostic;
+
+$delivery_ref    = (string) get_post_meta( $draft_id, '_studio_social_delivery_ref', true );
+$handoff_retries = array();
+for ( $attempt = 1; '' === $delivery_ref && $attempt <= 3; ++$attempt ) {
+	$handoff_retries[] = wp_get_ability( 'extrachill/retry-social-publish' )->execute( array( 'post_id' => $draft_id ) );
+	$delivery_ref      = (string) get_post_meta( $draft_id, '_studio_social_delivery_ref', true );
+}
+$key            = 'delegated:' . hash( 'sha256', "delegated-idempotency\0" . DelegatedCrossPostAction::ACTION_ID . "\0studio-social-publish:" . get_current_blog_id() . ':' . $draft_id );
+$jobs           = new Jobs();
+$job            = $jobs->get_job_by_idempotency_key( $key );
+$job_diagnostic = is_array( $job )
+	? array_intersect_key( $job, array_flip( array( 'job_id', 'status', 'operation_state', 'operation_generation', 'operation_action_id' ) ) )
+	: null;
+ec_studio_operator_assert(
+	1 === preg_match( '/^dop_[a-f0-9]{64}$/', $delivery_ref ),
+	'one opaque delegated receipt is stored (job=' . (string) wp_json_encode( $job_diagnostic ) . ', handoff_retries=' . (string) wp_json_encode( $handoff_retries ) . ', raw_submit=' . (string) wp_json_encode( $diagnostic['raw_submit_delegated_operation'] ) . ', action_scheduler=' . $diagnostic['action_scheduler_loaded'] . ')'
+);
+ec_studio_operator_assert( is_array( $job ), 'one durable delegated operation exists' );
+$job_id = (int) $job['job_id'];
+
+// Unchanged replay, rapid double-submit, and reload-equivalent reads reuse one identity.
+$unchanged_one = ExtraChillStudio\enqueue_social_publish( get_post( $draft_id ) );
+$unchanged_two = ExtraChillStudio\enqueue_social_publish( get_post( $draft_id ) );
+ec_studio_operator_assert( ! empty( $unchanged_one['success'] ) && ! empty( $unchanged_one['delivery']['duplicate'] ), 'unchanged replay is explicit duplicate' );
+ec_studio_operator_assert( ( $unchanged_one['delivery']['delivery_ref'] ?? '' ) === $delivery_ref, 'unchanged replay preserves operation identity' );
+ec_studio_operator_assert( ( $unchanged_two['delivery']['delivery_ref'] ?? '' ) === $delivery_ref, 'rapid double-submit preserves operation identity' );
+ec_studio_operator_assert( $job_id === (int) $jobs->get_job_by_idempotency_key( $key )['job_id'], 'rapid replay creates no second job' );
+
+// A stale tab changes live meta after approval; frozen operation input must not change.
+$stale_caption = 'Stale tab overwrite that must never reach a provider.';
+update_post_meta( $draft_id, '_studio_social_caption', $stale_caption );
+$changed = ExtraChillStudio\enqueue_social_publish( get_post( $draft_id ) );
+ec_studio_operator_assert( empty( $changed['success'] ) && 'social_publish_idempotency_conflict' === ( $changed['error']['code'] ?? '' ), 'changed-input replay conflicts explicitly' );
+wp_update_post( array(
+	'ID'          => $draft_id,
+	'post_status' => 'publish',
+	'post_title'  => 'Gardner published social review',
+) );
+ec_studio_operator_assert( $job_id === (int) $jobs->get_job_by_idempotency_key( $key )['job_id'], 'same publish status creates no duplicate operation' );
+
+// Direct delegated-operation and forged-receipt bypasses fail at owner boundaries.
+wp_set_current_user( $ordinary_id );
+$direct = wp_get_ability( 'datamachine/submit-delegated-operation' )->execute(
+	array(
+		'action'       => DelegatedCrossPostAction::ACTION_ID,
+		'operation_id' => 'ordinary-team-forged-operation',
+		'input'        => array(
+			'post_id'      => $draft_id,
+			'source_url'   => get_permalink( $draft_id ),
+			'caption'      => $approved_caption,
+			'content_hash' => hash( 'sha256', $approved_caption ),
+			'channels'     => array( 'instagram' ),
+			'media_kind'   => 'image',
+			'asset_refs'   => array(
+				array(
+					'source_id' => $approved_media['source_id'],
+					'role'      => 'image',
+				),
+			),
+		),
+	)
+);
+ec_studio_operator_assert( is_wp_error( $direct ) || empty( $direct['success'] ), 'direct delegated operation bypass denied' );
+wp_set_current_user( $gardner_id );
+$forged = wp_get_ability( 'datamachine/get-social-publish' )->execute( array( 'delivery_ref' => 'dop_' . str_repeat( 'a', 64 ) ) );
+ec_studio_operator_assert( is_wp_error( $forged ) || empty( $forged['success'] ), 'forged receipt denied' );
+
+ec_studio_operator_execute_job( $jobs->get_job( $job_id ) );
+$job = $jobs->get_job( $job_id );
+ec_studio_operator_assert( str_starts_with( (string) $job['status'], 'failed' ), 'partial delivery reaches durable failed state' );
+$partial = ExtraChillStudio\get_social_publish_state( $draft_id );
+ec_studio_operator_assert( ! empty( $partial['success'] ) && 'failed' === ( $partial['delivery']['status'] ?? '' ), 'partial delivery reload is plain failed state' );
+ec_studio_operator_assert( ! empty( $partial['delivery']['retryable'] ), 'partial delivery is safely retryable' );
+
+// Shares are recorded against the attribution_post's OWN site (the main
+// site the article lives on, per DelegatedCrossPostAction::with_site()),
+// never against whichever blog the delegated job itself executes on.
+switch_to_blog( $article_site_id );
+$shares = DataMachineSocials\Tracking\SocialShareTracker::get_shares( $article_id );
+restore_current_blog();
+ec_studio_operator_assert( 1 === count( $shares ) && 'instagram' === $shares[0]['platform'], 'partial delivery preserves Instagram exactly once' );
+
+$transitions   = get_option( 'ec_studio_operator_transition_ledger', array() );
+$transitions[] = array(
+	'state'      => 'future',
+	'effects'    => 0,
+	'core_event' => 'publish_future_post',
+);
+$transitions[] = array(
+	'state'             => 'queued',
+	'job_id'            => $job_id,
+	'delivery_ref_hash' => hash( 'sha256', $delivery_ref ),
+);
+$transitions[] = array(
+	'state'     => 'partial',
+	'instagram' => 'delivered',
+	'bluesky'   => 'undelivered',
+	'retryable' => true,
+);
+update_option( 'ec_studio_operator_transition_ledger', $transitions, false );
+
+$fixture['delivery_ref']                = $delivery_ref;
+$fixture['job_id']                      = $job_id;
+$fixture['idempotency_key']             = $key;
+$fixture['product_contract_diagnostic'] = $diagnostic;
+update_option( 'ec_rig_journey_fixture_gardner_social_operator', $fixture, false );
+
+restore_current_blog();
+
+echo wp_json_encode(
+	array(
+		'schema'       => 'extrachill-network/journey-fixture/gardner-social-operator-delivery/v1',
+		'status'       => 'partial',
+		'job_id'       => $job_id,
+		'delivery_ref' => hash( 'sha256', $delivery_ref ),
+	),
+	JSON_PRETTY_PRINT
+);

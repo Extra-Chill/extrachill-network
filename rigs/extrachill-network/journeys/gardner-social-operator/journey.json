@@ -1,0 +1,75 @@
+{
+  "schema": "extrachill-network/journey/v1",
+  "id": "gardner-social-operator",
+  "title": "Gardner Studio social-operator: approve, schedule, deliver, retry, and reconcile a cross-platform post",
+  "description": "Walks Chris Gardner through Studio's real social-operations surface -- access/denial boundaries, a due-cron scheduled cross-post, a partial (Instagram-delivered, Bluesky-failed) delivery, and a safe retry to a fully-delivered, correctly-attributed final state -- on the real studio.extrachill.com site inside the full 11-site network. Ported from extrachill-studio tests/wp-codebox/chris-gardner-social-operator*.json (a standalone single-plugin wp-codebox recipe using its own multisite-convert bootstrap and adversarial-campaign extension) onto this rig's journey contract (extrachill-network#293). The deterministic scenario matrix is preserved; the old recipe's adaptive/adversarial-exploration campaign and typed wp_upload_dir() artifact ledgers are dropped -- see evidence/FINDINGS.md.",
+  "origin": {
+    "repository": "Extra-Chill/extrachill-studio",
+    "files": [
+      "tests/wp-codebox/chris-gardner-social-operator.json",
+      "tests/wp-codebox/chris-gardner-social-operator-setup.php",
+      "tests/wp-codebox/chris-gardner-social-operator-deliver.php",
+      "tests/wp-codebox/chris-gardner-social-operator-reload.php",
+      "tests/wp-codebox/chris-gardner-social-operator-provider-stub.php",
+      "tests/wp-codebox/chris-gardner-social-operator-provider-contract.php",
+      "tests/wp-codebox/chris-gardner-social-operator-contract.test.mjs",
+      "tests/wp-codebox/chris-gardner-persona.json",
+      "tests/wp-codebox/chris-gardner-persona-seed.php",
+      "tests/wp-codebox/README.md"
+    ],
+    "mergedIn": "extrachill-network#293"
+  },
+  "persona": {
+    "id": "extra-chill-users/chris-gardner",
+    "version": "1.0.0",
+    "file": "gardner.v1.json"
+  },
+  "sites": ["studio.extrachill.com"],
+  "runtimeEnv": {
+    "WP_AGENT_RUNTIME": "1"
+  },
+  "fixtureMuPlugins": ["provider-stub.php"],
+  "seed": { "codeFile": "seed.php", "timeoutMs": 120000 },
+  "grade": { "codeFile": "grade.php", "timeoutMs": 180000 },
+  "steps": [
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "gardner-social-tab-access" },
+      "args": [
+        "url=http://studio.extrachill.com/",
+        "route-host=studio.extrachill.com",
+        "network-policy=block",
+        "allow-host=studio.extrachill.com",
+        "auth=wordpress-admin",
+        "auth-user-id=201",
+        "step-timeout=30s",
+        "timeout=120s",
+        "capture=steps,console,errors,network,html,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://studio.extrachill.com/\",\"waitFor\":\"load\"},{\"kind\":\"expect\",\"selector\":\"[data-ec-studio-root][data-can-brand-socials=\\\"true\\\"]\",\"state\":\"attached\"},{\"kind\":\"waitFor\",\"selector\":\"[data-ec-studio-root][data-ec-studio-mounted=\\\"true\\\"]\"},{\"kind\":\"expect\",\"selector\":\".ec-tabs__tab:has-text(\\\"Socials\\\")\",\"state\":\"visible\"},{\"kind\":\"click\",\"selector\":\".ec-tabs__tab:has-text(\\\"Socials\\\")\"},{\"kind\":\"waitFor\",\"selector\":\".ec-studio-socials-layout\"},{\"kind\":\"expect\",\"selector\":\".ec-socials-sidebar__platform:has-text(\\\"Instagram\\\")\",\"state\":\"visible\"},{\"kind\":\"expect\",\"selector\":\".ec-socials-sidebar__platform:has-text(\\\"Bluesky\\\")\",\"state\":\"visible\"},{\"kind\":\"screenshot\",\"name\":\"gardner-social-operator-access\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "ordinary-team-social-denial" },
+      "args": [
+        "url=http://studio.extrachill.com/",
+        "route-host=studio.extrachill.com",
+        "network-policy=block",
+        "allow-host=studio.extrachill.com",
+        "auth=wordpress-admin",
+        "auth-user-id=220",
+        "step-timeout=30s",
+        "timeout=120s",
+        "capture=steps,console,errors,network,html,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://studio.extrachill.com/\",\"waitFor\":\"load\"},{\"kind\":\"expect\",\"selector\":\"[data-ec-studio-root][data-can-brand-socials=\\\"false\\\"]\",\"state\":\"attached\"},{\"kind\":\"waitFor\",\"selector\":\"[data-ec-studio-root][data-ec-studio-mounted=\\\"true\\\"]\"},{\"kind\":\"expect\",\"selector\":\".ec-tabs__tab:has-text(\\\"Socials\\\")\",\"state\":\"detached\"},{\"kind\":\"screenshot\",\"name\":\"ordinary-team-social-denial\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.run-php",
+      "args": ["code-file=${journey.dir}/deliver.php"],
+      "timeoutMs": 180000
+    }
+  ]
+}
