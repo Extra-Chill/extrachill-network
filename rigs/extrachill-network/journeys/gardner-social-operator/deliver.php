@@ -300,7 +300,33 @@ $diagnostic = array(
 	'workflow_validation'      => $workflow_validation,
 	'execution_plan'           => $execution_plan,
 	'delegated_submit_ability' => wp_get_ability( 'datamachine/submit-delegated-operation' ) ? 'available' : 'missing',
+	'action_scheduler_loaded'  => function_exists( 'as_schedule_single_action' ) ? 'loaded' : 'missing',
 );
+
+// Diagnostic-only: capture the RAW datamachine/submit-delegated-operation
+// error code before Studio's own SocialPublishAbility::normalizeResult()
+// collapses several distinct underlying failures (delegated_enqueue_failed,
+// delegated_operation_create_failed, delegated_operation_persist_failed,
+// delegated_operation_load_failed, delegated_ability_unavailable,
+// delegated_response_invalid) into one generic
+// social_publish_scheduler_unavailable. Uses the SAME action/operation_id
+// the real submission uses, so this IS the real first attempt, not a
+// parallel one -- the retry loop below sees it as already_exists.
+$submit_ability                               = wp_get_ability( 'datamachine/submit-delegated-operation' );
+$raw_submit_diagnostic                        = $submit_ability
+	? $submit_ability->execute( array(
+		'action'       => DelegatedCrossPostAction::ACTION_ID,
+		'operation_id' => $publish_input['idempotency_key'],
+		'input'        => $owner_context['input'],
+	) )
+	: new WP_Error( 'submit_ability_missing', 'datamachine/submit-delegated-operation is unavailable.' );
+$diagnostic['raw_submit_delegated_operation'] = is_wp_error( $raw_submit_diagnostic )
+	? array(
+		'code'    => $raw_submit_diagnostic->get_error_code(),
+		'message' => $raw_submit_diagnostic->get_error_message(),
+		'data'    => $raw_submit_diagnostic->get_error_data(),
+	)
+	: $raw_submit_diagnostic;
 
 $delivery_ref    = (string) get_post_meta( $draft_id, '_studio_social_delivery_ref', true );
 $handoff_retries = array();
@@ -316,7 +342,7 @@ $job_diagnostic = is_array( $job )
 	: null;
 ec_studio_operator_assert(
 	1 === preg_match( '/^dop_[a-f0-9]{64}$/', $delivery_ref ),
-	'one opaque delegated receipt is stored (job=' . (string) wp_json_encode( $job_diagnostic ) . ', handoff_retries=' . (string) wp_json_encode( $handoff_retries ) . ')'
+	'one opaque delegated receipt is stored (job=' . (string) wp_json_encode( $job_diagnostic ) . ', handoff_retries=' . (string) wp_json_encode( $handoff_retries ) . ', raw_submit=' . (string) wp_json_encode( $diagnostic['raw_submit_delegated_operation'] ) . ', action_scheduler=' . $diagnostic['action_scheduler_loaded'] . ')'
 );
 ec_studio_operator_assert( is_array( $job ), 'one durable delegated operation exists' );
 $job_id = (int) $job['job_id'];
