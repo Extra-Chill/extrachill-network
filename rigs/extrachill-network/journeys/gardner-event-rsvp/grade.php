@@ -199,7 +199,6 @@ ec_rig_grade_case(
 		'pass_found'       => is_array( $pass ),
 		'status'           => is_array( $pass ) ? (string) $pass['status'] : null,
 		'code_length'      => strlen( $pass_code ),
-		'tables_precreated' => $fixture['tables_precreated'] ?? array(),
 	)
 );
 
@@ -365,6 +364,30 @@ ec_rig_grade_case(
 	array(
 		'marked'         => $new_creative_marked,
 		'member_of_site' => $new_creative_member,
+	)
+);
+
+// Diagnostic (not a persona case): the logged-out Going click redirects to
+// the events site's /login/ page. If that page does not respond in this
+// runtime, the click->register->RSVP loop cannot be exercised and the
+// browser step stalls on the pending navigation. Record the page's health
+// so the finding lands on the right repo.
+switch_to_blog( $events_blog_id );
+$login_url = home_url( '/login/' );
+restore_current_blog();
+$login_response   = wp_remote_get( $login_url, array( 'timeout' => 20, 'sslverify' => false ) );
+$login_status     = is_wp_error( $login_response ) ? $login_response->get_error_message() : wp_remote_retrieve_response_code( $login_response );
+$login_body_start = is_wp_error( $login_response ) ? '' : substr( (string) wp_remote_retrieve_body( $login_response ), 0, 400 );
+ec_rig_grade_case(
+	'login-page-responds-for-logged-out-visitors',
+	'obvious-state',
+	! is_wp_error( $login_response ) && 200 === (int) $login_status,
+	'Click Going while logged out and reach a working sign-in page.',
+	array(
+		'login_url'     => $login_url,
+		'status'        => $login_status,
+		'body_start'    => $login_body_start,
+		'note'          => 'Diagnostic for the register->RSVP loop: a non-200 or error here means the loop failure is the login page, not the registration form.',
 	)
 );
 

@@ -70,11 +70,14 @@ zip of every component (deploy parity).
   MySQL-only `GET_LOCK` primitive this runtime's database layer does not
   provide (documented in the events repo's own wp-codebox README first).
   Everything the JOURNEY then does runs through real registered abilities.
-- Tables are **verified, not created**: plugins reach activation through
-  real `activate_plugin()` calls on this rig, so activation hooks fire. The
-  seed fails loudly if a table it depends on is missing, and records (in
-  `tables_precreated`) any case where the hook path did not run -- the old
-  single-site seed's unconditional table creation is gone.
+- Tables are **verified, not created**: the rig's activation step fires
+  every plugin's activation hooks (network-wide, then per site), which is
+  what creates them in production. The seed fails loudly if a table it
+  depends on is missing -- that is a rig regression, never something the
+  journey papers over. (The first real run proved the shape of this: the
+  rig passed `activate_plugin(..., $silent = true)`, which skips activation
+  hooks entirely, so no plugin table existed and every RSVP silently
+  no-opped until the rig owned the fix.)
 - Multisite registration must be enabled for the live-registration step; a
   fresh install defaults it off, so the seed sets the network `registration`
   option to `user` and records that it did.

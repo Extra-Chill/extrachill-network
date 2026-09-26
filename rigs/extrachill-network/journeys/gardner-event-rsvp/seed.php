@@ -11,11 +11,13 @@
  *   network-topology.json's domain (events.extrachill.com) at runtime, and the
  *   rig's generated ec-network-domain-ids.php mu-plugin aligns the
  *   EC_BLOG_ID_* constants with the fresh install's actual blog IDs by domain.
- * - No unconditional table creation: plugins are activated through real
- *   activate_plugin() calls in this rig, so register_activation_hook callbacks
- *   fire and create their own tables. This seed only VERIFIES the tables it
- *   depends on and fails loudly if one is missing, recording any case where
- *   the hook path did not run.
+ * - No unconditional table creation: the RIG's activation step fires every
+ *   plugin's activation hooks (network-wide, then per site -- including
+ *   network-activated plugins re-fired per site, matching what production's
+ *   install-time activation did), so register_activation_hook callbacks run
+ *   and create their own tables. This seed only VERIFIES the tables it
+ *   depends on and fails loudly if one is missing: that is a rig regression,
+ *   not a journey concern.
  *
  * One thing the network boot genuinely adds: wordpress.run-php steps execute
  * against the primary site, where the per-site plugins (data-machine-events,
@@ -183,7 +185,6 @@ $evidence = array(
 	'events_blog_id'    => $events_blog_id,
 	'main_blog_id'      => $main_blog_id,
 	'steps'             => array(),
-	'tables_precreated' => array(),
 );
 
 /*
@@ -261,65 +262,36 @@ switch_to_blog( $events_blog_id );
 
 $evidence['steps']['bootstrap'] = ec_rig_journey_bootstrap_events_plugins();
 
+/*
+ * ---------------------------------------------------------------------------
+ * Table verification (not creation): the RIG's activation step is responsible
+ * for firing every plugin's activation hooks (network-wide, then per site),
+ * which is what creates these tables in production. This seed only verifies
+ * and fails loudly -- a missing table here is a rig regression, never
+ * something the journey should paper over.
+ * ---------------------------------------------------------------------------
+ */
 if ( ! class_exists( '\\DataMachineEvents\\Core\\EventDatesTable' ) ) {
 	throw new RuntimeException( 'EventDatesTable is unavailable after bootstrapping data-machine-events.' );
 }
 if ( ! \DataMachineEvents\Core\EventDatesTable::table_exists() ) {
-	\DataMachineEvents\Core\EventDatesTable::create_table();
-	$evidence['tables_precreated'][] = 'datamachine_event_dates';
-	if ( ! \DataMachineEvents\Core\EventDatesTable::table_exists() ) {
-		throw new RuntimeException( 'The event-dates table did not install on the events site.' );
-	}
+	throw new RuntimeException( 'The event-dates table does not exist on the events site; the rig activation step failed to fire data-machine-events\' activation hook.' );
 }
 
 if ( ! class_exists( '\\ExtraChillEvents\\Core\\RsvpPassesTable' ) ) {
 	throw new RuntimeException( 'RsvpPassesTable is unavailable after bootstrapping extrachill-events.' );
 }
 if ( ! \ExtraChillEvents\Core\RsvpPassesTable::table_exists() ) {
-	\ExtraChillEvents\Core\RsvpPassesTable::create_table();
-	$evidence['tables_precreated'][] = 'extrachill_rsvp_passes';
-	if ( ! \ExtraChillEvents\Core\RsvpPassesTable::table_exists() ) {
-		throw new RuntimeException( 'The RSVP pass table did not install on the events site; perk passes cannot be graded.' );
-	}
+	throw new RuntimeException( 'The RSVP pass table does not exist on the events site; the rig activation step failed to fire extrachill-events\' activation hook.' );
 }
 
-/*
- * The concert-tracking + notifications tables (global, extrachill-users'
- * activation hooks) are verified here for the same reason as the two events
- * tables above: activation callbacks do not reliably fire for mounted
- * plugins in this runtime (first real run: every RSVP silently no-opped with
- * 0 rows -- the identical failure the single-site journey documented before
- * adding this). Without the tracking table the mark ability fails invisibly,
- * which reads as fake usability findings, so it is a setup guard, not a
- * silent workaround.
- */
-$users_inc = WP_PLUGIN_DIR . '/extrachill-users/inc';
 if ( ! function_exists( 'extrachill_users_concert_tracking_table_name' ) ) {
-	require_once $users_inc . '/concert-tracking/db.php';
-}
-if ( ! function_exists( 'extrachill_users_concert_tracking_table_name' ) ) {
-	throw new RuntimeException( 'extrachill-users concert-tracking db.php is unavailable; RSVPs cannot be verified.' );
+	require_once WP_PLUGIN_DIR . '/extrachill-users/inc/concert-tracking/db.php';
 }
 global $wpdb;
 $concert_table = extrachill_users_concert_tracking_table_name();
 if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $concert_table ) ) !== $concert_table ) {
-	if ( function_exists( 'extrachill_users_install_concert_tracking_table' ) ) {
-		extrachill_users_install_concert_tracking_table();
-		$evidence['tables_precreated'][] = 'ec_concert_tracking';
-	}
-	if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $concert_table ) ) !== $concert_table ) {
-		throw new RuntimeException( 'The concert-tracking table did not install; every RSVP would silently no-op.' );
-	}
-}
-if ( ! function_exists( 'extrachill_users_notifications_table_name' ) ) {
-	require_once $users_inc . '/notifications/db.php';
-}
-if ( function_exists( 'extrachill_users_install_notifications_table' ) ) {
-	$notif_table_check = extrachill_users_notifications_table_name();
-	if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $notif_table_check ) ) !== $notif_table_check ) {
-		extrachill_users_install_notifications_table();
-		$evidence['tables_precreated'][] = 'ec_notifications';
-	}
+	throw new RuntimeException( 'The concert-tracking table does not exist; every RSVP would silently no-op. The rig activation step failed to fire extrachill-users\' activation hook.' );
 }
 
 $description = "Join us at Lo-Fi Brewing on Wednesday, October 21st from 6:30 to 9pm for a free gathering of the creative community focused on building your online presence in the AI era. This is an official WordPress meetup, hosted by Chris Huber, the founder of Extra Chill, who now works as an engineer at Automattic. However, you don't have to use WordPress or even know what it is to find value in this event.\n\nMusicians, writers, photographers, developers, small business owners, whether you have a website or just an Instagram. All experience levels are welcome.\n\nWe'll go behind the scenes of Extra Chill, showcasing our fully automated international concert calendar, artist platform, and community, all built on open source software. Other creatives will also be invited to share what they are building. At this event we will discuss AI, including both the challenges it presents to the creative community, and how it can be used to empower your own process. Bring your objections and your ideas, that's what this event is all about.\n\nMark yourself as Going on this page or the Meetup.com event and your first beer is on Extra Chill.";

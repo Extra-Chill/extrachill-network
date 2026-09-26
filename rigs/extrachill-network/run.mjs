@@ -507,6 +507,7 @@ function buildActivationMatrix(topology, activePlugins, excludedComponents) {
 function activatePluginsStep(matrix) {
   const encoded = Buffer.from(JSON.stringify({ network: matrix.network, perDomain: matrix.perDomain }), 'utf8').toString('base64');
   const code = `require_once ABSPATH . 'wp-admin/includes/plugin.php';
+require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 $matrix = json_decode(base64_decode('${encoded}'), true);
 if (!is_array($matrix)) {
     throw new RuntimeException('extrachill-network activation matrix did not decode.');
@@ -536,7 +537,7 @@ function extrachill_network_activate_with_retries($plugin_files, $network_wide) 
                 $activated_this_pass++;
                 continue;
             }
-            $result = activate_plugin($plugin_file, '', $network_wide, true);
+            $result = activate_plugin($plugin_file, '', $network_wide, false);
             if (is_wp_error($result)) {
                 $last_errors[$plugin_file] = $result->get_error_message();
                 $still_pending[] = $plugin_file;
@@ -559,6 +560,24 @@ extrachill_network_activate_with_retries($matrix['network'], true);
 foreach (get_sites(array('number' => 0)) as $site) {
     switch_to_blog((int) $site->blog_id);
     try {
+        // Network activation fires each plugin's activation hook exactly once,
+        // network-wide, from this request's current site. Plugins whose setup is
+        // per-site (tables on the site's own prefix, per-site options, CPT
+        // state) were installed in production by single-site activation firing
+        // their hooks with $network_wide=false on every site. Re-fire the
+        // activation hook per site here for the same coverage; the callbacks
+        // are idempotent (dbDelta, options guards, taxonomy_exists checks).
+        foreach ($matrix['network'] as $network_plugin_file) {
+            if (!file_exists(WP_PLUGIN_DIR . '/' . $network_plugin_file)) {
+                continue;
+            }
+            if (!did_action('activate_' . $network_plugin_file)) {
+                // The hook callback only exists if the plugin file was loaded;
+                // network activation above loaded it once.
+                plugin_sandbox_scrape($network_plugin_file);
+            }
+            do_action('activate_' . $network_plugin_file, false);
+        }
         $plugin_files = $matrix['perDomain'][$site->domain] ?? array();
         try {
             extrachill_network_activate_with_retries($plugin_files, false);
