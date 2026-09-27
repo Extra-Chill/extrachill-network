@@ -421,6 +421,8 @@ function journeyStep(journey, dir, step) {
   const substitute = (value) => (typeof value === 'string' ? value.replaceAll('${journey.dir}', dir).replaceAll('${journey.id}', journey.id) : value);
   return {
     ...step,
+    // See journeyPhaseStep: every journey step is isolated from the others.
+    allowFailure: true,
     args: (step.args ?? []).map(substitute),
     metadata: { ...(step.metadata ?? {}), kind: step.metadata?.kind ?? 'journey-browser-step', journey: journey.id },
   };
@@ -435,6 +437,10 @@ function journeyPhaseStep(journey, dir, phase) {
     command: 'wordpress.run-php',
     args: [`code-file=${path.join(dir, phaseConfig.codeFile)}`],
     ...(phaseConfig.timeoutMs ? { timeoutMs: phaseConfig.timeoutMs } : {}),
+    // Journey isolation: one journey's fatal must not stop the recipe and
+    // discard every other selected journey's results. The failure is still
+    // recorded (stepFailures) and the journeys workflow fails on it.
+    allowFailure: true,
     metadata: { kind: `journey-${phase}`, journey: journey.id },
   };
 }
@@ -466,6 +472,7 @@ function cachePurgeStep(journeyId, phase) {
   return {
     command: 'wordpress.wp-cli',
     args: ['command=extrachill-cache purge --all'],
+    allowFailure: true,
     metadata: { kind: `journey-${phase}-cache-purge`, journey: journeyId },
   };
 }

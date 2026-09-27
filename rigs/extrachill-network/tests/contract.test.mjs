@@ -161,6 +161,14 @@ try {
   for (let i = firstJourneyIndex + 1; i < gradeIndex; ++i) {
     assert.equal(withJourney.workflow.steps[i].metadata.journey, 'gardner-event-rsvp', `step ${i} belongs to the journey`);
   }
+  // Journey isolation: every journey step may fail without stopping the
+  // recipe; baseline steps (activation, assertion, page probes) stay fatal.
+  for (const step of withJourney.workflow.steps) {
+    if (step.metadata?.journey) {
+      assert.equal(step.allowFailure, true, `journey step ${step.metadata.kind} must be isolated (allowFailure)`);
+    }
+  }
+  assert.equal(withJourney.workflow.steps.find((step) => step.metadata?.kind === 'extrachill-network-assertion')?.allowFailure, undefined, 'baseline assertion stays fatal');
 
   const seedStep = withJourney.workflow.steps[firstJourneyIndex];
   assert.equal(seedStep.command, 'wordpress.run-php');
