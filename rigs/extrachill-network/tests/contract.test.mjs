@@ -73,6 +73,8 @@ try {
   assert.match(compatSource, /'ec_site_url_override'/);
   assert.match(compatSource, /'allowed_redirect_hosts'[\s\S]*ec_get_allowed_redirect_hosts\(\)[\s\S]*99/);
   assert.match(compatSource, /GET_LOCK\|RELEASE_LOCK\|IS_FREE_LOCK/);
+  assert.match(compatSource, /'extrachill_api_rate_limit_store'/);
+  assert.match(compatSource, /'extrachill_users_registration_admitter'/);
 
   // 1c. domainIdsMuPluginSource refuses a topology that dropped a mapped domain.
   assert.throws(

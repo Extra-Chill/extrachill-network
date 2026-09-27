@@ -67,7 +67,11 @@ multisite topology, release-zip mounting, and the theme-remote-sourcing gap).
   re-merges the network's hosts at priority 99. This is temporary until the
   pinned WP Codebox includes Automattic/wp-codebox#2533. (3) SQLite has no MySQL
   advisory locks, so the file answers `GET_LOCK`/`RELEASE_LOCK`/`IS_FREE_LOCK`
-  with `1`, because requests are serialized. These are infrastructure
+  with `1`, because requests are serialized. (4) Redis is excluded, so the network's atomic
+  abuse limiters (Extra Chill Users registration, extrachill-api public writes)
+  fail closed with a 503. The file answers their store seams
+  (`extrachill_users_registration_admitter`, `extrachill_api_rate_limit_store`)
+  with a site-option counter (#299). These are infrastructure
   substitutes, not product behaviour.
 - **Journeys** (optional): full user journeys -- seeded personas, real
   browser interactions, persona-oracle grading -- that run after the baseline
