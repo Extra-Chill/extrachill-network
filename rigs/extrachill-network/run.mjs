@@ -229,6 +229,26 @@ add_filter(
 );
 
 /*
+ * 5. Egress fence. Network domains are the REAL production hostnames, and
+ *    Playground resolves PHP HTTP requests on the real internet: a
+ *    server-side wp_remote_*() to one (a grade script, a cross-site REST
+ *    loopback) reached live extrachill.com. Fail closed. Temporary until the
+ *    pinned WP Codebox includes Automattic/wp-codebox#2534.
+ */
+add_filter(
+	'pre_http_request',
+	static function ( $preempt, $args, $url ) {
+		$host = strtolower( (string) wp_parse_url( (string) $url, PHP_URL_HOST ) );
+		if ( false === $preempt && preg_match( '/(^|\\.)extrachill\\.(com|link)$/', $host ) ) {
+			return new WP_Error( 'ec_rig_network_egress_blocked', 'The rig blocked a server-side request to ' . $host . ': it would reach production.' );
+		}
+		return $preempt;
+	},
+	PHP_INT_MAX,
+	3
+);
+
+/*
  * 4. SQLite has no MySQL advisory locks, so every GET_LOCK()-serialized write
  *    (Link Page creation and saves, artist membership) fails closed. Requests
  *    are serialized through one PHP runtime here, so answer as MySQL would.

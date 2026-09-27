@@ -75,6 +75,7 @@ try {
   assert.match(compatSource, /GET_LOCK\|RELEASE_LOCK\|IS_FREE_LOCK/);
   assert.match(compatSource, /'extrachill_api_rate_limit_store'/);
   assert.match(compatSource, /'extrachill_users_registration_admitter'/);
+  assert.match(compatSource, /'pre_http_request'[\s\S]*ec_rig_network_egress_blocked/, 'server-side HTTP to network domains must never reach production');
 
   // 1c. domainIdsMuPluginSource refuses a topology that dropped a mapped domain.
   assert.throws(

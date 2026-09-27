@@ -72,7 +72,11 @@ multisite topology, release-zip mounting, and the theme-remote-sourcing gap).
   fail closed with a 503. The file answers their store seams
   (`extrachill_users_registration_admitter`, `extrachill_api_rate_limit_store`)
   with a site-option counter (#299). These are infrastructure
-  substitutes, not product behaviour.
+  substitutes, not product behaviour. (5) **Egress fence:** network domains are the real
+  production hostnames, and Playground resolves PHP HTTP on the real internet,
+  so server-side `wp_remote_*()` to them is blocked
+  (`ec_rig_network_egress_blocked`) until the pinned WP Codebox includes
+  Automattic/wp-codebox#2534.
 - **Journeys** (optional): full user journeys -- seeded personas, real
   browser interactions, persona-oracle grading -- that run after the baseline
   when selected via `extrachill_journeys`. See "The journey contract" below.
