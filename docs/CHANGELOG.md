@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.25.0] - 2026-09-27
+
+### Added
+- musician Link Page onboarding journey as a nightly regression test
+
 ## [2.24.1] - 2026-09-27
 
 ### Fixed
