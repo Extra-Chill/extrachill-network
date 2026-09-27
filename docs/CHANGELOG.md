@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.26.1] - 2026-09-27
+
+### Fixed
+- isolate journeys so one journey's crash can't discard the others
+
 ## [2.26.0] - 2026-09-27
 
 ### Added
