@@ -81,6 +81,11 @@ jobs:
           npm run build
           npx playwright install --with-deps chromium
 
+      # The rig mounts this checkout as the extrachill-network plugin, so a PR's
+      # journey exercises the PR's own plugin code, not the last release.
+      - name: Install extrachill-network runtime dependencies
+        run: composer install --no-dev --no-interaction --no-progress --prefer-dist
+
       - name: Validate rig contracts
         run: node rigs/extrachill-network/tests/contract.test.mjs
 
@@ -95,7 +100,8 @@ jobs:
           journeys="${JOURNEYS:-$DEFAULT_JOURNEYS}"
           export HOMEBOY_SETTINGS_JSON="$(jq -cn --argjson j "${journeys}" \
             --arg theme "${{ github.workspace }}/.ci/extrachill-theme" \
-            '{extrachill_theme_source: $theme, extrachill_journeys: $j}')"
+            --arg network "${{ github.workspace }}" \
+            '{extrachill_theme_source: $theme, extrachill_journeys: $j, extrachill_component_source_overrides: {"extrachill-network": $network}}')"
           echo "Settings: ${HOMEBOY_SETTINGS_JSON}"
           node rigs/extrachill-network/run.mjs > /dev/null
 
