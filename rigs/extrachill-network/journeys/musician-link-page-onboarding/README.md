@@ -20,7 +20,7 @@ first-time musician. The musician here is a single-scenario fixture user
 | `power-page-mobile` | `/power/` at 390px | Most Link Page traffic is mobile. |
 | `join-link-live-signup` | `extrachill.link/join` → join modal → register → onboarding → create artist | The explicit signup door. |
 | `join-link-mobile` | `/join` at 390px | |
-| `musician-creates-artist-profile` | `/create-artist/` as the fixture musician | Records what exists right after the last visible step, then provisions (see below). |
+| `musician-creates-artist-profile` | `/create-artist/` as the fixture musician | Creating the artist must provision its Link Page and land in the editor. |
 | `musician-navigation-map` | artist home, `/manage-artist/`, `/manage-link-page/`, `/analytics/`, community home, main home | Every link that should lead to the editor, and where it actually goes. |
 | `musician-edits-link-page` | `extrachill.link/edit` | Add a Bandcamp link, set colors (Customize), set the inline subscribe form and a custom description (Advanced), save, view the public page, reload the editor. |
 | `fan-subscribes-inline` | public Link Page at 390px | A fan uses the inline form the musician enabled. |
@@ -53,25 +53,9 @@ behavior.
   `extrachill_bypass_turnstile_verification` seam, same as `auth-multisite`.
 - **Rate-limit store.** `extrachill-api` needs a persistent object cache
   (Redis is excluded on this rig).
-- **`ec_site_url_override`.** `ec_get_site_url()` returns production
-  `https://` URLs, but the sandbox serves plain `http`. Without the override,
-  `/join`, the `/power/` cards, and the editor endpoints all dead-end. This is
-  the filter `extrachill-network` ships for dev environments.
-- **https to http redirect downgrade.** Link Pages builds `https://`
-  canonical URLs (`ec_link_page_public_base_url`), which the http-only
-  sandbox can't answer.
-- **Advisory locks.** SQLite has no `GET_LOCK()`, so every Link Page create
-  and save fails closed. Requests are serialized here, so the lock query
-  answers `1`.
-- **`allowed_redirect_hosts` re-merge.** WordPress Playground's platform
-  mu-plugin replaces the allowed hosts with three wordpress.org hosts, which
-  breaks every cross-site `wp_safe_redirect`, including the editor token
-  handoff. The fixture re-merges the network's list at priority 99.
-- **Provision endpoint** (`?musician_journey_provision=1`). Self-serve artist
-  creation provisions no Link Page (see FINDINGS). The journey records that
-  first, then calls `ec_create_link_page()` so the editor half can still be
-  judged. The grade keeps the before-state as a finding. It is never counted
-  as a pass.
+- **Rig-level substitutes** (http URL resolution, the Playground redirect-host
+  re-merge, SQLite advisory locks) now live in the rig's generated
+  `ec-network-sandbox-compat.php` (extrachill-network#302), not here.
 - **Observation sink** (`?musician_journey_observe=1`).
   `wordpress.browser-actions` only keeps an `evaluate` value when the step
   asserts. This journey is exploratory, so each observation POSTs itself and

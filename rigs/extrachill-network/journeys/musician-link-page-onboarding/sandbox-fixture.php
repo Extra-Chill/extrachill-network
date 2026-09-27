@@ -21,23 +21,6 @@
 
 add_filter( 'extrachill_bypass_turnstile_verification', '__return_true' );
 
-/*
- * ec_get_site_url() builds production https:// URLs; the sandbox serves the
- * network over plain http, so every cross-site hop (the /join redirect, the
- * /power bridge cards, the editor handoff endpoints) would dead-end on a TLS
- * connection nothing answers. extrachill-network ships `ec_site_url_override`
- * for exactly this ("for dev environments"): answer with each site's real
- * home URL.
- */
-add_filter(
-	'ec_site_url_override',
-	static function ( $url, $key, $blog_id ) {
-		unset( $key );
-		return $blog_id ? untrailingslashit( get_home_url( (int) $blog_id ) ) : $url;
-	},
-	10,
-	3
-);
 add_filter( 'pre_wp_mail', '__return_true' );
 
 /**
@@ -72,36 +55,7 @@ add_filter(
 	}
 );
 
-/*
- * WordPress Playground's platform mu-plugin REPLACES allowed_redirect_hosts
- * with three wordpress.org hosts (playground_allowed_redirect_hosts() ignores
- * its input), which drops the network domains extrachill-network merges in.
- * Every cross-site wp_safe_redirect -- including the extrachill.link editor
- * token handoff -- then falls back to wp-admin. Re-merge the network's own
- * list after Playground's filter; production is unaffected (verified with
- * wp_validate_redirect on extrachill.com).
- */
-add_filter(
-	'allowed_redirect_hosts',
-	static function ( $hosts ) {
-		return function_exists( 'ec_get_allowed_redirect_hosts' ) ? array_values( array_unique( array_merge( (array) $hosts, ec_get_allowed_redirect_hosts() ) ) ) : $hosts;
-	},
-	99
-);
 
-/*
- * link-pages builds public URLs as https:// (ec_link_page_public_base_url),
- * so the canonical redirect off a Link Page slug lands on a TLS port nothing
- * answers in this http-only sandbox. Downgrade network-host redirects to
- * http; production is https end to end.
- */
-add_filter(
-	'wp_redirect',
-	static function ( $location ) {
-		return is_string( $location ) ? preg_replace( '#^https://((?:[a-z0-9-]+\.)?extrachill\.(?:com|link))(?=[/?\#]|$)#i', 'http://$1', $location ) : $location;
-	},
-	PHP_INT_MAX - 1
-);
 
 /*
  * Evidence for the /edit bearer handshake: what the REST layer saw.
@@ -168,24 +122,6 @@ add_action(
 	0
 );
 
-/*
- * MySQL advisory locks (GET_LOCK / RELEASE_LOCK) do not exist on the SQLite
- * driver this sandbox runs, so every Link Page create and save fails closed
- * with link_page_owner_lock_failed / link_page_id_lock_failed. The sandbox
- * serves requests sequentially through one PHP runtime, so the lock has
- * nothing to serialize; answer "acquired"/"released" the way MySQL would.
- * Same class of substitute as the rate-limit store above (a missing
- * infrastructure primitive), and never a claim about concurrency safety.
- */
-add_filter(
-	'query',
-	static function ( $query ) {
-		if ( is_string( $query ) && preg_match( '/^\s*SELECT\s+(GET_LOCK|RELEASE_LOCK|IS_FREE_LOCK)\s*\(/i', $query ) ) {
-			return 'SELECT 1';
-		}
-		return $query;
-	}
-);
 
 /**
  * Diagnose the extrachill.link editor token handoff in the sandbox.
