@@ -229,6 +229,26 @@ add_filter(
 );
 
 /*
+ * 5. Egress fence. Network domains are the REAL production hostnames, and
+ *    Playground resolves PHP HTTP requests on the real internet: a
+ *    server-side wp_remote_*() to one (a grade script, a cross-site REST
+ *    loopback) reached live extrachill.com. Fail closed. Temporary until the
+ *    pinned WP Codebox includes Automattic/wp-codebox#2534.
+ */
+add_filter(
+	'pre_http_request',
+	static function ( $preempt, $args, $url ) {
+		$host = strtolower( (string) wp_parse_url( (string) $url, PHP_URL_HOST ) );
+		if ( false === $preempt && preg_match( '/(^|\\.)extrachill\\.(com|link)$/', $host ) ) {
+			return new WP_Error( 'ec_rig_network_egress_blocked', 'The rig blocked a server-side request to ' . $host . ': it would reach production.' );
+		}
+		return $preempt;
+	},
+	PHP_INT_MAX,
+	3
+);
+
+/*
  * 4. SQLite has no MySQL advisory locks, so every GET_LOCK()-serialized write
  *    (Link Page creation and saves, artist membership) fails closed. Requests
  *    are serialized through one PHP runtime here, so answer as MySQL would.
@@ -1045,16 +1065,13 @@ foreach (get_sites(array('number' => 0)) as $site) {
         sort($expected_site);
         $missing = array_values(array_diff($expected_site, $active));
         $unexpected = array_values(array_diff($active, $expected_site));
-        $response = wp_remote_get(home_url('/'), array('timeout' => 30, 'sslverify' => false));
-        $status = is_wp_error($response) ? 0 : (int) wp_remote_retrieve_response_code($response);
-        $body = is_wp_error($response) ? $response->get_error_message() : wp_remote_retrieve_body($response);
-        $fatal = is_string($body) && (str_contains($body, 'Fatal error') || str_contains($body, 'There has been a critical error'));
-        $expected_status = $expected['expectedHomepageStatus'][$site->domain] ?? array(200);
+        // No server-side home-page request here: network domains are the
+        // real production hostnames, and Playground resolves PHP HTTP on the
+        // real internet, so a wp_remote_get(home_url()) measured PRODUCTION,
+        // not this boot. Each site's page load is judged in-sandbox by its
+        // baseline browser probe (routed through the sandbox proxy).
         $report['sites'][$site->domain] = array(
             'theme' => get_stylesheet(),
-            'httpStatus' => $status,
-            'expectedHttpStatus' => $expected_status,
-            'fatalMarkerInBody' => $fatal,
             'expectedActivePlugins' => $expected_site,
             'actualActivePlugins' => $active,
             'missingPlugins' => $missing,
@@ -1062,12 +1079,6 @@ foreach (get_sites(array('number' => 0)) as $site) {
         );
         if (!empty($missing)) {
             throw new RuntimeException('extrachill-network: ' . $site->domain . ' missing expected plugins: ' . implode(', ', $missing));
-        }
-        if (!in_array($status, $expected_status, true)) {
-            throw new RuntimeException('extrachill-network: ' . $site->domain . ' anonymous home request returned HTTP ' . $status . ' (expected one of: ' . implode(',', $expected_status) . ')');
-        }
-        if ($fatal) {
-            throw new RuntimeException('extrachill-network: ' . $site->domain . ' anonymous home request contains a fatal-error marker.');
         }
     } finally {
         restore_current_blog();
@@ -1093,6 +1104,8 @@ function browserProbeStep(site) {
       `allow-host=${site.domain}`,
       ...(strictStatus ? ['assert=no-console-errors'] : []),
       'assert=no-page-errors',
+      // WordPress renders its critical-error screen in .wp-die-message.
+      'assert=not-exists:.wp-die-message',
       'capture=console,errors,html,network,screenshot',
     ],
     metadata: { kind: 'extrachill-network-baseline-page-load', domain: site.domain },

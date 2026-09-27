@@ -270,6 +270,9 @@ if ( ! class_exists( '\\ExtraChillEvents\\Core\\VenueAuthorization' ) ) {
 }
 
 wp_set_current_user( 0 );
+// Other journeys selected in the same boot may mount a Turnstile bypass
+// (fixtureMuPlugins are boot-global); this case asserts the real gate.
+remove_all_filters( 'extrachill_bypass_turnstile_verification' );
 $request = new WP_REST_Request( 'POST', '/extrachill/v1/venues/' . $venue_a . '/booking-inquiries' );
 $request->set_param( 'venue', $venue_a );
 $request->set_param( 'idempotency_key', 'missing-turnstile' );

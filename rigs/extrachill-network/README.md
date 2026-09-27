@@ -41,11 +41,13 @@ multisite topology, release-zip mounting, and the theme-remote-sourcing gap).
   network activation fires it only once from the current site -- per-site
   setup on the other 10 sites otherwise never runs.
 - **Baseline scenario**: after activation, one assertion step compares actual
-  vs. expected active plugins per site and does an internal anonymous
-  `wp_remote_get(home_url('/'))` HTTP-status/fatal-marker check; then one
-  `wordpress.browser-probe` per site asserts no console/page errors on an
-  anonymous page load, with `network-policy=block` scoped to that site's own
-  host.
+  vs. expected active plugins per site; then one `wordpress.browser-probe` per
+  site asserts no console/page errors and no WordPress critical-error screen
+  (`.wp-die-message`) on an anonymous page load, routed through the sandbox
+  with `network-policy=block` scoped to that site's own host. (An earlier
+  server-side `wp_remote_get(home_url('/'))` check was removed: the domains
+  are real production hostnames and Playground resolves PHP HTTP on the real
+  internet, so it measured production, not the boot. See #308.)
 - **Domain-ID alignment** (generated mu-plugin): a fresh install assigns new
   sequential blog IDs, but the network plugin set routes through
   `EC_BLOG_ID_*` constants (production's IDs: events = 7, newsletter = 9,
@@ -72,7 +74,11 @@ multisite topology, release-zip mounting, and the theme-remote-sourcing gap).
   fail closed with a 503. The file answers their store seams
   (`extrachill_users_registration_admitter`, `extrachill_api_rate_limit_store`)
   with a site-option counter (#299). These are infrastructure
-  substitutes, not product behaviour.
+  substitutes, not product behaviour. (5) **Egress fence:** network domains are the real
+  production hostnames, and Playground resolves PHP HTTP on the real internet,
+  so server-side `wp_remote_*()` to them is blocked
+  (`ec_rig_network_egress_blocked`) until the pinned WP Codebox includes
+  Automattic/wp-codebox#2534.
 - **Journeys** (optional): full user journeys -- seeded personas, real
   browser interactions, persona-oracle grading -- that run after the baseline
   when selected via `extrachill_journeys`. See "The journey contract" below.
@@ -156,6 +162,10 @@ Contract rules enforced by `run.mjs` and `tests/contract.test.mjs`:
   bypass filter, a provider HTTP stub, ...) lives entirely inside the
   journey's own file (`auth-multisite`'s Turnstile bypass,
   `gardner-social-operator`'s provider stub), never in this rig.
+  Fixture mu-plugins are mounted for the whole boot, so they are visible to
+  every journey selected alongside. A journey that asserts behaviour another
+  journey's fixture stubs (e.g. the real Turnstile gate) must undo that stub
+  in its own seed/grade.
 - Steps run **after the full baseline** (activation, per-site assertion, and
   every site's anonymous browser probe), in the order the setting lists
   them; consumer `wordpress_runtime_post_steps` still run last.
