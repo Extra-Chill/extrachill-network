@@ -11,10 +11,6 @@
  *   product's own dev/test seam (`extrachill_bypass_turnstile_verification`),
  *   same as auth-multisite.
  * - No SMTP: never attempt a live send.
- * - extrachill-api's public-write admission counter hard-requires a
- *   persistent external object cache (Redis is an excluded component on this
- *   rig). A site-option-backed counter stands in via the existing
- *   `extrachill_api_rate_limit_store` filter.
  *
  * @package ExtraChillNetwork
  */
@@ -23,37 +19,6 @@ add_filter( 'extrachill_bypass_turnstile_verification', '__return_true' );
 
 add_filter( 'pre_wp_mail', '__return_true' );
 
-/**
- * Site-option-backed substitute for the Redis-backed admission counter.
- *
- * @param string $key Counter key.
- * @param int    $ttl Window lifetime in seconds.
- * @return int
- */
-function musician_journey_rate_limit_store( $key, $ttl ) {
-	$state = get_site_option( 'musician_journey_rate_limits', array() );
-	$now   = time();
-	$entry = $state[ $key ] ?? array(
-		'count'   => 0,
-		'expires' => $now + max( 1, (int) $ttl ),
-	);
-	if ( $entry['expires'] <= $now ) {
-		$entry = array(
-			'count'   => 0,
-			'expires' => $now + max( 1, (int) $ttl ),
-		);
-	}
-	++$entry['count'];
-	$state[ $key ] = $entry;
-	update_site_option( 'musician_journey_rate_limits', $state );
-	return (int) $entry['count'];
-}
-add_filter(
-	'extrachill_api_rate_limit_store',
-	static function () {
-		return 'musician_journey_rate_limit_store';
-	}
-);
 
 
 

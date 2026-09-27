@@ -51,10 +51,8 @@ behavior.
 
 - **Turnstile bypass and no mail.** Uses the product's own
   `extrachill_bypass_turnstile_verification` seam, same as `auth-multisite`.
-- **Rate-limit store.** `extrachill-api` needs a persistent object cache
-  (Redis is excluded on this rig).
-- **Rig-level substitutes** (http URL resolution, the Playground redirect-host
-  re-merge, SQLite advisory locks) now live in the rig's generated
+- **Rig-level substitutes** (http URL resolution, the redirect-host re-merge,
+  SQLite advisory locks, the Redis-less rate-limiter stores) now live in the rig's generated
   `ec-network-sandbox-compat.php` (extrachill-network#302), not here.
 - **Observation sink** (`?musician_journey_observe=1`).
   `wordpress.browser-actions` only keeps an `evaluate` value when the step

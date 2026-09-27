@@ -227,8 +227,6 @@ musician_journey_record(
  * Skips never fail; they mean an upstream case could not set the stage.
  */
 $known_findings = array(
-	'join-link-registration-creates-account' => 'https://github.com/Extra-Chill/extrachill-network/issues/299',
-	'fan-inline-subscription-lands'          => 'https://github.com/Extra-Chill/extrachill-network/pull/301',
 );
 $regressions = array();
 $unpin       = array();
