@@ -489,8 +489,7 @@
         {
           "pluginFile": "extrachill-artist-platform/extrachill-artist-platform.php",
           "scope": [
-            "artist.extrachill.com",
-            "extrachill.link"
+            "artist.extrachill.com"
           ]
         }
       ]

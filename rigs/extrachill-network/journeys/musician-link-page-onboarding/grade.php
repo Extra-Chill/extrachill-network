@@ -143,28 +143,17 @@ if ( $link_page_id ) {
 }
 restore_current_blog();
 
-$provision        = get_site_option( 'musician_journey_provision', array() );
-$provision_row    = array();
-foreach ( (array) ( $provision['artists'] ?? array() ) as $row ) {
-	if ( (int) $row['artist_id'] === $artist_id ) {
-		$provision_row = $row;
-	}
-}
-$had_page_before = ! empty( $provision_row ) ? (int) $provision_row['link_page_before'] > 0 : (bool) $link_page_id;
 musician_journey_record(
 	$results,
 	'create-artist-provisions-link-page',
-	'Creating an artist profile through the self-serve form leaves the musician with a Link Page they can open in the editor (without any hidden step).',
-	! $artist_id ? 'skip' : ( $had_page_before ? 'pass' : 'finding' ),
-	array(
-		'provision_record' => $provision,
-		'note'             => 'link_page_before = what existed after the musician finished every visible step; a journey-only fixture endpoint then provisioned the page so the editor could be judged.',
-	)
+	'Creating an artist profile through the self-serve form leaves the musician with a Link Page (no hidden step).',
+	! $artist_id ? 'skip' : ( $link_page_id ? 'pass' : 'finding' ),
+	array( 'artist_id' => $artist_id, 'link_page_id' => $link_page_id )
 );
 musician_journey_record(
 	$results,
 	'artist-gets-link-page',
-	'After provisioning, the artist has a Link Page stored on extrachill.link.',
+	'The artist\'s Link Page is stored on extrachill.link.',
 	$link_page_id ? 'pass' : ( $artist_id ? 'finding' : 'skip' ),
 	array(
 		'artist_id'      => $artist_id,
@@ -231,7 +220,7 @@ musician_journey_record(
 
 /*
  * Regression contract. Every open finding is pinned to the issue that owns
- * it. The grade fails the boot when:
+ * it. The journeys workflow fails when:
  *  - a case produces a finding that is NOT pinned (a new regression), or
  *  - a pinned case now passes (the fix landed: remove the pin so the case
  *    guards against the bug coming back).
@@ -239,11 +228,7 @@ musician_journey_record(
  */
 $known_findings = array(
 	'join-link-registration-creates-account' => 'https://github.com/Extra-Chill/extrachill-network/issues/299',
-	'create-artist-provisions-link-page'     => 'https://github.com/Extra-Chill/extrachill-artist-platform/issues/243',
-	'color-changes-persist'                  => 'https://github.com/Extra-Chill/extrachill-artist-platform/issues/245',
-	'newsletter-settings-persist'            => 'https://github.com/Extra-Chill/extrachill-artist-platform/issues/245',
-	'added-link-persists'                    => 'https://github.com/Extra-Chill/extrachill-artist-platform/issues/245',
-	'fan-inline-subscription-lands'          => 'https://github.com/Extra-Chill/extrachill-artist-platform/issues/245',
+	'fan-inline-subscription-lands'          => 'https://github.com/Extra-Chill/extrachill-network/pull/301',
 );
 $regressions = array();
 $unpin       = array();
@@ -271,18 +256,13 @@ $summary = array(
 	'handoff'   => get_site_option( 'musician_journey_handoff_diag', array() ),
 	'observed'  => get_site_option( 'musician_journey_observations', array() ),
 	'fatals'    => get_site_option( 'musician_journey_fatals', array() ),
+	'trace'     => get_site_option( 'musician_journey_render_trace', array() ),
+	'auth_rest' => get_site_option( 'musician_journey_auth_rest', array() ),
 	'rest_diag' => get_site_option( 'musician_journey_rest_diag', array() ),
 );
 
 // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped,WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Machine-readable journey result.
 printf( "EXTRACHILL_JOURNEY_RESULT:%s\n", base64_encode( (string) wp_json_encode( $summary ) ) );
 
-if ( $regressions || $unpin ) {
-	throw new RuntimeException(
-		esc_html(
-			'musician-link-page-onboarding regression contract failed.'
-			. ( $regressions ? ' New findings (not pinned to an issue): ' . implode( ', ', $regressions ) . '.' : '' )
-			. ( $unpin ? ' Pinned findings now pass -- remove their pins in grade.php: ' . implode( ', ', $unpin ) . '.' : '' )
-		)
-	);
-}
+// Pass/fail is decided by the caller (.github/workflows/journeys.yml) from
+// 'regressions' and 'unpin': throwing here would discard this result.

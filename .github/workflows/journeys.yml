@@ -109,6 +109,7 @@ jobs:
           const fs = require('node:fs');
           const envelope = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
           const out = [];
+          let failed = false;
           for (const execution of envelope.executions ?? []) {
             for (const match of String(execution.stdout ?? '').matchAll(/EXTRACHILL_JOURNEY_RESULT:([A-Za-z0-9+/=]+)/g)) {
               const result = JSON.parse(Buffer.from(match[1], 'base64').toString('utf8'));
@@ -116,12 +117,13 @@ jobs:
               for (const r of result.results ?? []) {
                 out.push(`| ${r.id} | ${r.outcome} | ${r.pinned_issue ?? ''} |`);
               }
-              if (result.regressions?.length) out.push('', `**New findings:** ${result.regressions.join(', ')}`);
-              if (result.unpin?.length) out.push('', `**Fixed, unpin:** ${result.unpin.join(', ')}`);
+              if (result.regressions?.length) { failed = true; out.push('', `**New findings:** ${result.regressions.join(', ')}`); }
+              if (result.unpin?.length) { failed = true; out.push('', `**Fixed, unpin in grade.php:** ${result.unpin.join(', ')}`); }
               out.push('');
             }
           }
           console.log(out.length ? out.join('\n') : 'No journey result markers were found (the boot may have failed before grading).');
+          if (!out.length || failed) process.exitCode = 1;
           NODE
 
       - name: Upload journey evidence

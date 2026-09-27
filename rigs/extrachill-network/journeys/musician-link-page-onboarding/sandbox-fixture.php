@@ -211,49 +211,6 @@ add_action(
 );
 
 /**
- * Journey-only unblock: provision the logged-in musician's Link Page.
- *
- * Self-serve artist creation provisions no Link Page and /manage-link-page/
- * then renders "Link Page management is unavailable." with no way forward
- * (see evidence/FINDINGS.md). That dead end is recorded first; this endpoint
- * then calls ec_create_link_page() -- the same function the claimable
- * external-artist onboarding ability uses -- inside a real front-end request
- * on the artist site (all per-site plugins loaded), so the editor half of
- * the journey can still be judged. Never a pass: grade.php records the
- * before-state as the finding.
- */
-add_action(
-	'template_redirect',
-	static function () {
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- sandbox-only fixture endpoint.
-		if ( empty( $_GET['musician_journey_provision'] ) || ! is_user_logged_in() || ! function_exists( 'ec_create_link_page' ) || ! function_exists( 'ec_get_artists_for_user' ) ) {
-			return;
-		}
-		$user_id = get_current_user_id();
-		$record  = array(
-			'user_id' => $user_id,
-			'artists' => array(),
-		);
-		foreach ( (array) ec_get_artists_for_user( $user_id ) as $artist_id ) {
-			$before = (int) ec_get_link_page_for_artist( $artist_id );
-			$error  = null;
-			if ( 0 === $before ) {
-				$created = ec_create_link_page( $artist_id );
-				$error   = is_wp_error( $created ) ? $created->get_error_code() . ': ' . $created->get_error_message() : null;
-			}
-			$record['artists'][] = array(
-				'artist_id'           => (int) $artist_id,
-				'link_page_before'    => $before,
-				'link_page_after'     => (int) ec_get_link_page_for_artist( $artist_id ),
-				'provision_error'     => $error,
-			);
-		}
-		update_site_option( 'musician_journey_provision', $record );
-		wp_send_json( $record );
-	}
-);
-
-/**
  * Record every redirect a front-end request issues, so the grade can show
  * the real hop sequence of the join funnel from the server side.
  */
@@ -272,4 +229,55 @@ add_filter(
 	},
 	PHP_INT_MAX,
 	2
+);
+
+/*
+ * Render trace for public Link Page requests: how far does a request get
+ * before an empty response? (Playground drops the body on a WASM-level
+ * crash, where no shutdown handler runs.)
+ */
+if ( isset( $_SERVER['HTTP_HOST'] ) && false !== strpos( (string) $_SERVER['HTTP_HOST'], 'extrachill.link' ) && false === strpos( (string) ( $_SERVER['REQUEST_URI'] ?? '' ), 'wp-json' ) ) {
+	$GLOBALS['musician_journey_trace_key'] = substr( md5( (string) microtime( true ) ), 0, 8 );
+	$musician_journey_mark                 = static function ( $label ) {
+		return static function ( $value = null ) use ( $label ) {
+			$log   = get_site_option( 'musician_journey_render_trace', array() );
+			$log[] = $GLOBALS['musician_journey_trace_key'] . ' ' . ( $_SERVER['REQUEST_URI'] ?? '' ) . ' ' . $label . ( is_string( $value ) && str_ends_with( $value, '.php' ) ? ' ' . basename( $value ) : '' ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+			update_site_option( 'musician_journey_render_trace', array_slice( $log, -60 ) );
+			return $value;
+		};
+	};
+	add_action( 'wp', $musician_journey_mark( 'wp' ), PHP_INT_MAX );
+	add_action( 'template_redirect', $musician_journey_mark( 'template_redirect:end' ), PHP_INT_MAX );
+	add_filter( 'template_include', $musician_journey_mark( 'template_include' ), PHP_INT_MAX );
+	add_action( 'ec_link_page_public_head', $musician_journey_mark( 'public_head' ), 0 );
+	add_action( 'ec_link_page_public_body_open', $musician_journey_mark( 'public_body_open' ), 0 );
+	add_action( 'wp_head', $musician_journey_mark( 'wp_head' ), 0 );
+	add_action( 'wp_footer', $musician_journey_mark( 'wp_footer' ), PHP_INT_MAX );
+	add_action( 'shutdown', $musician_journey_mark( 'shutdown' ), 0 );
+}
+
+/*
+ * #299 evidence: status and error code of every auth/registration REST call.
+ */
+add_filter(
+	'rest_post_dispatch',
+	static function ( $response, $server, $request ) {
+		$route = (string) $request->get_route();
+		if ( false !== strpos( $route, '/auth/' ) || false !== strpos( $route, 'register' ) || false !== strpos( $route, 'onboarding' ) || false !== strpos( $route, 'subscribe' ) ) {
+			$data  = $response instanceof WP_REST_Response ? $response->get_data() : null;
+			$log   = get_site_option( 'musician_journey_auth_rest', array() );
+			$log[] = array(
+				'route'       => $route,
+				'status'      => $response instanceof WP_REST_Response ? $response->get_status() : null,
+				'code'        => is_array( $data ) ? ( $data['code'] ?? null ) : null,
+				'message'     => is_array( $data ) ? substr( (string) ( $data['message'] ?? '' ), 0, 200 ) : null,
+				'remote_addr' => $_SERVER['REMOTE_ADDR'] ?? null, // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+				'ext_cache'   => wp_using_ext_object_cache(),
+			);
+			update_site_option( 'musician_journey_auth_rest', array_slice( $log, -20 ) );
+		}
+		return $response;
+	},
+	PHP_INT_MAX,
+	3
 );
