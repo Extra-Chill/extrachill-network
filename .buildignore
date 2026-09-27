@@ -6,7 +6,6 @@ vendor/bin/
 tests/
 .gitignore
 .buildignore
-build.sh
 composer.lock
 package-lock.json
 *.log
