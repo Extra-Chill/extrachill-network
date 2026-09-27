@@ -1,0 +1,562 @@
+{
+ "schema": "extrachill-network/journey-result/musician-link-page-onboarding/v1",
+ "fixture": {
+  "schema": "extrachill-network/journey-fixture/musician-link-page-onboarding/v1",
+  "main_blog_id": 1,
+  "artist_blog_id": 4,
+  "community_blog_id": 2,
+  "link_blog_id": 10,
+  "pages": {
+   "extrachill.com/power": 5,
+   "extrachill.com/login": 4,
+   "artist.extrachill.com/login": 3,
+   "artist.extrachill.com/create-artist": 4,
+   "artist.extrachill.com/manage-artist": 5,
+   "artist.extrachill.com/manage-link-page": 6,
+   "artist.extrachill.com/analytics": 8,
+   "community.extrachill.com/login": 3,
+   "community.extrachill.com/onboarding": 14,
+   "extrachill.link/login": 3
+  },
+  "musician_user_id": 601,
+  "cutover": true
+ },
+ "results": [
+  {
+   "id": "join-link-registration-creates-account",
+   "task": "A musician who clicks extrachill.link/join and registers ends up with an account.",
+   "outcome": "finding",
+   "evidence": {
+    "user_id": 0
+   },
+   "pinned_issue": "https://github.com/Extra-Chill/extrachill-network/issues/299"
+  },
+  {
+   "id": "create-artist-creates-profile",
+   "task": "Submitting the Create Artist Profile form creates an artist profile the musician manages.",
+   "outcome": "pass",
+   "evidence": {
+    "artist_profile_ids": [
+     12
+    ]
+   },
+   "pinned_issue": null
+  },
+  {
+   "id": "create-artist-provisions-link-page",
+   "task": "Creating an artist profile through the self-serve form leaves the musician with a Link Page they can open in the editor (without any hidden step).",
+   "outcome": "finding",
+   "evidence": {
+    "provision_record": {
+     "user_id": 601,
+     "artists": [
+      {
+       "artist_id": 12,
+       "link_page_before": 0,
+       "link_page_after": 9,
+       "provision_error": null
+      }
+     ]
+    },
+    "note": "link_page_before = what existed after the musician finished every visible step; a journey-only fixture endpoint then provisioned the page so the editor could be judged."
+   },
+   "pinned_issue": "https://github.com/Extra-Chill/extrachill-artist-platform/issues/243"
+  },
+  {
+   "id": "artist-gets-link-page",
+   "task": "After provisioning, the artist has a Link Page stored on extrachill.link.",
+   "outcome": "pass",
+   "evidence": {
+    "artist_id": 12,
+    "artist_slug": "the-porch-lights",
+    "link_page_id": 9,
+    "link_post_type": "ec_link_page",
+    "inventory": [
+     {
+      "id": 9,
+      "slug": "the-porch-lights",
+      "title": "The Porch Lights",
+      "status": "publish",
+      "owner": ""
+     }
+    ]
+   },
+   "pinned_issue": null
+  },
+  {
+   "id": "color-changes-persist",
+   "task": "The background and button colors the musician picked are saved.",
+   "outcome": "finding",
+   "evidence": {
+    "css_vars": {
+     "--link-page-background-color": "#121212",
+     "--link-page-card-bg-color": "rgba(0, 0, 0, 0.4)",
+     "--link-page-text-color": "#e5e5e5",
+     "--link-page-link-text-color": "#ffffff",
+     "--link-page-button-bg-color": "#0b5394",
+     "--link-page-button-border-color": "#0b5394",
+     "--link-page-button-hover-bg-color": "#53940b",
+     "--link-page-button-hover-text-color": "#ffffff",
+     "--link-page-muted-text-color": "#aaa",
+     "--link-page-overlay-color": "rgba(0, 0, 0, 0.5)",
+     "--link-page-input-bg": "#181818",
+     "--link-page-accent": "#888",
+     "--link-page-accent-hover": "#222",
+     "--link-page-background-type": "color",
+     "--link-page-background-gradient-start": "#0b5394",
+     "--link-page-background-gradient-end": "#53940b",
+     "--link-page-background-gradient-direction": "to right",
+     "--link-page-background-image-url": "",
+     "--link-page-image-size": "cover",
+     "--link-page-image-position": "center center",
+     "--link-page-image-repeat": "no-repeat",
+     "overlay": "1",
+     "--link-page-title-font-family": "Loft Sans",
+     "--link-page-title-font-size": "2.1em",
+     "--link-page-body-font-family": "Helvetica",
+     "--link-page-button-radius": "8px",
+     "--link-page-button-border-width": "0px",
+     "--link-page-profile-img-size": "30%",
+     "_link_page_profile_img_shape": "circle"
+    }
+   },
+   "pinned_issue": "https://github.com/Extra-Chill/extrachill-artist-platform/issues/245"
+  },
+  {
+   "id": "newsletter-settings-persist",
+   "task": "The inline subscribe form and the custom subscribe description are saved.",
+   "outcome": "finding",
+   "evidence": {
+    "subscribe_display_mode": "",
+    "subscribe_description": ""
+   },
+   "pinned_issue": "https://github.com/Extra-Chill/extrachill-artist-platform/issues/245"
+  },
+  {
+   "id": "added-link-persists",
+   "task": "The Bandcamp link the musician added is saved.",
+   "outcome": "finding",
+   "evidence": {
+    "links": ""
+   },
+   "pinned_issue": "https://github.com/Extra-Chill/extrachill-artist-platform/issues/245"
+  },
+  {
+   "id": "fan-inline-subscription-lands",
+   "task": "A fan who types their email into the inline subscribe form shows up in the artist subscriber list.",
+   "outcome": "finding",
+   "evidence": {
+    "subscribers": []
+   },
+   "pinned_issue": "https://github.com/Extra-Chill/extrachill-artist-platform/issues/245"
+  }
+ ],
+ "regressions": [],
+ "unpin": [],
+ "passed": 2,
+ "findings": 6,
+ "skipped": 0,
+ "redirects": [
+  {
+   "from": "http://extrachill.link/join",
+   "to": "http://artist.extrachill.com/login/?from_join=true",
+   "status": 301,
+   "user": 0
+  },
+  {
+   "from": "http://extrachill.link/join",
+   "to": "http://artist.extrachill.com/login/?from_join=true",
+   "status": 301,
+   "user": 0
+  },
+  {
+   "from": "http://artist.extrachill.com/wp-admin/admin-post.php?action=ec_link_token_handoff&return=http%3A%2F%2Fextrachill.link%2Fedit",
+   "to": "http://extrachill.link/edit#ec_link_token=q8zh7TRVeTXvfj9IXxS_NqK4ZxBS3Nyk2pxZENAozj8&ec_link_token_expires=1790477645",
+   "status": 302,
+   "user": 601
+  },
+  {
+   "from": "http://artist.extrachill.com/wp-admin/admin-post.php?action=ec_link_token_handoff&return=http%3A%2F%2Fextrachill.link%2Fedit",
+   "to": "http://extrachill.link/edit#ec_link_token=oG8DlDt8acNnDCehFH91mnm_svEMy4i37BSqcunQ3lE&ec_link_token_expires=1790477804",
+   "status": 302,
+   "user": 601
+  },
+  {
+   "from": "http://artist.extrachill.com/wp-admin/admin-post.php?action=ec_link_token_handoff&return=http%3A%2F%2Fextrachill.link%2Fedit",
+   "to": "http://extrachill.link/edit#ec_link_token_none=1",
+   "status": 302,
+   "user": 0
+  }
+ ],
+ "handoff": [
+  {
+   "user": 601,
+   "return": "http://extrachill.link/edit",
+   "esc_url_raw": "http://extrachill.link/edit",
+   "allowed_hosts": [
+    "wordpress.org",
+    "api.wordpress.org",
+    "downloads.wordpress.org",
+    "extrachill.com",
+    "community.extrachill.com",
+    "shop.extrachill.com",
+    "artist.extrachill.com",
+    "events.extrachill.com",
+    "newsletter.extrachill.com",
+    "docs.extrachill.com",
+    "wire.extrachill.com",
+    "studio.extrachill.com",
+    "extrachill.link",
+    "www.extrachill.link",
+    "auth.extrachill.com"
+   ],
+   "validated": "http://extrachill.link/edit#ec_link_token_none=1",
+   "token_callable": true,
+   "home": "http://artist.extrachill.com/"
+  },
+  {
+   "user": 601,
+   "return": "http://extrachill.link/edit",
+   "esc_url_raw": "http://extrachill.link/edit",
+   "allowed_hosts": [
+    "wordpress.org",
+    "api.wordpress.org",
+    "downloads.wordpress.org",
+    "extrachill.com",
+    "community.extrachill.com",
+    "shop.extrachill.com",
+    "artist.extrachill.com",
+    "events.extrachill.com",
+    "newsletter.extrachill.com",
+    "docs.extrachill.com",
+    "wire.extrachill.com",
+    "studio.extrachill.com",
+    "extrachill.link",
+    "www.extrachill.link",
+    "auth.extrachill.com"
+   ],
+   "validated": "http://extrachill.link/edit#ec_link_token_none=1",
+   "token_callable": true,
+   "home": "http://artist.extrachill.com/"
+  }
+ ],
+ "observed": [
+  {
+   "label": "o003",
+   "step": "",
+   "url": "http://extrachill.link/",
+   "value": "Extra Chill Link Pages"
+  },
+  {
+   "label": "o004",
+   "step": "",
+   "url": "http://extrachill.link/",
+   "value": "no-powered-footer"
+  },
+  {
+   "label": "o005",
+   "step": "",
+   "url": "http://extrachill.link/",
+   "value": []
+  },
+  {
+   "label": "o006",
+   "step": "",
+   "url": "http://extrachill.com/power/",
+   "value": "Extra Chill Open site search Toggle account menu Latest Interviews Reviews Extra Chill \u203a The Power of Extra Chill Extra Chill is not a blog. It's a whole network. One independent music scene with many doors. Pick the part that feels like home. Pick a door Live Music Calendar 0 events across 0 cities Concerts everywhere \u2014 big cities and small, big artists and small \u2014 free to browse, no login wall. Browse the calendar The Community 533 active members across 352 topics Forums for musicians, fans, and industry folks \u2014 the online music scene, in conversation. Join the conversation Festival Wire 0 dispatches Timely, no-nonsense coverage of festival news and lineups as it breaks. Read the Wire Artist Platform 0 artist profiles Free link pages, subscribers, and analytics for independent artists to run their own corner. Explore the platform The Publication 1 article Where it all started in 2011 \u2014 independent music journalism, written by people who show up. Read the blog The Open-Source Platform The whole network is open source and built in public. Peek under the hood. See the code on GitHub Independent since 2011 Extra Chill is grassroots, open source, and built for the people who make music scenes matter. No corporate playbook. No algorithm deciding who deserves a voice. 0 ONLINE NOW 0 TOTAL MEMBERS \u2190 Back to Extra Chill Network Blog Community Events Calendar Artist Platform Newsletter Shop Explore Interviews Live Reviews Festival Wire Song Meanings Music News About The Power of Extr"
+  },
+  {
+   "label": "o007",
+   "step": "",
+   "url": "http://extrachill.com/power/",
+   "value": [
+    "Live Music Calendar | Browse the calendar -> http://events.extrachill.com?utm_source=power&utm_medium=network_bridge&utm_campaign=events",
+    "The Community | Join the conversation -> http://community.extrachill.com?utm_source=power&utm_medium=network_bridge&utm_campaign=community",
+    "Festival Wire | Read the Wire -> http://wire.extrachill.com?utm_source=power&utm_medium=network_bridge&utm_campaign=wire",
+    "Artist Platform | Explore the platform -> http://artist.extrachill.com?utm_source=power&utm_medium=network_bridge&utm_campaign=artist",
+    "The Publication | Read the blog -> http://extrachill.com/",
+    "The Open-Source Platform | See the code on GitHub -> https://github.com/Extra-Chill"
+   ]
+  },
+  {
+   "label": "o008",
+   "step": "",
+   "url": "http://extrachill.com/power/",
+   "value": true
+  },
+  {
+   "label": "o009",
+   "step": "",
+   "url": "http://extrachill.com/power/",
+   "value": false
+  },
+  {
+   "label": "o001",
+   "step": "",
+   "url": "http://artist.extrachill.com/?utm_source=power&utm_medium=network_bridge&utm_campaign=artist",
+   "value": "http://artist.extrachill.com/?utm_source=power&utm_medium=network_bridge&utm_campaign=artist"
+  },
+  {
+   "label": "o001",
+   "step": "",
+   "url": "http://artist.extrachill.com/login/?from_join=true",
+   "value": "http://artist.extrachill.com/login/?from_join=true"
+  },
+  {
+   "label": "o012",
+   "step": "",
+   "url": "http://artist.extrachill.com/login/?from_join=true",
+   "value": "Extra Chill Open site search Toggle account menu Extra Chill \u203a Artist Platform \u203a Login Login Login Register Username Password Remember me Forgot your password? Don't have an account? Register here Welcome to the Extra Chill Artist Platform! Do you already have an Extra Chill Community account? Yes, I have an account No, I need to create an account 0 ONLINE NOW 0 TOTAL MEMBERS \u2190 Back to Artist Platform Network Blog Community Events Calendar Artist Platform Newsletter Shop Explore Interviews Live Reviews Festival Wire Song Meanings Music News About The Power of Extra Chill Documentation Tech Support Contact Us In the Press Contribute Subscribe \u00a9 2026 Extra Chill. All rights reserved. Affiliate Disclosure Privacy Policy"
+  },
+  {
+   "label": "o013",
+   "step": "",
+   "url": "http://artist.extrachill.com/login/?from_join=true",
+   "value": "block | Welcome to the Extra Chill Artist Platform! Do you already have an Extra Chill Community account? Yes, I have an account No, I need to create an account"
+  },
+  {
+   "label": "o014",
+   "step": "",
+   "url": "http://artist.extrachill.com/login/?from_join=true",
+   "value": {
+    "registerFieldVisible": false,
+    "hash": "",
+    "activeTab": "Login"
+   }
+  },
+  {
+   "label": "o001",
+   "step": "",
+   "url": "http://artist.extrachill.com/login/?from_join=true#tab-register",
+   "value": "http://artist.extrachill.com/login/?from_join=true#tab-register"
+  },
+  {
+   "label": "o015",
+   "step": "",
+   "url": "http://artist.extrachill.com/login/?from_join=true#tab-register",
+   "value": "Extra Chill Open site search Toggle account menu Extra Chill \u203a Artist Platform \u203a Login Login Login Register Email Password Confirm Password Email me the Extra Chill newsletter 0 ONLINE NOW 0 TOTAL MEMBERS \u2190 Back to Artist Platform Network Blog Community Events Calendar Artist Platform Newsletter Shop Explore Interviews Live Reviews Festival Wire Song Meanings Music News About The Power of Extra Chill Documentation Tech Support Contact Us In the Press Contribute Subscribe \u00a9 2026 Extra Chill. All rights reserved. Affiliate Disclosure Privacy Policy"
+  },
+  {
+   "label": "o019",
+   "step": "",
+   "url": "http://artist.extrachill.com/",
+   "value": "Extra Chill Open site search Toggle account menu Create Artist Profile Extra Chill \u203a Artist Platform Welcome, Sam Porch (Fixture Musician)! Create your artist profile to get a custom link page at extrachill.link, analytics dashboard, and subscriber tools. Create Artist Profile Learn More Discover Artists No artists have joined the platform yet. Create the First Artist Profile Browse All Artists 0 ONLINE NOW 0 TOTAL MEMBERS \u2190 Back to Extra Chill Network Blog Community Events Calendar Artist Platform Newsletter Shop Explore Interviews Live Reviews Festival Wire Song Meanings Music News About The Power of Extra Chill Documentation Tech Support Contact Us In the Press Contribute Subscribe \u00a9 2026 Extra Chill. All rights reserved. Affiliate Disclosure Privacy Policy"
+  },
+  {
+   "label": "o020",
+   "step": "",
+   "url": "http://artist.extrachill.com/",
+   "value": [
+    "Extra Chill -> http://artist.extrachill.com/",
+    "[icon] -> http://community.extrachill.com/notifications",
+    "View Profile -> http://community.extrachill.com/u/porch_lights_fixture",
+    "Edit Profile -> http://community.extrachill.com/u/porch_lights_fixture/edit/",
+    "Create Artist Profile -> http://artist.extrachill.com/create-artist/",
+    "Settings -> http://community.extrachill.com/settings/",
+    "Log Out -> http://artist.extrachill.com/?custom_logout=1&logout_nonce=8d995c247d"
+   ]
+  },
+  {
+   "label": "o001",
+   "step": "",
+   "url": "http://artist.extrachill.com/manage-link-page/",
+   "value": "http://artist.extrachill.com/manage-link-page/"
+  },
+  {
+   "label": "o021",
+   "step": "",
+   "url": "http://artist.extrachill.com/manage-link-page/",
+   "value": "Extra Chill Open site search Toggle account menu Manage Artist Create Link Page Extra Chill \u203a Artist Platform \u203a Manage Link Page Link Page management is unavailable. 0 ONLINE NOW 0 TOTAL MEMBERS \u2190 Back to Artist Platform Network Blog Community Events Calendar Artist Platform Newsletter Shop Explore Interviews Live Reviews Festival Wire Song Meanings Music News About The Power of Extra Chill Documentation Tech Support Contact Us In the Press Contribute Subscribe \u00a9 2026 Extra Chill. All rights reserved. Affiliate Disclosure Privacy Policy"
+  },
+  {
+   "label": "o022",
+   "step": "",
+   "url": "http://artist.extrachill.com/manage-link-page/",
+   "value": [
+    "Extra Chill -> http://extrachill.com",
+    "Artist Platform -> http://artist.extrachill.com"
+   ]
+  },
+  {
+   "label": "o023",
+   "step": "",
+   "url": "http://artist.extrachill.com/manage-link-page/",
+   "value": "Extra Chill Open site search Toggle account menu Manage Artist Create Link Page Extra Chill \u203a Artist Platform \u203a Manage Link Page Link Page management is unavailable. 0 ONLINE NOW 0 TOTAL MEMBERS \u2190 Back to Artist Platform Network Blog Community Events Calendar Artist Platform Newsletter Shop Explore Interviews Live Reviews Festival Wire Song Meanings Music News About The Power of Extra Chill Documentation Tech Support Contact Us In the Press Contribute Subscribe \u00a9 2026 Extra Chill. All rights reserved. Affiliate Disclosure Privacy Policy"
+  },
+  {
+   "label": "o024",
+   "step": "",
+   "url": "http://artist.extrachill.com/manage-link-page/",
+   "value": [
+    "Extra Chill -> http://extrachill.com",
+    "Artist Platform -> http://artist.extrachill.com"
+   ]
+  },
+  {
+   "label": "o025",
+   "step": "",
+   "url": "http://artist.extrachill.com/manage-artist/",
+   "value": [
+    "A: Create Link Page"
+   ]
+  },
+  {
+   "label": "o026",
+   "step": "",
+   "url": "http://artist.extrachill.com/?musician_journey_provision=1",
+   "value": "{\"user_id\":601,\"artists\":[{\"artist_id\":12,\"link_page_before\":0,\"link_page_after\":9,\"provision_error\":null}]}"
+  },
+  {
+   "label": "o027",
+   "step": "",
+   "url": "http://artist.extrachill.com/",
+   "value": [
+    "Extra Chill -> http://artist.extrachill.com/",
+    "[icon] -> http://community.extrachill.com/notifications",
+    "View Profile -> http://community.extrachill.com/u/porch_lights_fixture",
+    "Edit Profile -> http://community.extrachill.com/u/porch_lights_fixture/edit/",
+    "Manage Artist -> http://artist.extrachill.com/manage-artist/",
+    "Settings -> http://community.extrachill.com/settings/",
+    "Log Out -> http://artist.extrachill.com/?custom_logout=1&logout_nonce=8b24add795"
+   ]
+  },
+  {
+   "label": "o028",
+   "step": "",
+   "url": "http://artist.extrachill.com/",
+   "value": [
+    "Edit Profile -> http://community.extrachill.com/u/porch_lights_fixture/edit/",
+    "Manage Artist -> http://artist.extrachill.com/manage-artist/",
+    "Manage Artist -> http://artist.extrachill.com/manage-artist/",
+    "Manage Link Page -> http://artist.extrachill.com/manage-link-page/",
+    "Manage Artist -> http://artist.extrachill.com/manage-artist/",
+    "Manage Link Page -> https://extrachill.link/edit?link_page=9"
+   ]
+  },
+  {
+   "label": "o029",
+   "step": "",
+   "url": "http://artist.extrachill.com/manage-artist/",
+   "value": [
+    "Edit Profile -> http://community.extrachill.com/u/porch_lights_fixture/edit/",
+    "Manage Link Page -> http://artist.extrachill.com/manage-link-page/"
+   ]
+  },
+  {
+   "label": "o001",
+   "step": "",
+   "url": "http://artist.extrachill.com/manage-link-page/",
+   "value": "http://artist.extrachill.com/manage-link-page/"
+  },
+  {
+   "label": "o030",
+   "step": "",
+   "url": "http://artist.extrachill.com/manage-link-page/",
+   "value": "Extra Chill Open site search Toggle account menu Manage Artist Manage Link Page Analytics Extra Chill \u203a Artist Platform \u203a Manage Link Page Link Page management is unavailable. 0 ONLINE NOW 0 TOTAL MEMBERS \u2190 Back to Artist Platform Network Blog Community Events Calendar Artist Platform Newsletter Shop Explore Interviews Live Reviews Festival Wire Song Meanings Music News About The Power of Extra Chill Documentation Tech Support Contact Us In the Press Contribute Subscribe \u00a9 2026 Extra Chill. All rights reserved. Affiliate Disclosure Privacy Policy"
+  },
+  {
+   "label": "o031",
+   "step": "",
+   "url": "http://artist.extrachill.com/manage-link-page/",
+   "value": false
+  },
+  {
+   "label": "o032",
+   "step": "",
+   "url": "http://artist.extrachill.com/analytics/",
+   "value": [
+    "Create Link Page -> http://artist.extrachill.com/manage-link-page/"
+   ]
+  },
+  {
+   "label": "o033",
+   "step": "",
+   "url": "http://community.extrachill.com/",
+   "value": [
+    "Extra Chill -> http://community.extrachill.com/",
+    "[icon] -> http://community.extrachill.com/notifications",
+    "View Profile -> http://community.extrachill.com/u/porch_lights_fixture",
+    "Edit Profile -> http://community.extrachill.com/u/porch_lights_fixture/edit/",
+    "Manage Artist -> http://artist.extrachill.com/manage-artist/",
+    "Settings -> http://community.extrachill.com/settings/",
+    "Log Out -> http://community.extrachill.com/?custom_logout=1&logout_nonce=8b24add795"
+   ]
+  },
+  {
+   "label": "o036",
+   "step": "",
+   "url": "http://artist.extrachill.com/",
+   "value": [
+    "Manage Link Page -> http://artist.extrachill.com/manage-link-page/",
+    "Manage Link Page -> https://extrachill.link/edit?link_page=9"
+   ]
+  },
+  {
+   "label": "o001",
+   "step": "",
+   "url": "http://extrachill.link/edit",
+   "value": "http://extrachill.link/edit"
+  },
+  {
+   "label": "o037",
+   "step": "",
+   "url": "http://extrachill.link/edit",
+   "value": "Your account does not manage a link page yet. Get your link page"
+  },
+  {
+   "label": "o038",
+   "step": "",
+   "url": "http://extrachill.link/edit",
+   "value": {
+    "status": 200,
+    "body": "{\"available\":false}",
+    "cfg": "http://artist.extrachill.com/wp-json/extrachill/v1/link-pages/editor-configuration"
+   }
+  },
+  {
+   "label": "o001",
+   "step": "",
+   "url": "http://extrachill.link/the-porch-lights",
+   "value": "http://extrachill.link/the-porch-lights"
+  },
+  {
+   "label": "o002",
+   "step": "",
+   "url": "http://extrachill.link/the-porch-lights",
+   "value": true
+  },
+  {
+   "label": "o001",
+   "step": "",
+   "url": "http://extrachill.link/edit",
+   "value": "http://extrachill.link/edit"
+  },
+  {
+   "label": "o057",
+   "step": "",
+   "url": "http://extrachill.link/edit",
+   "value": "Extra Chill Open site search Toggle account menu Sign in to edit your link page. Sign in 1 ONLINE NOW 0 TOTAL MEMBERS \u2190 Back to Extra Chill Network Blog Community Events Calendar Artist Platform Newsletter Shop Explore Interviews Live Reviews Festival Wire Song Meanings Music News About The Power of Extra Chill Documentation Tech Support Contact Us In the Press Contribute Subscribe \u00a9 2026 Extra Chill. All rights reserved. Affiliate Disclosure Privacy Policy"
+  }
+ ],
+ "fatals": [],
+ "rest_diag": [
+  {
+   "route": "/extrachill/v1/link-pages/editor-configuration",
+   "has_auth_header": true,
+   "server_auth": true,
+   "user": 601
+  },
+  {
+   "route": "/extrachill/v1/link-pages/editor-configuration",
+   "has_auth_header": true,
+   "server_auth": true,
+   "user": 601
+  },
+  {
+   "route": "/extrachill/v1/link-pages/editor-configuration",
+   "has_auth_header": true,
+   "server_auth": true,
+   "user": 601
+  }
+ ]
+}

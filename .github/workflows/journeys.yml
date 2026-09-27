@@ -1,0 +1,136 @@
+name: Network journeys
+
+# User-journey regression tests on the full 11-site network rig
+# (rigs/extrachill-network, journey contract extrachill-network#291).
+#
+# Each selected journey boots the whole network from every component's
+# latest release, walks a real browser journey, and runs its grade.php.
+# A grade fails the run when a finding appears that is not pinned to an
+# open issue, or when a pinned finding starts passing (unpin it so the case
+# guards the fix). Known-open findings do not fail the run.
+#
+# This is deliberately separate from deploy.yml's pre-deploy gate: journeys
+# take ~15 minutes each and judge product behaviour, not whether the
+# component combination boots.
+
+on:
+  schedule:
+    - cron: '23 9 * * *'
+  pull_request:
+    paths:
+      - 'rigs/extrachill-network/**'
+      - '.github/workflows/journeys.yml'
+  workflow_dispatch:
+    inputs:
+      journeys:
+        description: 'JSON array of journey IDs (default: every regression journey below).'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: network-journeys-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned: floating refs make journey failures unattributable.
+  WP_CODEBOX_REF: v0.27.1
+  DEFAULT_JOURNEYS: '["musician-link-page-onboarding"]'
+
+jobs:
+  journey:
+    name: Journeys on the network rig
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Resolve the theme's latest release
+        id: theme
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "tag=$(gh release view -R Extra-Chill/extrachill --json tagName --jq .tagName)" >> "${GITHUB_OUTPUT}"
+
+      # A local theme checkout, not the release zip: the rig's remote-zip
+      # path is not multisite-aware (see rigs/extrachill-network/README.md).
+      - name: Checkout the theme at that release
+        uses: actions/checkout@v6
+        with:
+          repository: Extra-Chill/extrachill
+          ref: ${{ steps.theme.outputs.tag }}
+          path: .ci/extrachill-theme
+
+      - name: Checkout WP Codebox
+        uses: actions/checkout@v6
+        with:
+          repository: Automattic/wp-codebox
+          ref: ${{ env.WP_CODEBOX_REF }}
+          path: .ci/wp-codebox
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Build WP Codebox and its pinned Chromium
+        working-directory: .ci/wp-codebox
+        run: |
+          set -euo pipefail
+          npm install
+          npm run build
+          npx playwright install --with-deps chromium
+
+      - name: Validate rig contracts
+        run: node rigs/extrachill-network/tests/contract.test.mjs
+
+      - name: Boot the network and run journeys
+        env:
+          HOMEBOY_WP_CODEBOX_BIN: ${{ github.workspace }}/.ci/wp-codebox/packages/cli/dist/index.js
+          HOMEBOY_ARTIFACT_ROOT: ${{ runner.temp }}/journeys/artifacts
+          HOMEBOY_NETWORK_RESULT_FILE: ${{ runner.temp }}/journeys/result.json
+          JOURNEYS: ${{ inputs.journeys }}
+        run: |
+          set -euo pipefail
+          journeys="${JOURNEYS:-$DEFAULT_JOURNEYS}"
+          export HOMEBOY_SETTINGS_JSON="$(jq -cn --argjson j "${journeys}" \
+            --arg theme "${{ github.workspace }}/.ci/extrachill-theme" \
+            '{extrachill_theme_source: $theme, extrachill_journeys: $j}')"
+          echo "Settings: ${HOMEBOY_SETTINGS_JSON}"
+          node rigs/extrachill-network/run.mjs > /dev/null
+
+      - name: Summarize journey results
+        if: always()
+        run: |
+          set -euo pipefail
+          result="${{ runner.temp }}/journeys/result.json"
+          [ -f "${result}" ] || { echo "No rig result was written." >> "${GITHUB_STEP_SUMMARY}"; exit 0; }
+          node - "${result}" >> "${GITHUB_STEP_SUMMARY}" <<'NODE'
+          const fs = require('node:fs');
+          const envelope = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          const out = [];
+          for (const execution of envelope.executions ?? []) {
+            for (const match of String(execution.stdout ?? '').matchAll(/EXTRACHILL_JOURNEY_RESULT:([A-Za-z0-9+/=]+)/g)) {
+              const result = JSON.parse(Buffer.from(match[1], 'base64').toString('utf8'));
+              out.push(`## ${result.schema}`, '', '| Case | Outcome | Pinned issue |', '| --- | --- | --- |');
+              for (const r of result.results ?? []) {
+                out.push(`| ${r.id} | ${r.outcome} | ${r.pinned_issue ?? ''} |`);
+              }
+              if (result.regressions?.length) out.push('', `**New findings:** ${result.regressions.join(', ')}`);
+              if (result.unpin?.length) out.push('', `**Fixed, unpin:** ${result.unpin.join(', ')}`);
+              out.push('');
+            }
+          }
+          console.log(out.length ? out.join('\n') : 'No journey result markers were found (the boot may have failed before grading).');
+          NODE
+
+      - name: Upload journey evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: network-journeys
+          path: |
+            ${{ runner.temp }}/journeys/result.json
+            ${{ runner.temp }}/journeys/artifacts/runtime-*/files/browser/
+          if-no-files-found: warn
+          retention-days: 14
