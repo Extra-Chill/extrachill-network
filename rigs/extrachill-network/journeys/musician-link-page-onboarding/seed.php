@@ -139,8 +139,8 @@ $evidence = array(
 // content is the sentinel the_content filter replaces.
 switch_to_blog( $main_blog_id );
 update_option( 'permalink_structure', '/%postname%/' );
-$evidence['pages']['extrachill.com/power'] = musician_journey_ensure_page( 'power', 'The Power of Extra Chill', '<!-- extrachill-power-manifesto -->' );
-$evidence['pages']['extrachill.com/login'] = musician_journey_ensure_page( 'login', 'Login', '<!-- wp:extrachill/login-register /-->' );
+$evidence['pages']['extrachill.com/power']      = musician_journey_ensure_page( 'power', 'The Power of Extra Chill', '<!-- extrachill-power-manifesto -->' );
+$evidence['pages']['extrachill.com/login']      = musician_journey_ensure_page( 'login', 'Login', '<!-- wp:extrachill/login-register /-->' );
 $evidence['pages']['extrachill.com/contact-us'] = musician_journey_ensure_page( 'contact-us', 'Contact Us', '<!-- wp:extrachill/contact-form /-->' );
 flush_rewrite_rules();
 restore_current_blog();
@@ -148,7 +148,7 @@ restore_current_blog();
 // artist.extrachill.com: the artist platform pages, exactly as production.
 switch_to_blog( $artist_blog_id );
 update_option( 'permalink_structure', '/%postname%/' );
-$artist_home = 'http://artist.extrachill.com';
+$artist_home  = 'http://artist.extrachill.com';
 $artist_pages = array(
 	'login'            => array( 'Login', '<!-- wp:extrachill/login-register {"redirectUrl":"' . $artist_home . '"} /-->' ),
 	'create-artist'    => array( 'Create Artist', '<!-- wp:extrachill/artist-creator /-->' ),
@@ -156,8 +156,8 @@ $artist_pages = array(
 	'manage-link-page' => array( 'Manage Link Page', '<!-- wp:extrachill/link-page-editor /-->' ),
 	'analytics'        => array( 'Analytics', '<!-- wp:extrachill/artist-analytics /-->' ),
 );
-foreach ( $artist_pages as $slug => $page ) {
-	$evidence['pages'][ 'artist.extrachill.com/' . $slug ] = musician_journey_ensure_page( $slug, $page[0], $page[1] );
+foreach ( $artist_pages as $slug => $artist_page ) {
+	$evidence['pages'][ 'artist.extrachill.com/' . $slug ] = musician_journey_ensure_page( $slug, $artist_page[0], $artist_page[1] );
 }
 flush_rewrite_rules();
 restore_current_blog();
@@ -181,9 +181,9 @@ restore_current_blog();
 // yet -- the exact state a real musician is in the moment onboarding
 // finishes. Used by the editor-half browser steps via auth-user-id=601.
 $musician = musician_journey_force_user( MUSICIAN_JOURNEY_FIXTURE_USER_ID, 'porch_lights_fixture', 'porch-lights@example.invalid', 'Sam Porch (Fixture Musician)' );
-foreach ( array( $main_blog_id, $artist_blog_id, $community_blog_id, $link_blog_id ) as $blog_id ) {
-	if ( ! is_user_member_of_blog( MUSICIAN_JOURNEY_FIXTURE_USER_ID, $blog_id ) ) {
-		add_user_to_blog( $blog_id, MUSICIAN_JOURNEY_FIXTURE_USER_ID, 'subscriber' );
+foreach ( array( $main_blog_id, $artist_blog_id, $community_blog_id, $link_blog_id ) as $member_blog_id ) {
+	if ( ! is_user_member_of_blog( MUSICIAN_JOURNEY_FIXTURE_USER_ID, $member_blog_id ) ) {
+		add_user_to_blog( $member_blog_id, MUSICIAN_JOURNEY_FIXTURE_USER_ID, 'subscriber' );
 	}
 }
 update_user_meta( MUSICIAN_JOURNEY_FIXTURE_USER_ID, 'user_is_artist', '1' );

@@ -25,6 +25,16 @@ $musician_id    = (int) $fixture['musician_user_id'];
 $results = array();
 
 /**
+ * Map a boolean check to a graded outcome.
+ *
+ * @param bool $passed Whether the case passed.
+ * @return string
+ */
+function musician_journey_outcome( $passed ) {
+	return $passed ? 'pass' : 'finding';
+}
+
+/**
  * Record one graded case.
  *
  * @param array  $results  Result list (by reference).
@@ -58,14 +68,14 @@ if ( $live_user ) {
 		$results,
 		'join-registration-remembers-join-context',
 		'The account created via /join is marked as a join-flow signup so onboarding routes it to the artist tools.',
-		'1' === get_user_meta( $live_user->ID, 'onboarding_from_join', true ) ? 'pass' : 'finding',
+		musician_journey_outcome( '1' === get_user_meta( $live_user->ID, 'onboarding_from_join', true ) ),
 		array( 'onboarding_from_join' => get_user_meta( $live_user->ID, 'onboarding_from_join', true ) )
 	);
 	musician_journey_record(
 		$results,
 		'join-onboarding-marks-artist',
 		'Finishing onboarding with "I am a musician" checked leaves the account able to create an artist profile.',
-		'1' === get_user_meta( $live_user->ID, 'user_is_artist', true ) ? 'pass' : 'finding',
+		musician_journey_outcome( '1' === get_user_meta( $live_user->ID, 'user_is_artist', true ) ),
 		array(
 			'user_is_artist'       => get_user_meta( $live_user->ID, 'user_is_artist', true ),
 			'onboarding_completed' => get_user_meta( $live_user->ID, 'onboarding_completed', true ),
@@ -85,14 +95,17 @@ if ( $live_user ) {
 // ---------------------------------------------------------------------------
 // Venue and promoter doors: /join must not push them into an artist profile.
 // ---------------------------------------------------------------------------
-foreach ( array( 'venue' => 'porch-venue-live@example.test', 'promoter' => 'porch-promoter-live@example.test' ) as $intent_id => $email ) {
+foreach ( array(
+	'venue'    => 'porch-venue-live@example.test',
+	'promoter' => 'porch-promoter-live@example.test',
+) as $intent_id => $email ) {
 	$member = get_user_by( 'email', $email );
 	$ids    = $member ? get_user_meta( $member->ID, '_artist_profile_ids', true ) : array();
 	musician_journey_record(
 		$results,
 		'join-' . $intent_id . '-not-routed-to-artist',
 		'A ' . $intent_id . ' joining via /join is recorded as such and is not made to create an artist profile.',
-		! $member ? 'finding' : ( ( $intent_id === get_user_meta( $member->ID, 'onboarding_join_intent', true ) && empty( $ids ) && '1' === get_user_meta( $member->ID, 'user_is_professional', true ) ) ? 'pass' : 'finding' ),
+		musician_journey_outcome( $member && get_user_meta( $member->ID, 'onboarding_join_intent', true ) === $intent_id && empty( $ids ) && '1' === get_user_meta( $member->ID, 'user_is_professional', true ) ),
 		array(
 			'user_id'            => $member ? (int) $member->ID : 0,
 			'join_intent'        => $member ? get_user_meta( $member->ID, 'onboarding_join_intent', true ) : null,
@@ -126,12 +139,12 @@ if ( $artist_id ) {
 $link_page_id = 0;
 $link_meta    = array();
 if ( $artist_id && function_exists( 'ec_get_link_page_id_for_owner' ) ) {
-	$owned = ec_get_link_page_id_for_owner( 'post:' . $artist_blog_id . ':artist_profile:' . $artist_id );
+	$owned        = ec_get_link_page_id_for_owner( 'post:' . $artist_blog_id . ':artist_profile:' . $artist_id );
 	$link_page_id = is_wp_error( $owned ) ? 0 : (int) $owned;
 }
 switch_to_blog( $link_blog_id );
-$link_post_type = function_exists( 'ec_link_page_post_type' ) ? ec_link_page_post_type( $link_blog_id ) : 'artist_link_page';
-$link_pages     = get_posts(
+$link_post_type      = function_exists( 'ec_link_page_post_type' ) ? ec_link_page_post_type( $link_blog_id ) : 'artist_link_page';
+$link_pages          = get_posts(
 	array(
 		'post_type'      => $link_post_type,
 		'post_status'    => 'any',
@@ -141,16 +154,16 @@ $link_pages     = get_posts(
 	)
 );
 $link_page_inventory = array();
-foreach ( $link_pages as $page ) {
+foreach ( $link_pages as $link_page_post ) {
 	$link_page_inventory[] = array(
-		'id'     => (int) $page->ID,
-		'slug'   => $page->post_name,
-		'title'  => $page->post_title,
-		'status' => $page->post_status,
-		'owner'  => get_post_meta( $page->ID, '_link_page_owner', true ),
+		'id'     => (int) $link_page_post->ID,
+		'slug'   => $link_page_post->post_name,
+		'title'  => $link_page_post->post_title,
+		'status' => $link_page_post->post_status,
+		'owner'  => get_post_meta( $link_page_post->ID, '_link_page_owner', true ),
 	);
-	if ( ! $link_page_id && $artist_post && ( $page->post_name === $artist_post->post_name || $page->post_title === $artist_post->post_title ) ) {
-		$link_page_id = (int) $page->ID;
+	if ( ! $link_page_id && $artist_post && ( $link_page_post->post_name === $artist_post->post_name || $link_page_post->post_title === $artist_post->post_title ) ) {
+		$link_page_id = (int) $link_page_post->ID;
 	}
 }
 if ( $link_page_id ) {
@@ -168,7 +181,10 @@ musician_journey_record(
 	'create-artist-provisions-link-page',
 	'Creating an artist profile through the self-serve form leaves the musician with a Link Page (no hidden step).',
 	! $artist_id ? 'skip' : ( $link_page_id ? 'pass' : 'finding' ),
-	array( 'artist_id' => $artist_id, 'link_page_id' => $link_page_id )
+	array(
+		'artist_id'    => $artist_id,
+		'link_page_id' => $link_page_id,
+	)
 );
 musician_journey_record(
 	$results,
@@ -246,10 +262,9 @@ musician_journey_record(
  *    guards against the bug coming back).
  * Skips never fail; they mean an upstream case could not set the stage.
  */
-$known_findings = array(
-);
-$regressions = array();
-$unpin       = array();
+$known_findings = array();
+$regressions    = array();
+$unpin          = array();
 foreach ( $results as &$result ) {
 	$result['pinned_issue'] = $known_findings[ $result['id'] ] ?? null;
 	if ( 'finding' === $result['outcome'] && null === $result['pinned_issue'] ) {
@@ -262,21 +277,21 @@ foreach ( $results as &$result ) {
 unset( $result );
 
 $summary = array(
-	'schema'    => 'extrachill-network/journey-result/musician-link-page-onboarding/v1',
-	'fixture'   => $fixture,
+	'schema'      => 'extrachill-network/journey-result/musician-link-page-onboarding/v1',
+	'fixture'     => $fixture,
 	'results'     => $results,
 	'regressions' => $regressions,
 	'unpin'       => $unpin,
-	'passed'    => count( array_filter( $results, static fn( $r ) => 'pass' === $r['outcome'] ) ),
-	'findings'  => count( array_filter( $results, static fn( $r ) => 'finding' === $r['outcome'] ) ),
-	'skipped'   => count( array_filter( $results, static fn( $r ) => 'skip' === $r['outcome'] ) ),
-	'redirects' => get_site_option( 'musician_journey_redirects', array() ),
-	'handoff'   => get_site_option( 'musician_journey_handoff_diag', array() ),
-	'observed'  => get_site_option( 'musician_journey_observations', array() ),
-	'fatals'    => get_site_option( 'musician_journey_fatals', array() ),
-	'trace'     => get_site_option( 'musician_journey_render_trace', array() ),
-	'auth_rest' => get_site_option( 'musician_journey_auth_rest', array() ),
-	'rest_diag' => get_site_option( 'musician_journey_rest_diag', array() ),
+	'passed'      => count( array_filter( $results, static fn( $r ) => 'pass' === $r['outcome'] ) ),
+	'findings'    => count( array_filter( $results, static fn( $r ) => 'finding' === $r['outcome'] ) ),
+	'skipped'     => count( array_filter( $results, static fn( $r ) => 'skip' === $r['outcome'] ) ),
+	'redirects'   => get_site_option( 'musician_journey_redirects', array() ),
+	'handoff'     => get_site_option( 'musician_journey_handoff_diag', array() ),
+	'observed'    => get_site_option( 'musician_journey_observations', array() ),
+	'fatals'      => get_site_option( 'musician_journey_fatals', array() ),
+	'trace'       => get_site_option( 'musician_journey_render_trace', array() ),
+	'auth_rest'   => get_site_option( 'musician_journey_auth_rest', array() ),
+	'rest_diag'   => get_site_option( 'musician_journey_rest_diag', array() ),
 );
 
 // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped,WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Machine-readable journey result.

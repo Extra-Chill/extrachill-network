@@ -65,7 +65,7 @@ register_shutdown_function(
 );
 
 /*
- * Observation sink. wordpress.browser-actions only records an `evaluate`
+ * Observation sink. WordPress.browser-actions only records an `evaluate`
  * step's value when the step asserts; this journey is exploratory (what
  * does the musician SEE, where do the links go), so each observation posts
  * itself here and grade.php prints the collected list.
