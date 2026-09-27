@@ -37,7 +37,7 @@ concurrency:
 env:
   # Pinned: floating refs make journey failures unattributable.
   WP_CODEBOX_REF: v0.27.1
-  DEFAULT_JOURNEYS: '["musician-link-page-onboarding"]'
+  DEFAULT_JOURNEYS: '["musician-link-page-onboarding","returning-artist-link-page"]'
 
 jobs:
   journey:
