@@ -71,6 +71,7 @@ try {
   assert.equal(compatMount.target, `/wordpress/wp-content/mu-plugins/${SANDBOX_COMPAT_MU_PLUGIN_FILENAME}`);
   const compatSource = await readFile(compatMount.source, 'utf8');
   assert.match(compatSource, /'ec_site_url_override'/);
+  assert.match(compatSource, /'clean_url', 'ec_rig_downgrade_network_urls'/);
   assert.match(compatSource, /'allowed_redirect_hosts'[\s\S]*ec_get_allowed_redirect_hosts\(\)[\s\S]*99/);
   assert.match(compatSource, /GET_LOCK\|RELEASE_LOCK\|IS_FREE_LOCK/);
   assert.match(compatSource, /'extrachill_api_rate_limit_store'/);
