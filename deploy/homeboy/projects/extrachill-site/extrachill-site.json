@@ -197,11 +197,6 @@
       "local_path": ""
     },
     {
-      "id": "extrachill-roadie",
-      "remote_path": "wp-content/plugins/extrachill-roadie",
-      "local_path": ""
-    },
-    {
       "id": "extrachill-search",
       "remote_path": "wp-content/plugins/extrachill-search",
       "local_path": ""
@@ -224,11 +219,6 @@
     {
       "id": "extrachill-users",
       "remote_path": "wp-content/plugins/extrachill-users",
-      "local_path": ""
-    },
-    {
-      "id": "frontend-agent-chat",
-      "remote_path": "wp-content/plugins/frontend-agent-chat",
       "local_path": ""
     },
     {
