@@ -1065,16 +1065,13 @@ foreach (get_sites(array('number' => 0)) as $site) {
         sort($expected_site);
         $missing = array_values(array_diff($expected_site, $active));
         $unexpected = array_values(array_diff($active, $expected_site));
-        $response = wp_remote_get(home_url('/'), array('timeout' => 30, 'sslverify' => false));
-        $status = is_wp_error($response) ? 0 : (int) wp_remote_retrieve_response_code($response);
-        $body = is_wp_error($response) ? $response->get_error_message() : wp_remote_retrieve_body($response);
-        $fatal = is_string($body) && (str_contains($body, 'Fatal error') || str_contains($body, 'There has been a critical error'));
-        $expected_status = $expected['expectedHomepageStatus'][$site->domain] ?? array(200);
+        // No server-side home-page request here: network domains are the
+        // real production hostnames, and Playground resolves PHP HTTP on the
+        // real internet, so a wp_remote_get(home_url()) measured PRODUCTION,
+        // not this boot. Each site's page load is judged in-sandbox by its
+        // baseline browser probe (routed through the sandbox proxy).
         $report['sites'][$site->domain] = array(
             'theme' => get_stylesheet(),
-            'httpStatus' => $status,
-            'expectedHttpStatus' => $expected_status,
-            'fatalMarkerInBody' => $fatal,
             'expectedActivePlugins' => $expected_site,
             'actualActivePlugins' => $active,
             'missingPlugins' => $missing,
@@ -1082,12 +1079,6 @@ foreach (get_sites(array('number' => 0)) as $site) {
         );
         if (!empty($missing)) {
             throw new RuntimeException('extrachill-network: ' . $site->domain . ' missing expected plugins: ' . implode(', ', $missing));
-        }
-        if (!in_array($status, $expected_status, true)) {
-            throw new RuntimeException('extrachill-network: ' . $site->domain . ' anonymous home request returned HTTP ' . $status . ' (expected one of: ' . implode(',', $expected_status) . ')');
-        }
-        if ($fatal) {
-            throw new RuntimeException('extrachill-network: ' . $site->domain . ' anonymous home request contains a fatal-error marker.');
         }
     } finally {
         restore_current_blog();
@@ -1113,6 +1104,8 @@ function browserProbeStep(site) {
       `allow-host=${site.domain}`,
       ...(strictStatus ? ['assert=no-console-errors'] : []),
       'assert=no-page-errors',
+      // WordPress renders its critical-error screen in .wp-die-message.
+      'assert=not-exists:.wp-die-message',
       'capture=console,errors,html,network,screenshot',
     ],
     metadata: { kind: 'extrachill-network-baseline-page-load', domain: site.domain },

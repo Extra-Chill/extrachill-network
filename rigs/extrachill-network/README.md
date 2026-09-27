@@ -41,11 +41,13 @@ multisite topology, release-zip mounting, and the theme-remote-sourcing gap).
   network activation fires it only once from the current site -- per-site
   setup on the other 10 sites otherwise never runs.
 - **Baseline scenario**: after activation, one assertion step compares actual
-  vs. expected active plugins per site and does an internal anonymous
-  `wp_remote_get(home_url('/'))` HTTP-status/fatal-marker check; then one
-  `wordpress.browser-probe` per site asserts no console/page errors on an
-  anonymous page load, with `network-policy=block` scoped to that site's own
-  host.
+  vs. expected active plugins per site; then one `wordpress.browser-probe` per
+  site asserts no console/page errors and no WordPress critical-error screen
+  (`.wp-die-message`) on an anonymous page load, routed through the sandbox
+  with `network-policy=block` scoped to that site's own host. (An earlier
+  server-side `wp_remote_get(home_url('/'))` check was removed: the domains
+  are real production hostnames and Playground resolves PHP HTTP on the real
+  internet, so it measured production, not the boot. See #308.)
 - **Domain-ID alignment** (generated mu-plugin): a fresh install assigns new
   sequential blog IDs, but the network plugin set routes through
   `EC_BLOG_ID_*` constants (production's IDs: events = 7, newsletter = 9,
