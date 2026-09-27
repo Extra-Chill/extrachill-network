@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.27.1] - 2026-09-27
+
+### Fixed
+- return a refused queued fallback instead of fataling
+
 ## [2.27.0] - 2026-09-27
 
 ### Added
