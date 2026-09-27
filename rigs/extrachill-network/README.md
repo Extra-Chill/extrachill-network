@@ -188,6 +188,15 @@ rule from the events repo journeys: a **finding** is a real product defect,
 a **skip** is a runtime that could not fairly judge the case, and neither is
 ever silently converted into a pass.
 
+### Regression journeys in CI
+
+`.github/workflows/journeys.yml` runs selected journeys nightly, on rig PRs,
+and on demand (`workflow_dispatch` with a `journeys` JSON array). It boots
+the network from latest releases and uploads the browser evidence. A journey
+opts into regression semantics by pinning its known findings to issues in
+its grade (see `journeys/musician-link-page-onboarding/README.md`), so a new
+finding, or a pinned one that now passes, fails the run.
+
 ### Journeys ported from extrachill-events (extrachill-network#292)
 
 The Events repo's entire `tests/wp-codebox/`, `tests/NetworkE2E/`, and
