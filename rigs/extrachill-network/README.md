@@ -156,6 +156,10 @@ Contract rules enforced by `run.mjs` and `tests/contract.test.mjs`:
   bypass filter, a provider HTTP stub, ...) lives entirely inside the
   journey's own file (`auth-multisite`'s Turnstile bypass,
   `gardner-social-operator`'s provider stub), never in this rig.
+  Fixture mu-plugins are mounted for the whole boot, so they are visible to
+  every journey selected alongside. A journey that asserts behaviour another
+  journey's fixture stubs (e.g. the real Turnstile gate) must undo that stub
+  in its own seed/grade.
 - Steps run **after the full baseline** (activation, per-site assertion, and
   every site's anonymous browser probe), in the order the setting lists
   them; consumer `wordpress_runtime_post_steps` still run last.
