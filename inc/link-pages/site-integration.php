@@ -223,21 +223,70 @@ function ec_network_link_page_edit_endpoints( $endpoints ) {
 add_filter( 'ec_link_page_edit_endpoints', 'ec_network_link_page_edit_endpoints' );
 
 /**
+ * What a /join visitor can be getting a Link Page for.
+ *
+ * Extra Chill Link Pages have three owner kinds: artists (artist platform),
+ * venues and promoters (Events). Onboarding asks one question from this list
+ * (extrachill-users ec_onboarding_join_intents); the first is pre-selected.
+ *
+ * @param array $intents Existing intents.
+ * @return array
+ */
+function ec_network_onboarding_join_intents( $intents ) {
+	$intents   = is_array( $intents ) ? $intents : array();
+	$intents[] = array(
+		'id'    => 'artist',
+		'label' => __( 'My music (artist or band)', 'extrachill-network' ),
+		'roles' => array( 'artist' ),
+	);
+	$intents[] = array(
+		'id'    => 'venue',
+		'label' => __( 'A venue I run or book', 'extrachill-network' ),
+		'roles' => array( 'professional' ),
+	);
+	$intents[] = array(
+		'id'    => 'promoter',
+		'label' => __( 'A promoter, collective, or event series', 'extrachill-network' ),
+		'roles' => array( 'professional' ),
+	);
+	return $intents;
+}
+add_filter( 'ec_onboarding_join_intents', 'ec_network_onboarding_join_intents' );
+
+/**
  * Where a user lands after onboarding from extrachill.link/join.
  *
- * A user who already manages an artist goes straight to editing that
- * artist's Link Page on extrachill.link; anyone else creates an artist.
- * Professionals have no Link Page owner entity yet
- * (extrachill-link-pages#27 §7), so they keep that destination for now.
+ * - artist (and legacy role-only answers): edit an existing artist Link Page
+ *   on extrachill.link, else create an artist.
+ * - venue / promoter: their Link Pages live in the Events workspace, which is
+ *   team-gated today (venue_booking tier; promoter organizations are
+ *   team-verified). Members who can open it go there; everyone else requests
+ *   one through the contact form with the topic preselected.
+ *
  * Runs wherever onboarding runs (the community site), so it resolves
  * through network-active APIs only.
  *
  * @param string   $redirect_url Default destination.
  * @param int      $user_id      User ID.
  * @param string[] $roles        Roles chosen during onboarding.
+ * @param string   $intent       Join intent ID, or '' for legacy role-only onboarding.
  * @return string
  */
-function ec_network_onboarding_join_destination( $redirect_url, $user_id, $roles ) {
+function ec_network_onboarding_join_destination( $redirect_url, $user_id, $roles, $intent = '' ) {
+	if ( 'venue' === $intent || 'promoter' === $intent ) {
+		// Venue and promoter Link Pages live in the Events workspace. While that
+		// workspace is team-gated (the venue_booking feature tier), a new member
+		// cannot open it, so send them to request one: team members go straight
+		// to the workspace.
+		if ( 'venue' === $intent && function_exists( 'ec_feature_available' ) && ec_feature_available( 'venue_booking', (int) $user_id ) ) {
+			$events = ec_get_site_url( 'events' );
+			if ( $events ) {
+				return $events . '/venue-settings/#tab-link-page';
+			}
+		}
+		$subject = 'venue' === $intent ? 'venue-link-page' : 'promoter-link-page';
+		return add_query_arg( 'subject', $subject, ec_get_site_url( 'main' ) . '/contact-us/' );
+	}
 	if ( ! array_intersect( array( 'artist', 'professional' ), (array) $roles ) ) {
 		return $redirect_url;
 	}
@@ -255,4 +304,4 @@ function ec_network_onboarding_join_destination( $redirect_url, $user_id, $roles
 	$artist_site = ec_get_site_url( 'artist' );
 	return $artist_site ? $artist_site . '/create-artist/' : $redirect_url;
 }
-add_filter( 'ec_onboarding_join_destination', 'ec_network_onboarding_join_destination', 10, 3 );
+add_filter( 'ec_onboarding_join_destination', 'ec_network_onboarding_join_destination', 10, 4 );
