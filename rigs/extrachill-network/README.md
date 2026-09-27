@@ -64,7 +64,8 @@ multisite topology, release-zip mounting, and the theme-remote-sourcing gap).
   with each site's real home URL and downgrades network-host redirects to
   http. (2) WordPress Playground's platform mu-plugin *replaces*
   `allowed_redirect_hosts` with three wordpress.org hosts, so the file
-  re-merges the network's hosts at priority 99. (3) SQLite has no MySQL
+  re-merges the network's hosts at priority 99. This is temporary until the
+  pinned WP Codebox includes Automattic/wp-codebox#2533. (3) SQLite has no MySQL
   advisory locks, so the file answers `GET_LOCK`/`RELEASE_LOCK`/`IS_FREE_LOCK`
   with `1`, because requests are serialized. These are infrastructure
   substitutes, not product behaviour.

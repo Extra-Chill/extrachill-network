@@ -167,10 +167,10 @@ add_filter(
 
 /*
  * 2. WordPress Playground's platform mu-plugin REPLACES allowed_redirect_hosts
- *    with three wordpress.org hosts (packages/playground/wordpress/src/
- *    platform-mu-plugins.ts), discarding the network hosts extrachill-network
- *    merges in, so every cross-site wp_safe_redirect falls back to wp-admin.
- *    Re-merge the network's list after it.
+ *    with three wordpress.org hosts, so every cross-site wp_safe_redirect
+ *    between mapped domains falls back to wp-admin. The real fix is in WP
+ *    Codebox's mapped-domain bootstrap (Automattic/wp-codebox#2533); delete
+ *    this block once the rig's pinned WP Codebox includes it.
  */
 add_filter(
 \t'allowed_redirect_hosts',
