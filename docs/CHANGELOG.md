@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.24.1] - 2026-09-27
+
+### Fixed
+- deliver principal-less transactional mail (password resets) via system flag + queued fallback
+
 ## [2.24.0] - 2026-09-26
 
 ### Added
