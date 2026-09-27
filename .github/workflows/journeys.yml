@@ -116,19 +116,44 @@ jobs:
           const envelope = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
           const out = [];
           let failed = false;
+
+          // Journey steps are isolated (allowFailure), so the recipe keeps
+          // going when one journey breaks. Browser-step failures are judged by
+          // each journey's grade; a crashed seed/grade/PHP step means that
+          // journey could not be judged at all, which fails the run.
+          const crashes = {};
+          for (const f of [...(envelope.stepFailures ?? []), ...(envelope.advisoryFailures ?? [])]) {
+            const meta = f.metadata ?? {};
+            const journey = meta.journey;
+            if (!journey || f.command === 'wordpress.browser-actions') continue;
+            (crashes[journey] ??= new Set()).add(`${meta.kind ?? f.command}: ${String(f.error?.message ?? '').split('\n').find((l) => /Fatal error|Exception|failed/.test(l)) ?? ''}`.slice(0, 300));
+          }
+          if (Object.keys(crashes).length) {
+            failed = true;
+            out.push('## Journeys that crashed', '');
+            for (const [journey, messages] of Object.entries(crashes)) {
+              out.push(`- **${journey}**`, ...[...messages].map((m) => `  - ${m.replace(/<[^>]+>/g, '')}`));
+            }
+            out.push('');
+          }
+
           for (const execution of envelope.executions ?? []) {
             for (const match of String(execution.stdout ?? '').matchAll(/EXTRACHILL_JOURNEY_RESULT:([A-Za-z0-9+/=]+)/g)) {
-              const result = JSON.parse(Buffer.from(match[1], 'base64').toString('utf8'));
-              out.push(`## ${result.schema}`, '', '| Case | Outcome | Pinned issue |', '| --- | --- | --- |');
-              for (const r of result.results ?? []) {
-                out.push(`| ${r.id} | ${r.outcome} | ${r.pinned_issue ?? ''} |`);
+              let result;
+              try { result = JSON.parse(Buffer.from(match[1], 'base64').toString('utf8')); } catch { continue; }
+              out.push(`## ${result.schema ?? result.scenario ?? 'journey'}`, '');
+              if (Array.isArray(result.results)) {
+                out.push('| Case | Outcome | Pinned issue |', '| --- | --- | --- |');
+                for (const r of result.results) out.push(`| ${r.id} | ${r.outcome} | ${r.pinned_issue ?? ''} |`);
+              } else if (typeof result.passed === 'number') {
+                out.push(`${result.passed} of ${result.assertions ?? '?'} assertions passed (legacy result format, informational).`);
               }
               if (result.regressions?.length) { failed = true; out.push('', `**New findings:** ${result.regressions.join(', ')}`); }
               if (result.unpin?.length) { failed = true; out.push('', `**Fixed, unpin in grade.php:** ${result.unpin.join(', ')}`); }
               out.push('');
             }
           }
-          console.log(out.length ? out.join('\n') : 'No journey result markers were found (the boot may have failed before grading).');
+          console.log(out.length ? out.join('\n') : 'No journey results were found (the boot may have failed before any journey ran).');
           if (!out.length || failed) process.exitCode = 1;
           NODE
 
