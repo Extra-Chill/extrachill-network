@@ -199,7 +199,7 @@ $result = ec_send_email( array( 'to' => 'fan@example.com', 'subject' => 'Hi' ) )
 
 mail_assert(
 	is_wp_error( $result ) && 'email_mailbox_forbidden' === $result->get_error_code(),
-	'a WP_Error from the queued retry is returned as-is instead of fataling (extrachill-events#917)'
+	'a WP_Error from the queued retry is returned as-is instead of fataling (#316)'
 );
 
 // --- (b3) Other failure codes do not trigger the fallback. -------------------
