@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { buildRecipe, domainIdsMuPluginSource, DOMAIN_IDS_MU_PLUGIN_FILENAME, journeySeedSetting, journeySelection, validateJourneyDocument } from '../run.mjs';
+import { buildRecipe, domainIdsMuPluginSource, DOMAIN_IDS_MU_PLUGIN_FILENAME, SANDBOX_COMPAT_MU_PLUGIN_FILENAME, journeySeedSetting, journeySelection, validateJourneyDocument } from '../run.mjs';
 
 const packageRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const topology = JSON.parse(await readFile(path.join(packageRoot, 'network-topology.json'), 'utf8'));
@@ -62,6 +62,17 @@ try {
   }
   assert.match(muSource, /WP_INSTALLING/, 'mu-plugin must skip while installing');
   assert.match(muSource, /function_exists\( ?'get_sites' ?\)/, 'mu-plugin must skip requests where the multisite API is not loaded yet');
+
+  // 1b'. The sandbox-compat mu-plugin is mounted on every boot
+  // (extrachill-network#302): http URL resolution, Playground redirect-host
+  // re-merge, SQLite advisory-lock answers.
+  const compatMount = withoutTheme.inputs.mounts.find((mount) => mount.metadata?.kind === 'extrachill-network-sandbox-compat');
+  assert.ok(compatMount, 'the sandbox-compat mu-plugin must be mounted on every boot');
+  assert.equal(compatMount.target, `/wordpress/wp-content/mu-plugins/${SANDBOX_COMPAT_MU_PLUGIN_FILENAME}`);
+  const compatSource = await readFile(compatMount.source, 'utf8');
+  assert.match(compatSource, /'ec_site_url_override'/);
+  assert.match(compatSource, /'allowed_redirect_hosts'[\s\S]*ec_get_allowed_redirect_hosts\(\)[\s\S]*99/);
+  assert.match(compatSource, /GET_LOCK\|RELEASE_LOCK\|IS_FREE_LOCK/);
 
   // 1c. domainIdsMuPluginSource refuses a topology that dropped a mapped domain.
   assert.throws(

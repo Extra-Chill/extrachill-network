@@ -57,6 +57,17 @@ multisite topology, release-zip mounting, and the theme-remote-sourcing gap).
   identity silently lands on whichever site draws blog 7 (docs, on this
   topology). This is rig infrastructure, not a product workaround; the
   upstream fix is for `ec_get_blog_id()` to resolve by domain itself.
+- **Sandbox compatibility** (generated mu-plugin, extrachill-network#302):
+  `ec-network-sandbox-compat.php` covers three gaps every browser journey
+  hits. (1) The sandbox serves http, but `ec_get_site_url()` builds
+  production `https://` URLs, so the file answers `ec_site_url_override`
+  with each site's real home URL and downgrades network-host redirects to
+  http. (2) WordPress Playground's platform mu-plugin *replaces*
+  `allowed_redirect_hosts` with three wordpress.org hosts, so the file
+  re-merges the network's hosts at priority 99. (3) SQLite has no MySQL
+  advisory locks, so the file answers `GET_LOCK`/`RELEASE_LOCK`/`IS_FREE_LOCK`
+  with `1`, because requests are serialized. These are infrastructure
+  substitutes, not product behaviour.
 - **Journeys** (optional): full user journeys -- seeded personas, real
   browser interactions, persona-oracle grading -- that run after the baseline
   when selected via `extrachill_journeys`. See "The journey contract" below.
