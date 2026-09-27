@@ -69,3 +69,36 @@ add_action(
 	},
 	0
 );
+
+/*
+ * Core's WP_Ability::invoke_callback() turns a thrown exception into a
+ * generic WP_Error and drops the file, line, and trace. Wrap the submission
+ * ability's callback so the grade can report where a failure came from.
+ */
+add_filter(
+	'wp_register_ability_args',
+	static function ( $args, $name ) {
+		if ( 'extrachill/submit-event' !== $name || ! is_callable( $args['execute_callback'] ?? null ) ) {
+			return $args;
+		}
+		$inner                    = $args['execute_callback'];
+		$args['execute_callback'] = static function ( $input ) use ( $inner ) {
+			try {
+				return $inner( $input );
+			} catch ( \Throwable $e ) {
+				$log   = get_site_option( 'ec_submission_journey_exceptions', array() );
+				$log[] = array(
+					'class'   => get_class( $e ),
+					'message' => $e->getMessage(),
+					'at'      => $e->getFile() . ':' . $e->getLine(),
+					'trace'   => substr( $e->getTraceAsString(), 0, 4000 ),
+				);
+				update_site_option( 'ec_submission_journey_exceptions', array_slice( $log, -5 ) );
+				throw $e;
+			}
+		};
+		return $args;
+	},
+	10,
+	2
+);

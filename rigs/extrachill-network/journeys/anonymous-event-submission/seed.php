@@ -32,6 +32,7 @@ update_site_option( 'ec_turnstile_secret_key', '1x000000000000000000000000000000
 // Clear evidence from any earlier run in the same boot.
 delete_site_option( 'ec_submission_journey_rest' );
 delete_site_option( 'ec_submission_journey_observations' );
+delete_site_option( 'ec_submission_journey_exceptions' );
 
 switch_to_blog( $events_blog_id );
 

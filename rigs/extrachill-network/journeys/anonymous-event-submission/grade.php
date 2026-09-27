@@ -190,6 +190,7 @@ $summary = array(
 	'findings'     => count( array_filter( $results, static fn( $r ) => 'finding' === $r['outcome'] ) ),
 	'skipped'      => count( array_filter( $results, static fn( $r ) => 'skip' === $r['outcome'] ) ),
 	'rest_log'     => $rest_log,
+	'exceptions'   => get_site_option( 'ec_submission_journey_exceptions', array() ),
 	'observations' => $observations,
 );
 
