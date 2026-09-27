@@ -166,6 +166,33 @@ add_filter(
 );
 
 /*
+ * 1b. Same downgrade for URLs the product emits directly rather than via a
+ *     redirect: escaped links in HTML (clean_url) and URLs inside REST
+ *     responses (e.g. the Link Page owner pencil's manage_url). Production
+ *     is https end to end.
+ */
+function ec_rig_downgrade_network_urls( $value ) {
+	if ( is_string( $value ) ) {
+		return preg_replace( '#https://((?:[a-z0-9-]+\\.)?extrachill\\.(?:com|link))(?=[/?\\#"]|$)#i', 'http://$1', $value );
+	}
+	if ( is_array( $value ) ) {
+		return array_map( 'ec_rig_downgrade_network_urls', $value );
+	}
+	return $value;
+}
+add_filter( 'clean_url', 'ec_rig_downgrade_network_urls', PHP_INT_MAX );
+add_filter(
+	'rest_post_dispatch',
+	static function ( $response ) {
+		if ( $response instanceof WP_REST_Response ) {
+			$response->set_data( ec_rig_downgrade_network_urls( $response->get_data() ) );
+		}
+		return $response;
+	},
+	PHP_INT_MAX
+);
+
+/*
  * 2. WordPress Playground's platform mu-plugin REPLACES allowed_redirect_hosts
  *    with three wordpress.org hosts, so every cross-site wp_safe_redirect
  *    between mapped domains falls back to wp-admin. The real fix is in WP
