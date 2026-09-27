@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.27.2] - 2026-09-27
+
+### Changed
+- anonymous event submission journey (extrachill-events#910)
+
 ## [2.27.1] - 2026-09-27
 
 ### Fixed
