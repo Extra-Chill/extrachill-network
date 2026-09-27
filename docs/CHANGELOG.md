@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.27.0] - 2026-09-27
+
+### Added
+- returning-artist journey — reach and edit an existing Link Page from anywhere
+
 ## [2.26.1] - 2026-09-27
 
 ### Fixed
