@@ -71,12 +71,12 @@ try {
   assert.equal(compatMount.target, `/wordpress/wp-content/mu-plugins/${SANDBOX_COMPAT_MU_PLUGIN_FILENAME}`);
   const compatSource = await readFile(compatMount.source, 'utf8');
   assert.match(compatSource, /'ec_site_url_override'/);
+  // Redirect hosts and the production egress fence are WP Codebox's job since v0.28.2 (#2533, #2534).
+  assert.doesNotMatch(compatSource, /'allowed_redirect_hosts'|'pre_http_request'/);
   assert.match(compatSource, /'clean_url', 'ec_rig_downgrade_network_urls'/);
-  assert.match(compatSource, /'allowed_redirect_hosts'[\s\S]*ec_get_allowed_redirect_hosts\(\)[\s\S]*99/);
   assert.match(compatSource, /GET_LOCK\|RELEASE_LOCK\|IS_FREE_LOCK/);
   assert.match(compatSource, /'extrachill_api_rate_limit_store'/);
   assert.match(compatSource, /'extrachill_users_registration_admitter'/);
-  assert.match(compatSource, /'pre_http_request'[\s\S]*ec_rig_network_egress_blocked/, 'server-side HTTP to network domains must never reach production');
 
   // 1c. domainIdsMuPluginSource refuses a topology that dropped a mapped domain.
   assert.throws(

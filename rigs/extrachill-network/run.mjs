@@ -193,21 +193,6 @@ add_filter(
 );
 
 /*
- * 2. WordPress Playground's platform mu-plugin REPLACES allowed_redirect_hosts
- *    with three wordpress.org hosts, so every cross-site wp_safe_redirect
- *    between mapped domains falls back to wp-admin. The real fix is in WP
- *    Codebox's mapped-domain bootstrap (Automattic/wp-codebox#2533); delete
- *    this block once the rig's pinned WP Codebox includes it.
- */
-add_filter(
-\t'allowed_redirect_hosts',
-\tstatic function ( $hosts ) {
-\t\treturn function_exists( 'ec_get_allowed_redirect_hosts' ) ? array_values( array_unique( array_merge( (array) $hosts, ec_get_allowed_redirect_hosts() ) ) ) : $hosts;
-\t},
-\t99
-);
-
-/*
  * 3. No persistent object cache. Redis is an excluded component on this rig,
  *    and the network's two atomic abuse limiters fail closed without one:
  *    Extra Chill Users registration (registration_limiter_unavailable, 503;
@@ -253,26 +238,6 @@ add_filter(
 				: true;
 		};
 	}
-);
-
-/*
- * 5. Egress fence. Network domains are the REAL production hostnames, and
- *    Playground resolves PHP HTTP requests on the real internet: a
- *    server-side wp_remote_*() to one (a grade script, a cross-site REST
- *    loopback) reached live extrachill.com. Fail closed. Temporary until the
- *    pinned WP Codebox includes Automattic/wp-codebox#2534.
- */
-add_filter(
-	'pre_http_request',
-	static function ( $preempt, $args, $url ) {
-		$host = strtolower( (string) wp_parse_url( (string) $url, PHP_URL_HOST ) );
-		if ( false === $preempt && preg_match( '/(^|\\.)extrachill\\.(com|link)$/', $host ) ) {
-			return new WP_Error( 'ec_rig_network_egress_blocked', 'The rig blocked a server-side request to ' . $host . ': it would reach production.' );
-		}
-		return $preempt;
-	},
-	PHP_INT_MAX,
-	3
 );
 
 /*
@@ -676,7 +641,7 @@ export async function buildRecipe(settings = {}, cwd = process.cwd()) {
           source: sandboxCompatPath,
           target: `/wordpress/wp-content/mu-plugins/${SANDBOX_COMPAT_MU_PLUGIN_FILENAME}`,
           mode: 'readonly',
-          metadata: { kind: 'extrachill-network-sandbox-compat', generated: true, note: 'http/https URL resolution, Playground allowed_redirect_hosts re-merge, SQLite advisory-lock answers; see run.mjs sandboxCompatMuPluginSource.' },
+          metadata: { kind: 'extrachill-network-sandbox-compat', generated: true, note: 'http/https URL resolution, Redis-less rate-limiter stores, SQLite advisory-lock answers; see run.mjs sandboxCompatMuPluginSource.' },
         },
         ...(theme.mounts ? theme.mounts : []),
         ...journeyFixtureMuPluginMounts,

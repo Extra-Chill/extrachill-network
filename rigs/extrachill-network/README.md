@@ -60,25 +60,21 @@ multisite topology, release-zip mounting, and the theme-remote-sourcing gap).
   topology). This is rig infrastructure, not a product workaround; the
   upstream fix is for `ec_get_blog_id()` to resolve by domain itself.
 - **Sandbox compatibility** (generated mu-plugin, extrachill-network#302):
-  `ec-network-sandbox-compat.php` covers three gaps every browser journey
-  hits. (1) The sandbox serves http, but `ec_get_site_url()` builds
-  production `https://` URLs, so the file answers `ec_site_url_override`
-  with each site's real home URL and downgrades network-host redirects to
-  http. (2) WordPress Playground's platform mu-plugin *replaces*
-  `allowed_redirect_hosts` with three wordpress.org hosts, so the file
-  re-merges the network's hosts at priority 99. This is temporary until the
-  pinned WP Codebox includes Automattic/wp-codebox#2533. (3) SQLite has no MySQL
-  advisory locks, so the file answers `GET_LOCK`/`RELEASE_LOCK`/`IS_FREE_LOCK`
-  with `1`, because requests are serialized. (4) Redis is excluded, so the network's atomic
-  abuse limiters (Extra Chill Users registration, extrachill-api public writes)
-  fail closed with a 503. The file answers their store seams
+  `ec-network-sandbox-compat.php` covers the gaps every browser journey hits.
+  (1) The sandbox serves http, but the network builds production `https://`
+  URLs, so the file answers `ec_site_url_override` with each site's real home
+  URL and downgrades network URLs in redirects, escaped links and REST
+  responses to http. (2) SQLite has no MySQL advisory locks, so it answers
+  `GET_LOCK`/`RELEASE_LOCK`/`IS_FREE_LOCK` with `1` (requests are serialized).
+  (3) Redis is excluded, so the network's atomic abuse limiters (Extra Chill
+  Users registration, extrachill-api public writes) would fail closed with a
+  503; the file answers their store seams
   (`extrachill_users_registration_admitter`, `extrachill_api_rate_limit_store`)
-  with a site-option counter (#299). These are infrastructure
-  substitutes, not product behaviour. (5) **Egress fence:** network domains are the real
-  production hostnames, and Playground resolves PHP HTTP on the real internet,
-  so server-side `wp_remote_*()` to them is blocked
-  (`ec_rig_network_egress_blocked`) until the pinned WP Codebox includes
-  Automattic/wp-codebox#2534.
+  with a site-option counter (#299). These are infrastructure substitutes, not
+  product behaviour. Redirects between the mapped domains and the fence that
+  stops server-side HTTP from reaching the real production hostnames come
+  from WP Codebox itself (v0.28.2+: Automattic/wp-codebox#2533, #2534), which
+  the journeys workflow pins and the deploy gate requires.
 - **Journeys** (optional): full user journeys -- seeded personas, real
   browser interactions, persona-oracle grading -- that run after the baseline
   when selected via `extrachill_journeys`. See "The journey contract" below.
@@ -278,7 +274,7 @@ WooCommerce to already be active).
 (merged into wp-codebox `main` 2026-09-21 as v0.27.0, itself born from
 [homeboy-extensions#2857](https://github.com/Extra-Chill/homeboy-extensions/issues/2857)
 filed during this rig's own spike). The wp-codebox CLI installed on this host
-is v0.27.1, so both sourcing modes below are available. One caveat drove the
+is v0.28.2, so both sourcing modes below are available. One caveat drove the
 rig's default: wp-codebox's own `extra_themes` activation is not
 multisite-aware (it does not `switch_theme()` on every created site), while
 the local-mount path carries a rig-owned activation step that switches the

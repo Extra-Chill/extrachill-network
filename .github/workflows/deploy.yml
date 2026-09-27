@@ -346,8 +346,10 @@ jobs:
       # it inherited the action's WP_CODEBOX_SOURCE_SHA, and wp-codebox's
       # build provenance check refused to build a different commit under
       # that SHA ("does not match source checkout HEAD"). The action's copy
-      # (v0.27.1 at the time of writing) already includes the remote
-      # theme-zip support the rig needs (Automattic/wp-codebox#2519, v0.27.0).
+      # must be v0.28.2+: remote theme zips (#2519), redirects between mapped
+      # domains (#2533), and the fence that keeps server-side HTTP to the
+      # mapped production hostnames inside the sandbox (#2534). Without the
+      # fence the gate's own requests reach live extrachill.com.
       # Fail closed if it is missing or too old.
       - name: Verify WP Codebox from homeboy-action
         if: steps.release_set.outputs.component_count != '0' && steps.plan.outputs.gate_bypassed != 'true'
@@ -360,8 +362,8 @@ jobs:
           fi
           version="$(node "${HOMEBOY_WP_CODEBOX_BIN}" --version | tr -d '[:space:]')"
           echo "WP Codebox ${version} at ${HOMEBOY_WP_CODEBOX_BIN}"
-          if [ "$(printf '%s\n%s\n' 0.27.0 "${version}" | sort -V | head -1)" != "0.27.0" ]; then
-            echo "::error::WP Codebox ${version} is older than 0.27.0, which the rig needs for remote theme zips. Refusing to deploy ungated."
+          if [ "$(printf '%s\n%s\n' 0.28.2 "${version}" | sort -V | head -1)" != "0.28.2" ]; then
+            echo "::error::WP Codebox ${version} is older than 0.28.2, which the rig needs (theme zips, mapped-domain redirects, production egress fence). Refusing to deploy ungated."
             exit 1
           fi
 
