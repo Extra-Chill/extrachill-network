@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.26.0] - 2026-09-27
+
+### Added
+- route /join by Link Page kind — artist, venue, or promoter
+
 ## [2.25.0] - 2026-09-27
 
 ### Added
