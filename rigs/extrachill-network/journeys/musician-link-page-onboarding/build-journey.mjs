@@ -105,7 +105,10 @@ const steps = [
       shot('08-onboarding-form'),
       ev("Array.from(document.querySelectorAll('#onboarding-form label')).map(l=>l.innerText.trim())"),
       { kind: 'fill', selector: '#onboarding-username', value: 'porchlightslive' },
-      { kind: 'click', selector: '#user_is_artist' },
+      // /join asks "What's your Link Page for?" with "My music" pre-selected
+      // (extrachill-users#440); a musician changes nothing.
+      { kind: 'expect', selector: "input[name='join_intent'][value='artist']", state: 'checked' },
+      ev("Array.from(document.querySelectorAll(\"input[name='join_intent']\")).map(i=>i.value+':'+i.closest('label').innerText.trim())"),
       { kind: 'click', selector: '#onboarding-submit' },
       { kind: 'waitFor', selector: '#ec-artist-name', timeout: '60s' },
       here,
@@ -120,6 +123,38 @@ const steps = [
       noErrors,
     ],
   }),
+  // A venue owner and a promoter use the same /join door and must not be
+  // pushed into creating an artist profile.
+  ...[
+    ['venue', 'porch-venue-live@example.test', 'porchvenuelive', 'venue-link-page', 'Venue Link Page'],
+    ['promoter', 'porch-promoter-live@example.test', 'porchpromoterlive', 'promoter-link-page', 'Promoter or Collective Link Page'],
+  ].map(([intent, email, username, subject, subjectLabel]) =>
+    step(`join-link-${intent}-signup`, {
+      url: 'http://extrachill.link/join',
+      hosts: ALL,
+      timeout: '300s',
+      steps: [
+        nav('http://extrachill.link/join'),
+        { kind: 'waitFor', selector: '#extrachill_email', timeout: '60s' },
+        { kind: 'fill', selector: '#extrachill_email', value: email },
+        { kind: 'fill', selector: '#extrachill_password', value: `${username}-pass-248` },
+        { kind: 'fill', selector: '#extrachill_password_confirm', value: `${username}-pass-248` },
+        { kind: 'click', selector: "input[name='extrachill_register']" },
+        { kind: 'waitFor', selector: '#onboarding-username', timeout: '60s' },
+        { kind: 'fill', selector: '#onboarding-username', value: username },
+        { kind: 'click', selector: `input[name='join_intent'][value='${intent}']` },
+        shot(`35-${intent}-intent-chosen`),
+        { kind: 'click', selector: '#onboarding-submit' },
+        { kind: 'waitFor', selector: '#ec-contact-subject', timeout: '60s' },
+        here,
+        { kind: 'expect', selector: '#ec-contact-subject', state: 'visible' },
+        ev(`document.querySelector('#ec-contact-subject').value`),
+        ev("(document.querySelector('.wp-block-extrachill-contact-form .notice, .notice-info')||{innerText:''}).innerText.trim()"),
+        shot(`36-${intent}-lands-on-request-form`),
+        noErrors,
+      ],
+    }),
+  ),
   step('join-link-mobile', {
     url: 'http://extrachill.link/join',
     hosts: ALL,
@@ -240,8 +275,10 @@ const steps = [
       wait(500),
       shot('25-advanced-tab'),
       ev("Array.from(document.querySelectorAll('.ec-lpe-field > label')).map(l=>l.textContent.trim())"),
-      { kind: 'select', selector: field('Subscription Display', 'select'), value: 'inline_form' },
-      { kind: 'fill', selector: field('Subscribe Form Description', 'textarea'), value: 'Get show dates and new songs from The Porch Lights first. No spam, ever.' },
+      { kind: 'click', selector: ".ec-lpe-tabs [role=tab]:has-text('Newsletter')" },
+      wait(500),
+      { kind: 'select', selector: field('How fans sign up', 'select'), value: 'inline_form' },
+      { kind: 'fill', selector: field('Message to fans', 'textarea'), value: 'Get show dates and new songs from The Porch Lights first. No spam, ever.' },
       wait(800),
       shot('26-advanced-newsletter-set'),
       ev("!!document.querySelector('.ec-editor__preview-region .extrch-link-page-subscribe-inline-form-container')"),

@@ -83,6 +83,26 @@ if ( $live_user ) {
 }
 
 // ---------------------------------------------------------------------------
+// Venue and promoter doors: /join must not push them into an artist profile.
+// ---------------------------------------------------------------------------
+foreach ( array( 'venue' => 'porch-venue-live@example.test', 'promoter' => 'porch-promoter-live@example.test' ) as $intent_id => $email ) {
+	$member = get_user_by( 'email', $email );
+	$ids    = $member ? get_user_meta( $member->ID, '_artist_profile_ids', true ) : array();
+	musician_journey_record(
+		$results,
+		'join-' . $intent_id . '-not-routed-to-artist',
+		'A ' . $intent_id . ' joining via /join is recorded as such and is not made to create an artist profile.',
+		! $member ? 'finding' : ( ( $intent_id === get_user_meta( $member->ID, 'onboarding_join_intent', true ) && empty( $ids ) && '1' === get_user_meta( $member->ID, 'user_is_professional', true ) ) ? 'pass' : 'finding' ),
+		array(
+			'user_id'            => $member ? (int) $member->ID : 0,
+			'join_intent'        => $member ? get_user_meta( $member->ID, 'onboarding_join_intent', true ) : null,
+			'user_is_artist'     => $member ? get_user_meta( $member->ID, 'user_is_artist', true ) : null,
+			'artist_profile_ids' => $ids,
+		)
+	);
+}
+
+// ---------------------------------------------------------------------------
 // Fixture musician: artist profile + Link Page + edits.
 // ---------------------------------------------------------------------------
 $artist_ids = get_user_meta( $musician_id, '_artist_profile_ids', true );

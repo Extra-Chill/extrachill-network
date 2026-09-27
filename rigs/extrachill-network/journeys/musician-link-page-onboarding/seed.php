@@ -141,6 +141,7 @@ switch_to_blog( $main_blog_id );
 update_option( 'permalink_structure', '/%postname%/' );
 $evidence['pages']['extrachill.com/power'] = musician_journey_ensure_page( 'power', 'The Power of Extra Chill', '<!-- extrachill-power-manifesto -->' );
 $evidence['pages']['extrachill.com/login'] = musician_journey_ensure_page( 'login', 'Login', '<!-- wp:extrachill/login-register /-->' );
+$evidence['pages']['extrachill.com/contact-us'] = musician_journey_ensure_page( 'contact-us', 'Contact Us', '<!-- wp:extrachill/contact-form /-->' );
 flush_rewrite_rules();
 restore_current_blog();
 
