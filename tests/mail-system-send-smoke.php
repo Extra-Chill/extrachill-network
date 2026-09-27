@@ -189,6 +189,19 @@ mail_assert(
 	'an envelope refusal with code email_mailbox_forbidden also triggers the queued fallback'
 );
 
+// --- (b2b) A refused queued retry is returned untouched, never indexed. -----
+
+mail_reset();
+$GLOBALS['mail_direct_result'] = new WP_Error( 'email_auth_ref_required', 'An authorized mailbox ref is required to send email.' );
+$GLOBALS['mail_queued_result'] = new WP_Error( 'email_mailbox_forbidden', 'Mailbox forbidden.' );
+
+$result = ec_send_email( array( 'to' => 'fan@example.com', 'subject' => 'Hi' ) );
+
+mail_assert(
+	is_wp_error( $result ) && 'email_mailbox_forbidden' === $result->get_error_code(),
+	'a WP_Error from the queued retry is returned as-is instead of fataling (#316)'
+);
+
 // --- (b3) Other failure codes do not trigger the fallback. -------------------
 
 mail_reset();

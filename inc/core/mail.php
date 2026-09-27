@@ -311,7 +311,12 @@ function ec_send_email( array $args ) {
 		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- deliberate server-side diagnostics so a refused send is never silent.
 		error_log( sprintf( 'ExtraChill mail: ec_send_email() direct send refused for a principal-less call (code: %s) — retrying through ec_send_email_queued() (interim fallback for data-machine#3534, see Extra-Chill/extrachill-network#235).', $fallback_code ) );
 		unset( $args['system'] );
-		$queued             = ec_send_email_queued( $args );
+		$queued = ec_send_email_queued( $args );
+		// The queued ability can also refuse (it returns a WP_Error). Hand
+		// that back untouched; indexing into it fatals the caller.
+		if ( ! is_array( $queued ) ) {
+			return $queued;
+		}
 		$queued['delivery'] = 'queued_fallback';
 		return $queued;
 	}
