@@ -128,7 +128,7 @@ export async function writeDomainIdsMuPlugin(directory, topology) {
 export const SANDBOX_COMPAT_MU_PLUGIN_FILENAME = 'ec-network-sandbox-compat.php';
 
 /**
- * Sandbox compatibility mu-plugin (extrachill-network#302): the three
+ * Sandbox compatibility mu-plugin (extrachill-network#302, #299): the
  * disposable-runtime gaps every browser journey hits. Each substitutes a
  * missing piece of infrastructure, never product behaviour, and exists only
  * inside the disposable boot.
@@ -181,7 +181,55 @@ add_filter(
 );
 
 /*
- * 3. SQLite has no MySQL advisory locks, so every GET_LOCK()-serialized write
+ * 3. No persistent object cache. Redis is an excluded component on this rig,
+ *    and the network's two atomic abuse limiters fail closed without one:
+ *    Extra Chill Users registration (registration_limiter_unavailable, 503;
+ *    every browser sign-up) and extrachill-api public writes (register,
+ *    login, refresh). Both expose a store seam; answer them with a
+ *    site-option counter. Requests are serialized, so this is not a claim
+ *    of atomicity under real concurrency (extrachill-network#299).
+ */
+function ec_rig_sandbox_counter( $key, $ttl ) {
+	$state = get_site_option( 'ec_rig_sandbox_counters', array() );
+	$now   = time();
+	$entry = $state[ $key ] ?? array( 'count' => 0, 'expires' => $now + max( 1, (int) $ttl ) );
+	if ( $entry['expires'] <= $now ) {
+		$entry = array( 'count' => 0, 'expires' => $now + max( 1, (int) $ttl ) );
+	}
+	++$entry['count'];
+	$state[ $key ] = $entry;
+	update_site_option( 'ec_rig_sandbox_counters', $state );
+	return (int) $entry['count'];
+}
+add_filter(
+	'extrachill_api_rate_limit_store',
+	static function () {
+		return 'ec_rig_sandbox_counter';
+	}
+);
+add_filter(
+	'extrachill_users_registration_admitter',
+	static function ( $admitter ) {
+		if ( ! function_exists( 'extrachill_users_registration_attempt_key' ) || ! defined( 'EXTRACHILL_USERS_REGISTRATION_RATE_WINDOW' ) || ! defined( 'EXTRACHILL_USERS_REGISTRATION_RATE_LIMIT' ) ) {
+			return $admitter;
+		}
+		return static function () {
+			$key = extrachill_users_registration_attempt_key();
+			if ( '' === $key ) {
+				return new WP_Error( 'registration_limiter_unavailable', 'Registration is temporarily unavailable.', array( 'status' => 503 ) );
+			}
+			$window     = EXTRACHILL_USERS_REGISTRATION_RATE_WINDOW;
+			$expires_at = ( intdiv( time(), $window ) + 1 ) * $window;
+			$count      = ec_rig_sandbox_counter( 'registration_' . $key, 2 * $window );
+			return $count > EXTRACHILL_USERS_REGISTRATION_RATE_LIMIT && function_exists( 'extrachill_users_registration_rate_limit_error' )
+				? extrachill_users_registration_rate_limit_error( $expires_at )
+				: true;
+		};
+	}
+);
+
+/*
+ * 4. SQLite has no MySQL advisory locks, so every GET_LOCK()-serialized write
  *    (Link Page creation and saves, artist membership) fails closed. Requests
  *    are serialized through one PHP runtime here, so answer as MySQL would.
  *    Not a claim of concurrency safety.
