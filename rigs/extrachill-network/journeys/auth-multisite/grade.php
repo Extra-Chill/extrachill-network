@@ -162,14 +162,20 @@ ec_rig_auth_multisite_case(
  * this run-php process, exactly as production's REST API resolves them.
  * ---------------------------------------------------------------------------
  */
-$initial_count = (int) $fixture['initial_user_count'];
+// Count at grade time, not seed time: the browser steps between seed and
+// grade now really register a user (the rig's rate-limiter substitute,
+// extrachill-network#304), which made a seed-time baseline stale.
+$initial_count = ec_rig_auth_multisite_network_user_count();
 foreach ( $plan['invalid_registrations'] as $case ) {
 	$response = ec_rig_auth_multisite_rest( '/extrachill/v1/auth/register', ec_rig_auth_multisite_registration( $case ) );
 	ec_rig_auth_multisite_case(
 		'invalid-registration-rejected-' . $case['id'],
 		$response->get_status() >= 400 && ec_rig_auth_multisite_network_user_count() === $initial_count,
 		'An invalid registration attempt (' . $case['id'] . ') is rejected and never mutates the network user count.',
-		array( 'status' => $response->get_status() )
+		array(
+			'status' => $response->get_status(),
+			'code'   => ( (array) $response->get_data() )['code'] ?? null,
+		)
 	);
 }
 
@@ -183,6 +189,8 @@ ec_rig_auth_multisite_case(
 	array(
 		'status'  => $created->get_status(),
 		'user_id' => $created_id,
+		'code'    => $created_data['code'] ?? null,
+		'message' => isset( $created_data['message'] ) ? substr( (string) $created_data['message'], 0, 200 ) : null,
 	)
 );
 ec_rig_auth_multisite_case(
@@ -205,7 +213,10 @@ ec_rig_auth_multisite_case(
 	'existing-persona-authenticates-directly',
 	$direct_auth instanceof WP_User,
 	'The pre-seeded existing persona\'s stored credentials authenticate.',
-	array( 'ok' => $direct_auth instanceof WP_User )
+	array(
+		'ok'   => $direct_auth instanceof WP_User,
+		'code' => is_wp_error( $direct_auth ) ? $direct_auth->get_error_code() : null,
+	)
 );
 foreach ( array( $existing->user_login, $existing->user_email ) as $identifier ) {
 	$login = ec_rig_auth_multisite_rest( '/extrachill/v1/auth/login', array(
@@ -218,7 +229,10 @@ foreach ( array( $existing->user_login, $existing->user_email ) as $identifier )
 		'login-succeeds-with-' . ( is_email( $identifier ) ? 'email' : 'username' ),
 		200 === $login->get_status() && (int) ( $login->get_data()['user']['id'] ?? 0 ) === (int) $existing->ID,
 		'Logging in with a ' . ( is_email( $identifier ) ? 'email address' : 'username' ) . ' resolves the right network identity.',
-		array( 'status' => $login->get_status() )
+		array(
+			'status' => $login->get_status(),
+			'code'   => ( (array) $login->get_data() )['code'] ?? null,
+		)
 	);
 }
 $unknown_login = ec_rig_auth_multisite_rest( '/extrachill/v1/auth/login', array(
