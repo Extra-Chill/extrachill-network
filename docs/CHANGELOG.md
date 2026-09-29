@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.27.3] - 2026-09-29
+
+### Fixed
+- send all platform mail as the system via PermissionHelper::run_as_system
+
 ## [2.27.2] - 2026-09-27
 
 ### Changed
