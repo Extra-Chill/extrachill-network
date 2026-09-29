@@ -1,21 +1,25 @@
 <?php
 /**
- * Standalone tests for the principal-less system-send declaration and the
- * interim queued fallback in ec_send_email() (#235 / data-machine#3534).
+ * Standalone tests for the platform mail wrappers: every send runs inside
+ * PermissionHelper::run_as_system() (data-machine#3572) and WP_Error results
+ * are normalized into the documented array envelope.
  */
 
 namespace DataMachine\Abilities {
 
 	class PermissionHelper {
-		public static int $acting_user_id = 0;
-		public static bool $agent_context = false;
+		public static bool $system = false;
+		public static int $entered = 0;
 
-		public static function acting_user_id(): int {
-			return self::$acting_user_id;
-		}
-
-		public static function in_agent_context(): bool {
-			return self::$agent_context;
+		public static function run_as_system( callable $callback ) {
+			++self::$entered;
+			$previous     = self::$system;
+			self::$system = true;
+			try {
+				return $callback();
+			} finally {
+				self::$system = $previous;
+			}
 		}
 	}
 }
@@ -93,6 +97,7 @@ function get_option( $name ) {
 class FakeSendEmailAbility {
 	public function execute( array $args ) {
 		$GLOBALS['mail_direct_args'] = $args;
+		$GLOBALS['mail_seen_system'] = DataMachine\Abilities\PermissionHelper::$system;
 		return $GLOBALS['mail_direct_result'];
 	}
 }
@@ -100,6 +105,7 @@ class FakeSendEmailAbility {
 class FakeSendEmailQueuedAbility {
 	public function execute( array $args ) {
 		$GLOBALS['mail_queued_args'] = $args;
+		$GLOBALS['mail_seen_system'] = DataMachine\Abilities\PermissionHelper::$system;
 		return $GLOBALS['mail_queued_result'];
 	}
 }
@@ -129,138 +135,48 @@ function mail_reset() {
 	$GLOBALS['mail_direct_args']    = null;
 	$GLOBALS['mail_queued_result']  = null;
 	$GLOBALS['mail_queued_args']    = null;
-	DataMachine\Abilities\PermissionHelper::$acting_user_id = 0;
-	DataMachine\Abilities\PermissionHelper::$agent_context  = false;
+	$GLOBALS['mail_seen_system']    = null;
+	DataMachine\Abilities\PermissionHelper::$system  = false;
+	DataMachine\Abilities\PermissionHelper::$entered = 0;
 }
 
-// --- (a) Principal-less call declares a system send. ------------------------
+// --- Direct send runs as the system. ------------------------------------------
 
 mail_reset();
 $GLOBALS['mail_direct_result'] = array( 'success' => true, 'message' => 'sent' );
-
 $result = ec_send_email( array( 'to' => 'fan@example.com', 'subject' => 'Hi' ) );
 
-mail_assert(
-	isset( $GLOBALS['mail_direct_args']['system'] ) && true === $GLOBALS['mail_direct_args']['system'],
-	'a principal-less call sets system => true on the direct ability input'
-);
-mail_assert(
-	true === $result['success'] && null === $GLOBALS['mail_queued_args'],
-	'a successful principal-less direct send is returned untouched with no queued fallback'
-);
+mail_assert( 1 === DataMachine\Abilities\PermissionHelper::$entered, 'ec_send_email() enters run_as_system once' );
+mail_assert( true === $GLOBALS['mail_seen_system'], 'the direct ability executes inside the system context' );
+mail_assert( false === DataMachine\Abilities\PermissionHelper::$system, 'the system context is left after the send' );
+mail_assert( true === $result['success'], 'a successful direct send is returned untouched' );
+mail_assert( ! array_key_exists( 'system', $GLOBALS['mail_direct_args'] ), 'no system input flag is sent to the ability' );
+mail_assert( null === $GLOBALS['mail_queued_args'], 'a direct send never falls back to the queue' );
 
-// --- (b) email_auth_ref_required triggers the queued fallback. ---------------
+// --- Queued send runs as the system. ------------------------------------------
+
+mail_reset();
+$GLOBALS['mail_queued_result'] = array( 'success' => true, 'action_id' => 7 );
+$result = ec_send_email_queued( array( 'to' => 'fan@example.com', 'subject' => 'Hi' ) );
+
+mail_assert( 1 === DataMachine\Abilities\PermissionHelper::$entered && true === $GLOBALS['mail_seen_system'], 'ec_send_email_queued() executes inside the system context' );
+mail_assert( 7 === $result['action_id'], 'a successful queued send is returned untouched' );
+mail_assert( 1 === (int) $GLOBALS['mail_queued_args']['mail_site_id'] && 'extrachill/branded' === $GLOBALS['mail_queued_args']['template'], 'queued sends keep the resolved mail defaults' );
+
+// --- WP_Error results are normalized, never returned raw. ---------------------
 
 mail_reset();
 $GLOBALS['mail_direct_result'] = new WP_Error( 'email_auth_ref_required', 'An authorized mailbox ref is required to send email.' );
-$GLOBALS['mail_queued_result'] = array( 'success' => true, 'action_id' => 7, 'scheduled_for' => 1234567890 );
-
 $result = ec_send_email( array( 'to' => 'fan@example.com', 'subject' => 'Hi' ) );
 
-mail_assert(
-	is_array( $result ) && true === $result['success'] && 'queued_fallback' === ( $result['delivery'] ?? '' ),
-	'an email_auth_ref_required refusal falls back to the queued path and returns delivery => queued_fallback'
-);
-mail_assert(
-	is_array( $GLOBALS['mail_queued_args'] ) && ! array_key_exists( 'system', $GLOBALS['mail_queued_args'] ),
-	'the queued retry receives the same args minus the system flag'
-);
-mail_assert(
-	(int) $GLOBALS['mail_queued_args']['mail_site_id'] === 1 && 'extrachill/branded' === $GLOBALS['mail_queued_args']['template'],
-	'the queued retry keeps the resolved mail defaults'
-);
-
-$log_contents = (string) file_get_contents( $GLOBALS['mail_log_file'] );
-mail_assert(
-	str_contains( $log_contents, 'email_auth_ref_required' ) && str_contains( $log_contents, 'ec_send_email_queued' ),
-	'the fallback logs one line naming the refused code and the queued retry'
-);
-
-// --- (b2) A refused envelope (array, not WP_Error) also falls back. ----------
+mail_assert( is_array( $result ) && false === $result['success'], 'a refused direct send returns an array envelope with success => false' );
+mail_assert( 'email_auth_ref_required' === $result['error_code'] && '' !== $result['error'], 'the envelope carries the error code and message' );
 
 mail_reset();
-$GLOBALS['mail_direct_result'] = array( 'success' => false, 'code' => 'email_mailbox_forbidden', 'error' => 'Mailbox forbidden.' );
-$GLOBALS['mail_queued_result'] = array( 'success' => true, 'action_id' => 8 );
+$GLOBALS['mail_queued_result'] = new WP_Error( 'ability_invalid_permissions', 'Denied.' );
+$result = ec_send_email_queued( array( 'to' => 'fan@example.com', 'subject' => 'Hi' ) );
 
-$result = ec_send_email( array( 'to' => 'fan@example.com', 'subject' => 'Hi' ) );
+mail_assert( is_array( $result ) && false === $result['success'] && 'ability_invalid_permissions' === $result['error_code'], 'a refused queued send is normalized too' );
 
-mail_assert(
-	is_array( $result ) && true === $result['success'] && 'queued_fallback' === ( $result['delivery'] ?? '' ),
-	'an envelope refusal with code email_mailbox_forbidden also triggers the queued fallback'
-);
-
-// --- (b2b) A refused queued retry is returned untouched, never indexed. -----
-
-mail_reset();
-$GLOBALS['mail_direct_result'] = new WP_Error( 'email_auth_ref_required', 'An authorized mailbox ref is required to send email.' );
-$GLOBALS['mail_queued_result'] = new WP_Error( 'email_mailbox_forbidden', 'Mailbox forbidden.' );
-
-$result = ec_send_email( array( 'to' => 'fan@example.com', 'subject' => 'Hi' ) );
-
-mail_assert(
-	is_wp_error( $result ) && 'email_mailbox_forbidden' === $result->get_error_code(),
-	'a WP_Error from the queued retry is returned as-is instead of fataling (#316)'
-);
-
-// --- (b3) Other failure codes do not trigger the fallback. -------------------
-
-mail_reset();
-$GLOBALS['mail_direct_result'] = new WP_Error( 'invalid_email_recipient', 'No valid recipient' );
-
-$result = ec_send_email( array( 'to' => '', 'subject' => 'Hi' ) );
-
-mail_assert(
-	is_wp_error( $result ) && 'invalid_email_recipient' === $result->get_error_code() && null === $GLOBALS['mail_queued_args'],
-	'a refusal with an unrelated code is returned untouched with no queued fallback'
-);
-
-// --- (c) A call with an acting user is passed through unchanged. -------------
-
-mail_reset();
-DataMachine\Abilities\PermissionHelper::$acting_user_id = 5;
-$GLOBALS['mail_direct_result'] = array( 'success' => true, 'message' => 'sent' );
-
-$result = ec_send_email( array( 'to' => 'fan@example.com', 'subject' => 'Hi' ) );
-
-mail_assert(
-	! array_key_exists( 'system', $GLOBALS['mail_direct_args'] ) && null === $GLOBALS['mail_queued_args'],
-	'a call with an acting user passes through with no system flag and no fallback'
-);
-mail_assert(
-	true === $result['success'],
-	'the acting-user result is returned unchanged'
-);
-
-// --- (d) An explicit auth_ref opts out of the system declaration. ------------
-
-mail_reset();
-$GLOBALS['mail_direct_result'] = new WP_Error( 'email_auth_ref_required', 'An authorized mailbox ref is required to send email.' );
-
-$result = ec_send_email( array( 'to' => 'fan@example.com', 'subject' => 'Hi', 'auth_ref' => 'email_imap:default' ) );
-
-mail_assert(
-	! array_key_exists( 'system', $GLOBALS['mail_direct_args'] ) && null === $GLOBALS['mail_queued_args'],
-	'a caller-supplied auth_ref gets no system flag and no queued fallback'
-);
-mail_assert(
-	is_wp_error( $result ) && 'email_auth_ref_required' === $result->get_error_code(),
-	'the auth_ref refusal is returned untouched'
-);
-
-// --- (e) An acting agent context is not treated as principal-less. -----------
-
-mail_reset();
-DataMachine\Abilities\PermissionHelper::$agent_context = true;
-$GLOBALS['mail_direct_result'] = array( 'success' => true, 'message' => 'sent' );
-
-ec_send_email( array( 'to' => 'fan@example.com', 'subject' => 'Hi' ) );
-
-mail_assert(
-	! array_key_exists( 'system', $GLOBALS['mail_direct_args'] ) && null === $GLOBALS['mail_queued_args'],
-	'an agent-context call gets no system flag and no fallback'
-);
-
-unlink( $GLOBALS['mail_log_file'] );
-
-echo "All mail system send tests passed.\n";
+echo "mail-system-send-smoke: ok\n";
 }
