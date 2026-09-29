@@ -236,14 +236,9 @@ function ec_mail_site_id() {
  * when `mail_site_id` is provided — callers must NOT wrap this in their
  * own `switch_to_blog()`.
  *
- * Principal-less calls (no logged-in user, no agent context, no `auth_ref`)
- * are declared as system sends by setting `system => true` on the ability
- * input (the flag introduced by data-machine#3534) — the site itself is the
- * sender for transactional mail like contact notifications and registration
- * notices. Until the released direct ability honours that flag, a refused
- * principal-less send falls back to {@see ec_send_email_queued()}, which
- * already accepts user-0 sends: its envelope is returned with an added
- * `delivery => 'queued_fallback'` key.
+ * Every send runs as the system through extrachill_mail_run_as_system(), so
+ * it works the same whoever owns the request (visitor, customer, contributor,
+ * background worker). WP_Error results are normalized to the array envelope.
  *
  * @see datamachine/send-email
  *
@@ -277,52 +272,7 @@ function ec_send_email( array $args ) {
 		);
 	}
 
-	// A principal-less call (no logged-in user, no agent context, no explicit
-	// mailbox ref) is a platform/transactional send — the site itself is the
-	// sender. Declare it as a system send so the ability's mailbox gate
-	// treats it accordingly (flag introduced by data-machine#3534). WP-CLI is
-	// excluded: it already passes the legacy-sender check through the CLI
-	// permission bypass.
-	$principal_less = false;
-	$permission     = '\DataMachine\Abilities\PermissionHelper';
-	if ( ! defined( 'WP_CLI' ) && empty( $args['auth_ref'] ) && class_exists( $permission ) ) {
-		$principal_less = $permission::acting_user_id() <= 0 && ! $permission::in_agent_context();
-	}
-
-	if ( $principal_less ) {
-		$args['system'] = true;
-	}
-
-	$result = $ability->execute( $args );
-
-	// Interim fallback for data-machine#3534 — remove this entire guarded
-	// block once #3534 is released and the direct ability honours the
-	// `system` flag (Extra-Chill/extrachill-network#235). Until then, a
-	// refused principal-less send is retried through the queued path, which
-	// already accepts user-0 sends, so the mail is never silently dropped.
-	$fallback_code = '';
-	if ( is_wp_error( $result ) ) {
-		$fallback_code = $result->get_error_code();
-	} elseif ( is_array( $result ) && isset( $result['code'] ) && is_string( $result['code'] ) ) {
-		$fallback_code = $result['code'];
-	}
-
-	if ( $principal_less && in_array( $fallback_code, array( 'email_auth_ref_required', 'email_mailbox_forbidden' ), true ) ) {
-		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- deliberate server-side diagnostics so a refused send is never silent.
-		error_log( sprintf( 'ExtraChill mail: ec_send_email() direct send refused for a principal-less call (code: %s) — retrying through ec_send_email_queued() (interim fallback for data-machine#3534, see Extra-Chill/extrachill-network#235).', $fallback_code ) );
-		unset( $args['system'] );
-		$queued = ec_send_email_queued( $args );
-		// The queued ability can also refuse (it returns a WP_Error). Hand
-		// that back untouched; indexing into it fatals the caller.
-		if ( ! is_array( $queued ) ) {
-			return $queued;
-		}
-		$queued['delivery'] = 'queued_fallback';
-		return $queued;
-	}
-	// End interim fallback for data-machine#3534.
-
-	return $result;
+	return extrachill_mail_normalize_result( extrachill_mail_run_as_system( static fn() => $ability->execute( $args ) ) );
 }
 
 /**
@@ -360,7 +310,60 @@ function ec_send_email_queued( array $args ) {
 		);
 	}
 
-	return $ability->execute( $args );
+	return extrachill_mail_normalize_result( extrachill_mail_run_as_system( static fn() => $ability->execute( $args ) ) );
+}
+
+/**
+ * Run a platform mail send as the system.
+ *
+ * Extra Chill product mail (RSVP passes, order notices, editorial alerts,
+ * digests, contact-form and registration mail) is sent by trusted server code
+ * on the platform's behalf, not by whichever user owns the current request.
+ * Data Machine's mail abilities gate the site default sender on the acting
+ * principal: without this, a send during a contributor's or customer's request
+ * is refused, a queued send records that user as issuer and is denied at the
+ * worker, and a no-user send only passes under WP-CLI.
+ *
+ * PermissionHelper::run_as_system() (data-machine#3572) is a PHP-only context,
+ * unreachable from REST or MCP. Callers must NOT wrap ec_send_email() or
+ * ec_send_email_queued() in their own PermissionHelper context.
+ *
+ * @param callable $send Send callback.
+ * @return mixed Ability result.
+ */
+function extrachill_mail_run_as_system( callable $send ) {
+	$helper = '\\DataMachine\\Abilities\\PermissionHelper';
+	if ( class_exists( $helper ) && method_exists( $helper, 'run_as_system' ) ) {
+		return $helper::run_as_system( $send );
+	}
+	return $send();
+}
+
+/**
+ * Normalize an ability result into the documented array envelope.
+ *
+ * Abilities return WP_Error on permission or validation failure. These
+ * wrappers document an array return and callers index into it, so a WP_Error
+ * becomes `[ 'success' => false, 'error' => ..., 'error_code' => ... ]`.
+ *
+ * @param mixed $result Ability result.
+ * @return array
+ */
+function extrachill_mail_normalize_result( $result ) {
+	if ( is_wp_error( $result ) ) {
+		return array(
+			'success'    => false,
+			'error'      => $result->get_error_message(),
+			'error_code' => $result->get_error_code(),
+		);
+	}
+	if ( ! is_array( $result ) ) {
+		return array(
+			'success' => false,
+			'error'   => 'Mail ability returned ' . gettype( $result ) . ' instead of an array.',
+		);
+	}
+	return $result;
 }
 
 /**
