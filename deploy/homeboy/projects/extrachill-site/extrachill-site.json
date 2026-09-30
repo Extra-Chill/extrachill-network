@@ -226,5 +226,10 @@
       "remote_path": "wp-content/plugins/wp-codebox",
       "local_path": ""
     }
-  ]
+  ],
+  "hooks": {
+    "post:deploy:project": [
+      "wp extrachill-cache purge --all --path={{base_path}}"
+    ]
+  }
 }
