@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.27.4] - 2026-09-30
+
+### Fixed
+- purge the page cache once after every deploy
+
 ## [2.27.3] - 2026-09-29
 
 ### Fixed
