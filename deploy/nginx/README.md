@@ -40,6 +40,13 @@ and refuses to run when the live file no longer matches, so a hand edit on the
 box blocks the next deploy until someone reconciles it. That refusal is the
 point: it converts silent drift into a visible error.
 
+The server block references `$crawler_block_net`, `$events_scraper`, and
+`zone=wp_login` from `docs/nginx/bot-blocking.conf`. The operator must copy that
+file into `/etc/nginx/conf.d/` and reload nginx before running
+`homeboy-edge-apply`; otherwise `nginx -t` fails and the apply rolls back.
+Because Matrix is decommissioned, remove the `/.well-known/matrix/server`
+probe from the root-owned homeboy-edge target config before applying.
+
 ## Why this directory exists
 
 `/etc/nginx/sites-available/extrachill` and `/etc/nginx/sites-enabled/extrachill`

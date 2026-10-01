@@ -39,7 +39,9 @@ Live install paths on the production VPS:
 /etc/nginx/sites-enabled/extrachill        ← applied from deploy/nginx/sites-enabled/extrachill
 ```
 
-Note that `server-snippet.conf` describes more than is currently live: the author-enumeration guard and the `/wp-login.php` + `/login/` rate-limit locations are documented here but are **not** present in the live server block. Reconciling that is tracked separately; now that the live file is committed under `deploy/`, the difference is a readable diff rather than an SSH session.
+The author-enumeration guard and `/wp-login.php` + `/login/` rate-limit locations are now present in `deploy/nginx/sites-enabled/extrachill` as well as documented in `server-snippet.conf`.
+
+The deployed server block depends on `$crawler_block_net`, `$events_scraper`, and `zone=wp_login` from `bot-blocking.conf`. The operator must copy `docs/nginx/bot-blocking.conf` into `/etc/nginx/conf.d/` and reload nginx before running `homeboy-edge-apply`; otherwise `nginx -t` fails and the apply rolls back. Because Matrix is decommissioned, remove the `/.well-known/matrix/server` probe from the root-owned homeboy-edge target config before applying.
 
 If the live config drifts (someone hand-edits the VPS or the CF dashboard), the right reconciliation is to update this directory to match the live state, then commit. Never let the live state run ahead of the docs silently.
 
