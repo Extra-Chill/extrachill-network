@@ -34,18 +34,14 @@ server {
     if ($bad_bot)    { return 429; }
     if ($blocked_ip) { return 444; }
     if ($bad_uri)    { return 444; }
+    # Block the two events crawlers identified in extrachill-network#320.
+    if ($crawler_block_net) { return 444; }
+    if ($events_scraper) { return 444; }
     # ---------------------------------------------
 
-    # Matrix .well-known delegation (tells clients and servers where the homeserver is)
-    location = /.well-known/matrix/server {
-        default_type application/json;
-        return 200 '{"m.server":"matrix.extrachill.com:443"}';
-    }
-
-    location = /.well-known/matrix/client {
-        default_type application/json;
-        add_header Access-Control-Allow-Origin *;
-        return 200 '{"m.homeserver":{"base_url":"https://matrix.extrachill.com"}}';
+    # Author enumeration exposes WordPress usernames without a legitimate use case.
+    if ($args ~* "(^|&)author=[0-9]+") {
+        return 444;
     }
 
     # ---- .well-known/ allow (added 2026-09-16 per extrachill-network#203) ----
@@ -55,10 +51,7 @@ server {
     # 403ing all of it: oauth-authorization-server, oauth-protected-resource,
     # security.txt, apple-app-site-association.
     #
-    # The two exact-match matrix locations above are unaffected: `=` is
-    # checked before `^~` and before regex. `^~` makes this the
-    # longest-prefix winner for everything else under /.well-known/ and tells
-    # nginx to skip regex matching once selected, so the dotfile-deny rule
+    # This location skips regex matching, so the dotfile-deny rule
     # never runs for this prefix regardless of file order. try_files serves a
     # static file if one exists on disk and otherwise falls through to
     # WordPress, so a template_redirect router can claim a path here. A
@@ -79,6 +72,25 @@ server {
     location /wp-json/ {
         limit_req zone=wpjson burst=10 nodelay;
         try_files $uri $uri/ /index.php?$args;
+    }
+
+    # Login rate limits (3 req/min per IP, burst 5) from bot-blocking.conf.
+    location = /wp-login.php {
+        limit_req zone=wp_login burst=5 nodelay;
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php8.4-fpm.sock;
+        fastcgi_read_timeout 120s;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    location = /login/ {
+        limit_req zone=wp_login burst=5 nodelay;
+        try_files $uri $uri/ /index.php?$args;
+    }
+
+    location = /login {
+        return 301 /login/;
     }
 
     # PHP handling
