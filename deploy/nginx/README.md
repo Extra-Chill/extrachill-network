@@ -5,6 +5,7 @@ VPS. They are not examples and not fragments.
 
 | File | Installed at |
 |------|--------------|
+| `conf.d/bot-blocking.conf` | `/etc/nginx/conf.d/bot-blocking.conf` |
 | `sites-enabled/extrachill` | `/etc/nginx/sites-enabled/extrachill` |
 
 ## How this differs from `docs/nginx/`
@@ -25,7 +26,16 @@ authoritative for the second.
 Open a pull request, get it reviewed, merge it. Then on the host:
 
 ```
+sudo /usr/local/sbin/homeboy-edge-apply extrachill-nginx-bots
 sudo /usr/local/sbin/homeboy-edge-apply extrachill-nginx
+```
+
+Apply `extrachill-nginx-bots` before `extrachill-nginx`: the server block
+references maps and limit zones defined by the bot-blocking file. When the live
+file already matches the repository, adopt it on the first apply:
+
+```
+sudo /usr/local/sbin/homeboy-edge-apply extrachill-nginx-bots --adopt
 ```
 
 The wrapper fetches this repository itself, reads the file out of the git object
@@ -41,11 +51,23 @@ box blocks the next deploy until someone reconciles it. That refusal is the
 point: it converts silent drift into a visible error.
 
 The server block references `$crawler_block_net`, `$events_scraper`, and
-`zone=wp_login` from `docs/nginx/bot-blocking.conf`. The operator must copy that
-file into `/etc/nginx/conf.d/` and reload nginx before running
-`homeboy-edge-apply`; otherwise `nginx -t` fails and the apply rolls back.
+`zone=wp_login` from `/etc/nginx/conf.d/bot-blocking.conf`, deployed by
+`extrachill-nginx-bots` above. Configure that root-owned target once with:
+
+```ini
+REPO_URL=https://github.com/Extra-Chill/extrachill-network.git
+TRUST_REF=refs/heads/main
+SOURCE_PATH=deploy/nginx/conf.d/bot-blocking.conf
+DEST_PATH=/etc/nginx/conf.d/bot-blocking.conf
+DEST_MODE=0644
+VALIDATE_CMD=/usr/sbin/nginx -t
+RELOAD_CMD=/usr/bin/systemctl reload nginx
+PROBE=https://extrachill.com/ 200 extrachill.com:443:127.0.0.1
+PROBE=https://extrachill.com/ 200
+```
+
 Because Matrix is decommissioned, remove the `/.well-known/matrix/server`
-probe from the root-owned homeboy-edge target config before applying.
+probe from the root-owned `extrachill-nginx` target config before applying.
 
 ## Why this directory exists
 
