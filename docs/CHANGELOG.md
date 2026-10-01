@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.27.5] - 2026-10-01
+
+### Fixed
+- block events crawlers and reconcile live server block
+
 ## [2.27.4] - 2026-09-30
 
 ### Fixed
