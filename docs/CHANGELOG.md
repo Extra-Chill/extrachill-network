@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.27.6] - 2026-10-01
+
+### Fixed
+- keep upload URLs on the switched blog's host
+
 ## [2.27.5] - 2026-10-01
 
 ### Fixed
