@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 const packageRoot = path.dirname(fileURLToPath(import.meta.url));
 
 const WP_CODEBOX_MAX_BUFFER_BYTES = 80 * 1024 * 1024;
-export const DEMO_MIN_WP_CODEBOX_VERSION = '0.31.0';
+export const DEMO_MIN_WP_CODEBOX_VERSION = '0.31.2';
 
 // Extra Chill's real product zips (WooCommerce, Gutenberg, data-machine, ...)
 // comfortably exceed WP Codebox's 25 MB/100 MB/5000-file defaults, which are
@@ -392,6 +392,9 @@ export async function validateJourneyDocument(journey, id, topology, personaExis
       if (!Array.isArray(demo.steps) || demo.steps.some((step) => !markers.has(step.after ?? step.marker))) throw new Error(`Journey '${id}' demo.steps references unknown markers.`);
     }
     if (!isRecord(demo.presentation)) throw new Error(`Journey '${id}' demo.presentation must be an object.`);
+    if (demo.environment !== undefined && (!isRecord(demo.environment) || (demo.environment.colorScheme !== undefined && !['light', 'dark', 'no-preference'].includes(demo.environment.colorScheme)))) throw new Error(`Journey '${id}' demo.environment must be an object with colorScheme light, dark, or no-preference.`);
+    if (demo.pacing !== undefined && (!isRecord(demo.pacing) || ['settleMs', 'minCaptionMs'].some((key) => demo.pacing[key] !== undefined && (!Number.isInteger(demo.pacing[key]) || demo.pacing[key] < 0)))) throw new Error(`Journey '${id}' demo.pacing requires non-negative integer settleMs and minCaptionMs values.`);
+    if (demo.cover !== undefined && (!isRecord(demo.cover) || typeof demo.cover.marker !== 'string' || !journeyMarkers(journey).includes(demo.cover.marker))) throw new Error(`Journey '${id}' demo.cover.marker must reference an existing step marker.`);
   }
   if (journey.fixtureMuPlugins !== undefined) {
     if (!Array.isArray(journey.fixtureMuPlugins) || journey.fixtureMuPlugins.length === 0 || journey.fixtureMuPlugins.some((file) => typeof file !== 'string' || file.trim() === '')) {
@@ -414,8 +417,27 @@ export function assembleDemoArgs(demo, theme = {}) {
     ...(demo.video.size ? [`video-size=${demo.video.size}`] : []),
     `presentation-json=${JSON.stringify(demo.presentation)}`,
     `annotation-theme-json=${JSON.stringify(theme)}`,
+    ...(demo.environment ? [`browser-environment-json=${JSON.stringify(demo.environment)}`] : []),
     ...(Number.parseInt(viewport.split('x')[0], 10) <= 600 ? ['is-mobile=true', 'has-touch=true'] : []),
   ];
+}
+
+export function paceDemoSteps(raw, pacing = {}) {
+  if (!pacing.settleMs && !pacing.minCaptionMs) return raw;
+  const steps = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  const paced = [];
+  for (const step of steps) {
+    paced.push(step);
+    if ((step.kind === 'navigate' || step.kind === 'click') && pacing.settleMs > 0) {
+      paced.push({ kind: 'waitFor', waitFor: 'duration', duration: `${pacing.settleMs}ms` });
+    }
+    // A caption with its own durationMs is followed by an authored wait; only
+    // untimed captions need the minimum on-screen time inserted.
+    if (step.kind === 'annotate' && step.shape === 'caption' && pacing.minCaptionMs > 0 && step.durationMs === undefined) {
+      paced.push({ kind: 'waitFor', waitFor: 'duration', duration: `${pacing.minCaptionMs}ms` });
+    }
+  }
+  return JSON.stringify(paced);
 }
 
 export function demoEncodeArgs(input, output, demo) {
@@ -665,6 +687,9 @@ export async function buildRecipe(settings = {}, cwd = process.cwd()) {
       const prepared = journeyStep(journey, dir, step);
       if (demoMode && step.command === 'wordpress.browser-actions') {
         prepared.args = [...prepared.args.filter((arg) => !arg.startsWith('capture=')), ...assembleDemoArgs(journey.demo, demoThemes.get(journey.demo.theme))];
+        if (journey.demo.pacing) {
+          prepared.args = prepared.args.map((arg) => arg.startsWith('steps-json=') ? `steps-json=${paceDemoSteps(arg.slice('steps-json='.length), journey.demo.pacing)}` : arg);
+        }
       }
       return prepared;
     }));
@@ -1277,6 +1302,17 @@ async function renderJourneyDemos(recipe, journeys) {
     const input = path.join(match.dir, match.summary.video.path);
     const encoded = spawnSync('ffmpeg', demoEncodeArgs(input, output, journey.demo), { stdio: 'inherit' });
     if (encoded.status !== 0) throw new Error(`ffmpeg failed encoding demo for ${journey.id}.`);
+    if (journey.demo.cover) {
+      const coverMarker = (match.summary.video.markers ?? []).find((marker) => marker.name === journey.demo.cover.marker);
+      if (!coverMarker) throw new Error(`Cover marker '${journey.demo.cover.marker}' for journey '${journey.id}' is missing from the recorded video.`);
+      const cover = path.join(path.dirname(output), `${journey.id}-cover.png`);
+      const coverArgs = ['-y', '-v', 'error', '-ss', String((coverMarker.endMs + 700) / 1000), '-i', input, '-frames:v', '1'];
+      const size = journey.demo.video.output;
+      if (size) coverArgs.splice(coverArgs.length - 2, 0, '-vf', `scale=${size.width}:${size.height}:flags=lanczos`);
+      coverArgs.push(cover);
+      const extracted = spawnSync('ffmpeg', coverArgs, { stdio: 'inherit' });
+      if (extracted.status !== 0) throw new Error(`ffmpeg failed extracting cover for ${journey.id}.`);
+    }
     for (const marker of match.summary.video.markers ?? []) {
       if (!marker.name) continue;
       const still = path.join(path.dirname(output), `${journey.id}-${marker.name}.png`);

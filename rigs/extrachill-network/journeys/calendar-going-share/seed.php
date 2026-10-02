@@ -2,9 +2,10 @@
 /**
  * Seed a believable Charleston weekend for the calendar-going-share journey.
  *
- * Fixture only: fictional show titles at real public Charleston venues, dated
- * relative to the rig's clock so "This Weekend" always has content. One
- * featured show carries a ticket URL. A disposable fan account (forced ID 230)
+ * Fixture only: fictional supporting show titles and Channel Bluff at public
+ * Charleston venues, dated relative to the rig's clock so "This Weekend"
+ * always has content. The featured show carries a demo ticket URL. A disposable
+ * fan account (forced ID 230)
  * is created for the authenticated browser step. No production user, email,
  * or personal data is copied, and nothing here can reach production.
  *
@@ -57,7 +58,7 @@ require_once WP_PLUGIN_DIR . '/data-machine-events/data-machine-events.php';
 if ( ! post_type_exists( 'data_machine_events' ) && class_exists( '\\DataMachineEvents\\Core\\Event_Post_Type' ) ) {
 	\DataMachineEvents\Core\Event_Post_Type::register();
 }
-foreach ( array( 'Venue_Taxonomy', 'Promoter_Taxonomy', 'Event_Type_Taxonomy' ) as $taxonomy_class ) {
+foreach ( array( 'Venue_Taxonomy', 'Promoter_Taxonomy', 'Event_Type_Taxonomy', 'Artist_Taxonomy' ) as $taxonomy_class ) {
 	$fqcn = "\\DataMachineEvents\\Core\\{$taxonomy_class}";
 	if ( class_exists( $fqcn ) ) {
 		$fqcn::register();
@@ -112,6 +113,7 @@ foreach ( $venues as $venue_name => $address ) {
 	update_term_meta( $venue_ids[ $venue_name ], '_venue_city', 'Charleston' );
 	update_term_meta( $venue_ids[ $venue_name ], '_venue_state', 'SC' );
 }
+$artist_id = calendar_demo_term( 'Channel Bluff', 'artist' );
 
 // Upcoming Friday/Saturday/Sunday relative to the rig clock, so "This Weekend"
 // always resolves to these shows.
@@ -122,7 +124,7 @@ $saturday = $friday->modify( '+1 day' );
 $sunday   = $friday->modify( '+2 days' );
 
 $events = array(
-	array( 'charleston-weekend-feature', 'The Tidewater Collective', $saturday, '21:00', 'Charleston Pour House', 'https://tickets.example.invalid/tidewater-collective', true ),
+	array( 'channel-bluff-charleston-pour-house', 'Channel Bluff', $saturday, '21:00', 'Charleston Pour House', 'https://tickets.example.invalid/channel-bluff', true ),
 	array( 'charleston-weekend-fri-1', 'Marsh Lights', $friday, '20:00', 'The Royal American', '', false ),
 	array( 'charleston-weekend-fri-2', 'Low Country Static', $friday, '21:30', 'Music Farm', '', false ),
 	array( 'charleston-weekend-sat-1', 'Saltwater Saints', $saturday, '19:00', 'Lo-Fi Brewing', '', false ),
@@ -167,6 +169,9 @@ foreach ( $events as $event ) {
 
 	wp_set_object_terms( $event_id, array( $venue_ids[ $venue_name ] ), 'venue', false );
 	wp_set_object_terms( $event_id, array( $charleston_id ), 'location', false );
+	if ( $featured ) {
+		wp_set_object_terms( $event_id, array( $artist_id ), 'artist', false );
+	}
 	if ( function_exists( 'data_machine_events_sync_datetime_meta' ) ) {
 		data_machine_events_sync_datetime_meta( $event_id, get_post( $event_id ), false );
 	}
@@ -177,7 +182,7 @@ foreach ( $events as $event ) {
 
 // Start every run with the fan not yet marked Going on the featured show, so
 // the journey's Going tap always marks (never toggles off).
-$featured_post = get_page_by_path( 'charleston-weekend-feature', OBJECT, 'data_machine_events' );
+$featured_post = get_page_by_path( 'channel-bluff-charleston-pour-house', OBJECT, 'data_machine_events' );
 if ( $featured_post && function_exists( 'ec_users_unmark_event' ) ) {
 	ec_users_unmark_event( CALENDAR_DEMO_FAN_ID, (int) $featured_post->ID, $events_blog_id );
 }

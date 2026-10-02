@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { assembleDemoArgs, buildRecipe, demoEncodeArgs, journeyMarkers, domainIdsMuPluginSource, DOMAIN_IDS_MU_PLUGIN_FILENAME, SANDBOX_COMPAT_MU_PLUGIN_FILENAME, journeySeedSetting, journeySelection, validateJourneyDocument } from '../run.mjs';
+import { assembleDemoArgs, buildRecipe, demoEncodeArgs, journeyMarkers, paceDemoSteps, domainIdsMuPluginSource, DOMAIN_IDS_MU_PLUGIN_FILENAME, SANDBOX_COMPAT_MU_PLUGIN_FILENAME, journeySeedSetting, journeySelection, validateJourneyDocument } from '../run.mjs';
 
 const packageRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const topology = JSON.parse(await readFile(path.join(packageRoot, 'network-topology.json'), 'utf8'));
@@ -236,17 +236,34 @@ try {
   await validateJourneyDocument(demoDoc, 'gardner-event-rsvp', topology);
   await assert.rejects(validateJourneyDocument({ ...demoDoc, demo: { ...demoDoc.demo, video: { viewport: 'phone' } } }, 'gardner-event-rsvp', topology), /viewport must be WxH/);
   await assert.rejects(validateJourneyDocument({ ...demoDoc, demo: { ...demoDoc.demo, theme: 'missing.json' } }, 'gardner-event-rsvp', topology), /unknown demo theme/);
+  await assert.rejects(validateJourneyDocument({ ...demoDoc, demo: { ...demoDoc.demo, environment: { colorScheme: 'sepia' } } }, 'gardner-event-rsvp', topology), /colorScheme/);
+  await assert.rejects(validateJourneyDocument({ ...demoDoc, demo: { ...demoDoc.demo, cover: { marker: 'missing' } } }, 'gardner-event-rsvp', topology), /cover.marker/);
   await assert.rejects(validateJourneyDocument({ ...demoDoc, steps: [{ marker: 'known' }], demo: { ...demoDoc.demo, steps: [{ after: 'missing' }] } }, 'gardner-event-rsvp', topology), /unknown markers/);
   const theme = { accentColor: '#53940b' };
   assert.deepEqual(assembleDemoArgs(demoDoc.demo, theme), ['capture=steps,console,errors,network,screenshot,video', 'viewport=390x844', 'video-size=390x844', 'presentation-json={}', 'annotation-theme-json={"accentColor":"#53940b"}', 'is-mobile=true', 'has-touch=true']);
+  assert.ok(assembleDemoArgs({ ...demoDoc.demo, environment: { colorScheme: 'dark' } }).includes('browser-environment-json={"colorScheme":"dark"}'));
+  const pacingInput = JSON.stringify([{ kind: 'navigate' }, { kind: 'annotate', shape: 'caption' }, { kind: 'click' }]);
+  assert.deepEqual(JSON.parse(paceDemoSteps(pacingInput, { settleMs: 1800, minCaptionMs: 2500 })), [{ kind: 'navigate' }, { kind: 'waitFor', waitFor: 'duration', duration: '1800ms' }, { kind: 'annotate', shape: 'caption' }, { kind: 'waitFor', waitFor: 'duration', duration: '2500ms' }, { kind: 'click' }, { kind: 'waitFor', waitFor: 'duration', duration: '1800ms' }]);
+  assert.equal(paceDemoSteps(pacingInput), pacingInput);
   assert.ok(!assembleDemoArgs({ ...demoDoc.demo, video: { viewport: '1280x720' } }).includes('is-mobile=true'));
   assert.deepEqual(demoEncodeArgs('in.webm', 'out.mp4', { video: { viewport: '540x960', output: { width: 1080, height: 1920, fps: 30 } } }).slice(5, 7), ['-vf', 'scale=1080:1920:flags=lanczos,fps=30,format=yuv420p']);
   const demoJourney = JSON.parse(await readFile(path.join(packageRoot, 'journeys', 'calendar-going-share', 'journey.json'), 'utf8'));
   assert.ok(journeyMarkers(demoJourney).includes('going'), 'calendar-going-share must mark its Going step');
+  assert.ok(journeyMarkers(demoJourney).includes(demoJourney.demo.cover.marker), 'cover marker exists in the journey');
+  const calendarSeed = await readFile(path.join(packageRoot, 'journeys', 'calendar-going-share', 'seed.php'), 'utf8');
+  const calendarGrade = await readFile(path.join(packageRoot, 'journeys', 'calendar-going-share', 'grade.php'), 'utf8');
+  const featuredSlug = calendarSeed.match(/array\( '(channel-bluff-[^']+)'/)[1];
+  assert.ok(calendarGrade.includes(`'${featuredSlug}'`), 'journey featured slug matches its grade');
   const shippedTheme = JSON.parse(await readFile(path.join(packageRoot, 'demo-themes', 'extra-chill.json'), 'utf8'));
   for (const key of ['accentColor', 'textColor', 'background', 'fontFamily']) assert.ok(key in shippedTheme, `extra-chill theme declares ${key}`);
   const demoRecipe = await buildRecipe({ extrachill_journeys: ['calendar-going-share'], extrachill_demo: true }, packageRoot);
   assert.ok(demoRecipe.workflow.steps.some((step) => step.metadata?.journey === 'calendar-going-share' && step.args?.includes('viewport=540x960') && step.args?.some((arg) => arg.startsWith('annotation-theme-json={'))));
+  const calendarRegression = await buildRecipe({ extrachill_journeys: ['calendar-going-share'] }, packageRoot);
+  const calendarDemoBrowser = demoRecipe.workflow.steps.find((step) => step.metadata?.kind === 'journey-browser-step' && step.metadata?.journey === 'calendar-going-share');
+  const calendarRegressionBrowser = calendarRegression.workflow.steps.find((step) => step.metadata?.kind === 'journey-browser-step' && step.metadata?.journey === 'calendar-going-share');
+  assert.ok(calendarDemoBrowser.args.includes('browser-environment-json={"colorScheme":"dark"}'));
+  assert.ok(!calendarRegressionBrowser.args.some((arg) => arg.startsWith('browser-environment-json=')));
+  assert.equal(calendarRegressionBrowser.args.find((arg) => arg.startsWith('steps-json=')), demoJourney.steps[0].args.find((arg) => arg.startsWith('steps-json=')), 'regression steps remain unpaced');
   await assert.rejects(buildRecipe({ extrachill_journeys: ['gardner-event-rsvp'], extrachill_demo: true }, packageRoot), /has no demo contract/);
   const allowedRecipeStepKeys = new Set(['command', 'args', 'metadata', 'allowFailure', 'timeoutMs', 'env', 'code', 'codeFile']);
   for (const step of demoRecipe.workflow.steps) {
