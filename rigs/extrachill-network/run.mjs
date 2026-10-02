@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 const packageRoot = path.dirname(fileURLToPath(import.meta.url));
 
 const WP_CODEBOX_MAX_BUFFER_BYTES = 80 * 1024 * 1024;
+export const DEMO_MIN_WP_CODEBOX_VERSION = '0.31.0';
 
 // Extra Chill's real product zips (WooCommerce, Gutenberg, data-machine, ...)
 // comfortably exceed WP Codebox's 25 MB/100 MB/5000-file defaults, which are
@@ -377,6 +378,21 @@ export async function validateJourneyDocument(journey, id, topology, personaExis
       throw new Error(`Journey '${id}' ${phase}.codeFile '${journey[phase].codeFile}' does not exist in journeys/${id}/.`);
     }
   }
+  if (journey.demo !== undefined) {
+    const demo = journey.demo;
+    if (!isRecord(demo) || !isRecord(demo.video) || !/^\d+x\d+$/.test(demo.video.viewport ?? '')) {
+      throw new Error(`Journey '${id}' demo.video.viewport must be WxH.`);
+    }
+    if (demo.video.size !== undefined && !/^\d+x\d+$/.test(demo.video.size)) throw new Error(`Journey '${id}' demo.video.size must be WxH.`);
+    if (demo.video.output !== undefined && (!isRecord(demo.video.output) || !['width', 'height', 'fps'].every((key) => Number.isInteger(demo.video.output[key]) && demo.video.output[key] > 0))) throw new Error(`Journey '${id}' demo.video.output requires positive integer width, height, and fps.`);
+    if (typeof demo.theme !== 'string' || !/^[a-z0-9-]+\.json$/.test(demo.theme)) throw new Error(`Journey '${id}' demo.theme must name a JSON theme file.`);
+    try { await readFile(path.join(packageRoot, 'demo-themes', demo.theme), 'utf8'); } catch { throw new Error(`Journey '${id}' references unknown demo theme '${demo.theme}'.`); }
+    if (demo.steps !== undefined) {
+      const markers = new Set(journey.steps.map((step) => step.marker).filter(Boolean));
+      if (!Array.isArray(demo.steps) || demo.steps.some((step) => !markers.has(step.after ?? step.marker))) throw new Error(`Journey '${id}' demo.steps references unknown markers.`);
+    }
+    if (!isRecord(demo.presentation)) throw new Error(`Journey '${id}' demo.presentation must be an object.`);
+  }
   if (journey.fixtureMuPlugins !== undefined) {
     if (!Array.isArray(journey.fixtureMuPlugins) || journey.fixtureMuPlugins.length === 0 || journey.fixtureMuPlugins.some((file) => typeof file !== 'string' || file.trim() === '')) {
       throw new Error(`Journey '${id}' fixtureMuPlugins must be a non-empty array of non-empty file names relative to journeys/${id}/.`);
@@ -388,6 +404,40 @@ export async function validateJourneyDocument(journey, id, topology, personaExis
     }
   }
   assertJourneyStepScoping(id, journey);
+}
+
+export function assembleDemoArgs(demo, theme = {}) {
+  const viewport = demo.video.viewport;
+  return [
+    'capture=steps,console,errors,network,screenshot,video',
+    `viewport=${viewport}`,
+    ...(demo.video.size ? [`video-size=${demo.video.size}`] : []),
+    `presentation-json=${JSON.stringify(demo.presentation)}`,
+    `annotation-theme-json=${JSON.stringify(theme)}`,
+    ...(Number.parseInt(viewport.split('x')[0], 10) <= 600 ? ['is-mobile=true', 'has-touch=true'] : []),
+  ];
+}
+
+export function demoEncodeArgs(input, output, demo) {
+  const out = demo.video.output;
+  const filters = [
+    ...(out ? [`scale=${out.width}:${out.height}:flags=lanczos`] : []),
+    ...(out?.fps ? [`fps=${out.fps}`] : []),
+    'format=yuv420p',
+  ];
+  return ['-y', '-v', 'error', '-i', input, '-vf', filters.join(','), '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-movflags', '+faststart', '-an', output];
+}
+
+export function journeyMarkers(journey) {
+  const markers = [];
+  for (const step of journey.steps) {
+    const raw = (step.args ?? []).find((arg) => arg.startsWith('steps-json='));
+    if (!raw) continue;
+    try {
+      for (const action of JSON.parse(raw.slice('steps-json='.length))) if (action.marker) markers.push(action.marker);
+    } catch { /* validated elsewhere */ }
+  }
+  return markers;
 }
 
 function assertJourneyStepScoping(id, journey) {
@@ -541,6 +591,16 @@ export async function buildRecipe(settings = {}, cwd = process.cwd()) {
   const phpVersion = runtimePhpVersion(settings);
 
   const journeys = await buildJourneys(settings, topology);
+  const demoMode = settings.extrachill_demo === true;
+  const demoThemes = new Map();
+  if (demoMode) {
+    for (const { journey } of journeys) {
+      if (!journey.demo) throw new Error(`Journey '${journey.id}' has no demo contract.`);
+      if (!demoThemes.has(journey.demo.theme)) {
+        demoThemes.set(journey.demo.theme, JSON.parse(await readFile(path.join(packageRoot, 'demo-themes', journey.demo.theme), 'utf8')));
+      }
+    }
+  }
 
   const activationHookExceptions = (components.activationHookExceptions ?? []).map((entry) => entry.pluginFile);
   const activationMatrix = buildActivationMatrix(topology, activePlugins, components.excludedComponents, activationHookExceptions);
@@ -595,7 +655,13 @@ export async function buildRecipe(settings = {}, cwd = process.cwd()) {
       }
       journeySteps.push(seed);
     }
-    journeySteps.push(...journey.steps.map((step) => journeyStep(journey, dir, step)));
+    journeySteps.push(...journey.steps.map((step) => {
+      const prepared = journeyStep(journey, dir, step);
+      if (demoMode && step.command === 'wordpress.browser-actions') {
+        prepared.args = [...prepared.args.filter((arg) => !arg.startsWith('capture=')), ...assembleDemoArgs(journey.demo, demoThemes.get(journey.demo.theme))];
+      }
+      return prepared;
+    }));
     const grade = journeyPhaseStep(journey, dir, 'grade');
     if (grade) {
       if (cacheActive) {
@@ -1140,6 +1206,7 @@ async function main() {
   const dryRun = process.argv.includes('--dry-run');
   const settings = parseSettings(process.env.HOMEBOY_SETTINGS_JSON);
   const recipe = await buildRecipe(settings);
+  if (settings.extrachill_demo === true) assertDemoCodeboxVersion();
   const temporary = await mkdtemp(path.join(os.tmpdir(), 'extrachill-network-'));
   const recipePath = path.join(temporary, 'recipe.json');
   const resultPath = process.env.HOMEBOY_NETWORK_RESULT_FILE || path.join(temporary, 'result.json');
@@ -1158,10 +1225,65 @@ async function main() {
     if (!dryRun && envelope.success !== true) {
       throw new Error('WP Codebox extrachill-network recipe did not succeed.');
     }
+    if (!dryRun && settings.extrachill_demo === true) {
+      const topology = await loadJson('network-topology.json');
+      const demoJourneys = (await buildJourneys(settings, topology)).map(({ journey }) => journey);
+      await renderJourneyDemos(recipe, demoJourneys);
+    }
     process.stdout.write(result.stdout);
   } finally {
     await rm(temporary, { recursive: true, force: true });
   }
+}
+
+function assertDemoCodeboxVersion() {
+  const executable = process.env.HOMEBOY_WP_CODEBOX_BIN || process.env.WP_CODEBOX_BIN || 'wp-codebox';
+  const result = spawnSync(executable, ['--version'], { encoding: 'utf8' });
+  const version = `${result.stdout ?? ''} ${result.stderr ?? ''}`.match(/\b(\d+)\.(\d+)\.(\d+)\b/)?.[0];
+  if (!version || compareVersions(version, DEMO_MIN_WP_CODEBOX_VERSION) < 0) {
+    throw new Error(`Demo mode requires WP Codebox >= ${DEMO_MIN_WP_CODEBOX_VERSION}; found ${version ?? 'unknown'}.`);
+  }
+}
+
+function compareVersions(a, b) {
+  const left = a.split('.').map(Number); const right = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) if (left[i] !== right[i]) return left[i] - right[i];
+  return 0;
+}
+
+async function renderJourneyDemos(recipe, journeys) {
+  const ffmpeg = spawnSync('ffmpeg', ['-version'], { encoding: 'utf8' });
+  if (ffmpeg.error || ffmpeg.status !== 0) throw new Error('Demo rendering requires ffmpeg on PATH. Install ffmpeg (https://ffmpeg.org/download.html) and retry.');
+  const files = await listFiles(recipe.artifacts.directory);
+  const summaries = [];
+  for (const file of files.filter((candidate) => candidate.endsWith(path.join('files', 'browser', 'action-summary.json')))) {
+    try {
+      const summary = JSON.parse(await readFile(file, 'utf8'));
+      if (summary.video?.path) summaries.push({ dir: path.dirname(path.dirname(path.dirname(file))), summary });
+    } catch { /* not a browser-actions summary */ }
+  }
+  for (const journey of journeys) {
+    const markers = new Set(journeyMarkers(journey));
+    const match = summaries.find(({ summary }) => (summary.video.markers ?? []).some((marker) => markers.has(marker.name)));
+    if (!match) throw new Error(`Demo video for journey '${journey.id}' was not found in the run artifacts.`);
+    const output = path.join(packageRoot, 'evidence', 'demo', `${journey.id}.mp4`);
+    await mkdir(path.dirname(output), { recursive: true });
+    const input = path.join(match.dir, match.summary.video.path);
+    const encoded = spawnSync('ffmpeg', demoEncodeArgs(input, output, journey.demo), { stdio: 'inherit' });
+    if (encoded.status !== 0) throw new Error(`ffmpeg failed encoding demo for ${journey.id}.`);
+    for (const marker of match.summary.video.markers ?? []) {
+      if (!marker.name) continue;
+      const still = path.join(path.dirname(output), `${journey.id}-${marker.name}.png`);
+      spawnSync('ffmpeg', ['-y', '-v', 'error', '-ss', String((marker.endMs + 700) / 1000), '-i', input, '-frames:v', '1', still], { stdio: 'inherit' });
+    }
+  }
+}
+
+async function listFiles(directory) {
+  try {
+    const entries = await readdir(directory, { withFileTypes: true });
+    return (await Promise.all(entries.map((entry) => entry.isDirectory() ? listFiles(path.join(directory, entry.name)) : [path.join(directory, entry.name)]))).flat();
+  } catch { return []; }
 }
 
 export function runCodebox(args, capture = false) {

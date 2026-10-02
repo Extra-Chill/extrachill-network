@@ -101,6 +101,7 @@ this is a local checkout path today, not a release zip.
 | `extrachill_theme_source` | Absolute local theme checkout path, or (forward-compatible only, see below) an `https://…zip` URL. Required for a real `up`. |
 | `extrachill_journeys` | Array of journey IDs from `journeys/` to run after the baseline, e.g. `["gardner-event-rsvp"]`. Unknown IDs, wrong schemas, undeclared site domains, or missing persona files fail recipe validation loudly. |
 | `extrachill_journey_seed` | Optional deterministic seed string, passed through opaquely as `get_site_option('ec_rig_journey_seed')` for any selected journey's `seed.php` to consume when it needs a replayable, seeded case plan (e.g. `auth-multisite`'s fuzz plan). The rig never inspects or names what a journey does with it. |
+| `extrachill_demo` | Set `true` to render selected demo-capable journeys as instructional videos. Requires WP Codebox >= `0.31.0` and ffmpeg on PATH. |
 | `extrachill_component_source_overrides` | `{ "<slug>": "<local path or URL>" }`. Overrides one component's mount source, e.g. to test an unreleased branch of `extrachill-network` itself. |
 | `extrachill_release_set` | `{ "<slug>": { "ref": "<tag>" } }`. Pins a GitHub-hosted component to an explicit release tag instead of `latest`. There is no resolver that turns a `homeboy/release-set/v1` manifest into these entries yet -- a caller wanting deploy-parity pinning composes this map itself (see extrachill-network#223's spike notes on why `release-set/v1` is a gate, not a resolver). |
 | `extrachill_include_excluded_components` | Array of slugs from `components.json`'s `excludedComponents` list to force-include; requires a matching `extrachill_component_source_overrides` entry (no default source exists for those). |
@@ -202,6 +203,19 @@ the network from latest releases and uploads the browser evidence. A journey
 opts into regression semantics by pinning its known findings to issues in
 its grade (see `journeys/musician-link-page-onboarding/README.md`), so a new
 finding, or a pinned one that now passes, fails the run.
+
+### Demo Mode
+
+Any journey can opt into a walkthrough by declaring `demo.video` (`viewport`,
+optional `size` and output dimensions/fps), `demo.presentation`, and a
+`demo.theme` filename under `demo-themes/`. Keep annotations and captions in
+the journey's own browser steps so regression and demo share the same journey
+contract. Optional demo overlays reference markers on journey steps.
+
+Set `extrachill_demo` to `true` when selecting a demo-capable journey. The run
+uses the disposable rig and writes `evidence/demo/<journey>.mp4`. Manual
+`journeys` workflow dispatch supports `demo: true`; nightly regression behavior
+is unchanged. Install WP Codebox `0.31.0` or later and ffmpeg to render.
 
 ### Journeys ported from extrachill-events (extrachill-network#292)
 

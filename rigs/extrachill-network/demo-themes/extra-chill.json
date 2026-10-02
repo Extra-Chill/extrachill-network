@@ -1,0 +1,9 @@
+{
+  "accentColor": "#53940b",
+  "textColor": "#ffffff",
+  "background": "rgba(0, 0, 0, 0.86)",
+  "fontFamily": "Helvetica, Arial, sans-serif",
+  "fontSize": 20,
+  "strokeWidth": 4,
+  "radius": 10
+}
