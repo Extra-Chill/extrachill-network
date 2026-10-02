@@ -67,6 +67,19 @@ jobs:
           ref: ${{ steps.theme.outputs.tag }}
           path: .ci/extrachill-theme
 
+      # assets/css/root.css (and the generated badge CSS) are build artifacts,
+      # gitignored in the theme repo and only present in the release zip. The
+      # theme only registers extrachill-root when the file exists, and every
+      # other theme stylesheet depends on it, so an unbuilt checkout renders
+      # completely unstyled. Build it the way the release does.
+      - name: Build the theme's generated assets
+        working-directory: .ci/extrachill-theme
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+          test -s assets/css/root.css
+
       - name: Checkout WP Codebox
         uses: actions/checkout@v6
         with:
@@ -77,6 +90,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+
+      # Demo mode encodes H.264 MP4s (rigs/extrachill-network/run.mjs
+      # renderJourneyDemos); the runner image ships no ffmpeg.
+      - name: Install ffmpeg for demo rendering
+        if: ${{ inputs.demo == true }}
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg >/dev/null && ffmpeg -version | head -1
 
       - name: Build WP Codebox and its pinned Chromium
         working-directory: .ci/wp-codebox

@@ -143,6 +143,7 @@ foreach ( $events as $event ) {
 			'endTime'   => '23:30',
 			'venue'     => $venue_name,
 			'ticketUrl' => $ticket_url,
+			'price'     => $featured ? '$15 advance / $20 day of show' : '$10',
 		)
 	);
 	$content = "<!-- wp:data-machine-events/event-details {$attrs} -->\n"
