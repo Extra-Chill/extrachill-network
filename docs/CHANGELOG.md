@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.29.0] - 2026-10-02
+
+### Added
+- dark-mode, paced Channel Bluff calendar demo with a cover frame
+
 ## [2.28.0] - 2026-10-02
 
 ### Added
