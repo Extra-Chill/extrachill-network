@@ -1313,10 +1313,12 @@ async function renderJourneyDemos(recipe, journeys) {
       const extracted = spawnSync('ffmpeg', coverArgs, { stdio: 'inherit' });
       if (extracted.status !== 0) throw new Error(`ffmpeg failed extracting cover for ${journey.id}.`);
     }
+    const stillScale = journey.demo.video.output ? ['-vf', `scale=${journey.demo.video.output.width}:${journey.demo.video.output.height}:flags=lanczos`] : [];
     for (const marker of match.summary.video.markers ?? []) {
-      if (!marker.name) continue;
+      // The cover marker is written above as <id>-cover.png; never overwrite it.
+      if (!marker.name || marker.name === journey.demo.cover?.marker) continue;
       const still = path.join(path.dirname(output), `${journey.id}-${marker.name}.png`);
-      spawnSync('ffmpeg', ['-y', '-v', 'error', '-ss', String((marker.endMs + 700) / 1000), '-i', input, '-frames:v', '1', still], { stdio: 'inherit' });
+      spawnSync('ffmpeg', ['-y', '-v', 'error', '-ss', String((marker.endMs + 700) / 1000), '-i', input, '-frames:v', '1', ...stillScale, still], { stdio: 'inherit' });
     }
   }
 }
