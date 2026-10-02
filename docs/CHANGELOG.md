@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.28.0] - 2026-10-02
+
+### Added
+- journey demo mode, rendering instructional walkthrough videos from the journey contract
+
 ## [2.27.6] - 2026-10-01
 
 ### Fixed
