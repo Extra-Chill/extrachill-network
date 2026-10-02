@@ -481,12 +481,18 @@ function assertJourneyStepScoping(id, journey) {
 
 function journeyStep(journey, dir, step) {
   const substitute = (value) => (typeof value === 'string' ? value.replaceAll('${journey.dir}', dir).replaceAll('${journey.id}', journey.id) : value);
+  // Emit only keys the WP Codebox recipe schema accepts: it rejects unknown
+  // step properties, so journey-only annotations (e.g. a step `marker`) must
+  // never leak into the recipe.
+  const { command, args, metadata, timeoutMs, env } = step;
   return {
-    ...step,
+    command,
+    ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+    ...(env !== undefined ? { env } : {}),
     // See journeyPhaseStep: every journey step is isolated from the others.
     allowFailure: true,
-    args: (step.args ?? []).map(substitute),
-    metadata: { ...(step.metadata ?? {}), kind: step.metadata?.kind ?? 'journey-browser-step', journey: journey.id },
+    args: (args ?? []).map(substitute),
+    metadata: { ...(metadata ?? {}), kind: metadata?.kind ?? 'journey-browser-step', journey: journey.id },
   };
 }
 
@@ -1213,7 +1219,7 @@ async function main() {
   await writeFile(recipePath, `${JSON.stringify(recipe, null, 2)}\n`);
 
   try {
-    runCodebox(['recipe', 'validate', '--recipe', recipePath, '--json']);
+    runCodebox(['recipe', 'validate', '--recipe', recipePath, '--json'], true);
     const args = ['recipe-run', '--recipe', recipePath, '--artifacts', recipe.artifacts.directory, '--json'];
     if (dryRun) {
       args.push('--dry-run');
@@ -1301,6 +1307,11 @@ export function runCodebox(args, capture = false) {
     process.stderr.write(result.stderr);
   }
   if (result.status !== 0) {
+    // Surface Codebox's own diagnostics: CI discards this script's stdout, so a
+    // failing `recipe validate` would otherwise report only an exit status.
+    if (capture && result.stdout) {
+      process.stderr.write(result.stdout);
+    }
     const error = new Error(`WP Codebox exited with status ${result.status}.`);
     error.stdout = result.stdout || '';
     error.stderr = result.stderr || '';
