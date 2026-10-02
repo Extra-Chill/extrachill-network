@@ -78,6 +78,12 @@ jobs:
         with:
           node-version: 24
 
+      # Demo mode encodes H.264 MP4s (rigs/extrachill-network/run.mjs
+      # renderJourneyDemos); the runner image ships no ffmpeg.
+      - name: Install ffmpeg for demo rendering
+        if: ${{ inputs.demo == true }}
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg >/dev/null && ffmpeg -version | head -1
+
       - name: Build WP Codebox and its pinned Chromium
         working-directory: .ci/wp-codebox
         run: |
