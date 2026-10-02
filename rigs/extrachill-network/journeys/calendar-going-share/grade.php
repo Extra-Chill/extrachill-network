@@ -16,7 +16,7 @@ if ( empty( $sites ) ) {
 }
 $events_blog_id = (int) $sites[0]->blog_id;
 switch_to_blog( $events_blog_id );
-$featured = get_page_by_path( 'charleston-weekend-feature', OBJECT, 'data_machine_events' );
+$featured = get_page_by_path( 'channel-bluff-charleston-pour-house', OBJECT, 'data_machine_events' );
 if ( ! $featured ) {
 	restore_current_blog();
 	throw new RuntimeException( 'Featured Charleston event was not seeded.' );
