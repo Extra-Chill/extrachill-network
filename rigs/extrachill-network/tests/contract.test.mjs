@@ -248,6 +248,10 @@ try {
   const demoRecipe = await buildRecipe({ extrachill_journeys: ['calendar-going-share'], extrachill_demo: true }, packageRoot);
   assert.ok(demoRecipe.workflow.steps.some((step) => step.metadata?.journey === 'calendar-going-share' && step.args?.includes('viewport=540x960') && step.args?.some((arg) => arg.startsWith('annotation-theme-json={'))));
   await assert.rejects(buildRecipe({ extrachill_journeys: ['gardner-event-rsvp'], extrachill_demo: true }, packageRoot), /has no demo contract/);
+  const allowedRecipeStepKeys = new Set(['command', 'args', 'metadata', 'allowFailure', 'timeoutMs', 'env', 'code', 'codeFile']);
+  for (const step of demoRecipe.workflow.steps) {
+    for (const key of Object.keys(step)) assert.ok(allowedRecipeStepKeys.has(key), `recipe step key '${key}' would fail the WP Codebox recipe schema`);
+  }
 
   // 8d. fixtureMuPlugins: journey-owned files mount into mu-plugins/ under a
   // journey-namespaced target, generically -- the rig never inspects their

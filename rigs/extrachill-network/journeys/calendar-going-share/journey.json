@@ -42,7 +42,6 @@
   },
   "steps": [
     {
-      "marker": "calendar-search",
       "command": "wordpress.browser-actions",
       "args": [
         "url=http://events.extrachill.com/",
