@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 const packageRoot = path.dirname(fileURLToPath(import.meta.url));
 
 const WP_CODEBOX_MAX_BUFFER_BYTES = 80 * 1024 * 1024;
-export const DEMO_MIN_WP_CODEBOX_VERSION = '0.31.0';
+export const DEMO_MIN_WP_CODEBOX_VERSION = '0.31.2';
 
 // Extra Chill's real product zips (WooCommerce, Gutenberg, data-machine, ...)
 // comfortably exceed WP Codebox's 25 MB/100 MB/5000-file defaults, which are
