@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.29.1] - 2026-10-02
+
+### Fixed
+- journeys render the styled theme, and demo renders encode
+
 ## [2.29.0] - 2026-10-02
 
 ### Added
