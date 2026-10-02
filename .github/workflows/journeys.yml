@@ -26,6 +26,11 @@ on:
         description: 'JSON array of journey IDs (default: every regression journey below).'
         required: false
         default: ''
+      demo:
+        description: 'Render selected journeys as instructional MP4 demos.'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -95,13 +100,15 @@ jobs:
           HOMEBOY_ARTIFACT_ROOT: ${{ runner.temp }}/journeys/artifacts
           HOMEBOY_NETWORK_RESULT_FILE: ${{ runner.temp }}/journeys/result.json
           JOURNEYS: ${{ inputs.journeys }}
+          DEMO: ${{ inputs.demo }}
         run: |
           set -euo pipefail
           journeys="${JOURNEYS:-$DEFAULT_JOURNEYS}"
           export HOMEBOY_SETTINGS_JSON="$(jq -cn --argjson j "${journeys}" \
             --arg theme "${{ github.workspace }}/.ci/extrachill-theme" \
             --arg network "${{ github.workspace }}" \
-            '{extrachill_theme_source: $theme, extrachill_journeys: $j, extrachill_component_source_overrides: {"extrachill-network": $network}}')"
+            --argjson demo "${DEMO:-false}" \
+            '{extrachill_theme_source: $theme, extrachill_journeys: $j, extrachill_demo: $demo, extrachill_component_source_overrides: {"extrachill-network": $network}}')"
           echo "Settings: ${HOMEBOY_SETTINGS_JSON}"
           node rigs/extrachill-network/run.mjs > /dev/null
 
@@ -165,5 +172,6 @@ jobs:
           path: |
             ${{ runner.temp }}/journeys/result.json
             ${{ runner.temp }}/journeys/artifacts/runtime-*/files/browser/
+            rigs/extrachill-network/evidence/demo/
           if-no-files-found: warn
           retention-days: 14

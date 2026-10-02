@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { buildRecipe, domainIdsMuPluginSource, DOMAIN_IDS_MU_PLUGIN_FILENAME, SANDBOX_COMPAT_MU_PLUGIN_FILENAME, journeySeedSetting, journeySelection, validateJourneyDocument } from '../run.mjs';
+import { assembleDemoArgs, buildRecipe, demoEncodeArgs, journeyMarkers, domainIdsMuPluginSource, DOMAIN_IDS_MU_PLUGIN_FILENAME, SANDBOX_COMPAT_MU_PLUGIN_FILENAME, journeySeedSetting, journeySelection, validateJourneyDocument } from '../run.mjs';
 
 const packageRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const topology = JSON.parse(await readFile(path.join(packageRoot, 'network-topology.json'), 'utf8'));
@@ -231,6 +231,23 @@ try {
     /allow-host to 'outside\.example'/,
   );
   await assert.rejects(validateJourneyDocument(doc({ steps: [{ command: 'wordpress.browser-actions', metadata: { kind: 'baseline' }, args: [] }] }), 'gardner-event-rsvp', topology), /reserved metadata kind/);
+
+  const demoDoc = doc({ demo: { video: { viewport: '390x844', size: '390x844', output: { width: 390, height: 844, fps: 30 } }, presentation: {}, theme: 'extra-chill.json', steps: [] } });
+  await validateJourneyDocument(demoDoc, 'gardner-event-rsvp', topology);
+  await assert.rejects(validateJourneyDocument({ ...demoDoc, demo: { ...demoDoc.demo, video: { viewport: 'phone' } } }, 'gardner-event-rsvp', topology), /viewport must be WxH/);
+  await assert.rejects(validateJourneyDocument({ ...demoDoc, demo: { ...demoDoc.demo, theme: 'missing.json' } }, 'gardner-event-rsvp', topology), /unknown demo theme/);
+  await assert.rejects(validateJourneyDocument({ ...demoDoc, steps: [{ marker: 'known' }], demo: { ...demoDoc.demo, steps: [{ after: 'missing' }] } }, 'gardner-event-rsvp', topology), /unknown markers/);
+  const theme = { accentColor: '#53940b' };
+  assert.deepEqual(assembleDemoArgs(demoDoc.demo, theme), ['capture=steps,console,errors,network,screenshot,video', 'viewport=390x844', 'video-size=390x844', 'presentation-json={}', 'annotation-theme-json={"accentColor":"#53940b"}', 'is-mobile=true', 'has-touch=true']);
+  assert.ok(!assembleDemoArgs({ ...demoDoc.demo, video: { viewport: '1280x720' } }).includes('is-mobile=true'));
+  assert.deepEqual(demoEncodeArgs('in.webm', 'out.mp4', { video: { viewport: '540x960', output: { width: 1080, height: 1920, fps: 30 } } }).slice(5, 7), ['-vf', 'scale=1080:1920:flags=lanczos,fps=30,format=yuv420p']);
+  const demoJourney = JSON.parse(await readFile(path.join(packageRoot, 'journeys', 'calendar-going-share', 'journey.json'), 'utf8'));
+  assert.ok(journeyMarkers(demoJourney).includes('going'), 'calendar-going-share must mark its Going step');
+  const shippedTheme = JSON.parse(await readFile(path.join(packageRoot, 'demo-themes', 'extra-chill.json'), 'utf8'));
+  for (const key of ['accentColor', 'textColor', 'background', 'fontFamily']) assert.ok(key in shippedTheme, `extra-chill theme declares ${key}`);
+  const demoRecipe = await buildRecipe({ extrachill_journeys: ['calendar-going-share'], extrachill_demo: true }, packageRoot);
+  assert.ok(demoRecipe.workflow.steps.some((step) => step.metadata?.journey === 'calendar-going-share' && step.args?.includes('viewport=540x960') && step.args?.some((arg) => arg.startsWith('annotation-theme-json={'))));
+  await assert.rejects(buildRecipe({ extrachill_journeys: ['gardner-event-rsvp'], extrachill_demo: true }, packageRoot), /has no demo contract/);
 
   // 8d. fixtureMuPlugins: journey-owned files mount into mu-plugins/ under a
   // journey-namespaced target, generically -- the rig never inspects their
