@@ -24,7 +24,7 @@ $sites = get_sites(
 	)
 );
 if ( empty( $sites ) ) {
-	throw new RuntimeException( 'Journey seed could not resolve site by domain: events.extrachill.com' );
+	throw new RuntimeException( esc_html( 'Journey seed could not resolve site by domain: events.extrachill.com' ) );
 }
 $events_blog_id = (int) $sites[0]->blog_id;
 
@@ -45,7 +45,7 @@ if ( ! get_user_by( 'id', CALENDAR_DEMO_FAN_ID ) ) {
 		array( '%d', '%s', '%s', '%s', '%s', '%s', '%s' )
 	);
 	if ( false === $inserted ) {
-		throw new RuntimeException( 'Unable to force-create the demo fan at ID ' . CALENDAR_DEMO_FAN_ID . '.' );
+		throw new RuntimeException( esc_html( 'Unable to force-create the demo fan at ID ' . CALENDAR_DEMO_FAN_ID . '.' ) );
 	}
 	clean_user_cache( CALENDAR_DEMO_FAN_ID );
 }
@@ -84,16 +84,22 @@ function calendar_demo_term( string $name, string $taxonomy, array $args = array
 	}
 	$created = wp_insert_term( $name, $taxonomy, $args );
 	if ( is_wp_error( $created ) ) {
-		throw new RuntimeException( "Could not create {$taxonomy} term {$name}: " . $created->get_error_message() );
+		throw new RuntimeException( esc_html( "Could not create {$taxonomy} term {$name}: " . $created->get_error_message() ) );
 	}
 	return (int) $created['term_id'];
 }
 
 $usa_id        = calendar_demo_term( 'United States', 'location', array( 'slug' => 'usa' ) );
-$sc_id         = calendar_demo_term( 'South Carolina', 'location', array( 'slug' => 'south-carolina', 'parent' => $usa_id ) );
-$charleston_id = calendar_demo_term( 'Charleston', 'location', array( 'slug' => 'charleston', 'parent' => $sc_id ) );
+$sc_id         = calendar_demo_term( 'South Carolina', 'location', array(
+	'slug'   => 'south-carolina',
+	'parent' => $usa_id,
+) );
+$charleston_id = calendar_demo_term( 'Charleston', 'location', array(
+	'slug'   => 'charleston',
+	'parent' => $sc_id,
+) );
 
-$venues = array(
+$venues    = array(
 	'Charleston Pour House' => '1977 Maybank Hwy',
 	'The Royal American'    => '970 Morrison Dr',
 	'Music Farm'            => '32 Ann St',
@@ -125,13 +131,13 @@ $events = array(
 );
 
 foreach ( $events as $event ) {
-	list( $slug, $title, $date, $time, $venue_name, $ticket_url, $featured ) = $event;
+	list( $event_slug, $event_title, $event_date, $event_time, $venue_name, $ticket_url, $featured ) = $event;
 
 	$attrs   = wp_json_encode(
 		array(
-			'startDate' => $date->format( 'Y-m-d' ),
-			'endDate'   => $date->format( 'Y-m-d' ),
-			'startTime' => $time,
+			'startDate' => $event_date->format( 'Y-m-d' ),
+			'endDate'   => $event_date->format( 'Y-m-d' ),
+			'startTime' => $event_time,
 			'endTime'   => '23:30',
 			'venue'     => $venue_name,
 			'ticketUrl' => $ticket_url,
@@ -142,21 +148,21 @@ foreach ( $events as $event ) {
 		. "<!-- wp:paragraph -->\n<p>Live music in Charleston, South Carolina.</p>\n<!-- /wp:paragraph -->"
 		. "</div>\n<!-- /wp:data-machine-events/event-details -->";
 
-	$existing = get_page_by_path( $slug, OBJECT, 'data_machine_events' );
-	$post     = array(
+	$existing   = get_page_by_path( $event_slug, OBJECT, 'data_machine_events' );
+	$event_post = array(
 		'post_type'    => 'data_machine_events',
 		'post_status'  => 'publish',
 		'post_author'  => 1,
-		'post_title'   => $title,
-		'post_name'    => $slug,
+		'post_title'   => $event_title,
+		'post_name'    => $event_slug,
 		'post_content' => $content,
 	);
 	if ( $existing ) {
-		$post['ID'] = (int) $existing->ID;
+		$event_post['ID'] = (int) $existing->ID;
 	}
-	$event_id = wp_insert_post( $post, true );
+	$event_id = wp_insert_post( $event_post, true );
 	if ( is_wp_error( $event_id ) ) {
-		throw new RuntimeException( "Could not seed event {$slug}: " . $event_id->get_error_message() );
+		throw new RuntimeException( esc_html( "Could not seed event {$event_slug}: " . $event_id->get_error_message() ) );
 	}
 
 	wp_set_object_terms( $event_id, array( $venue_ids[ $venue_name ] ), 'venue', false );
