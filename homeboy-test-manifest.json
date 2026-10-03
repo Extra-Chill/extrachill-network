@@ -22,6 +22,9 @@
     "tests/bridge-instrumentation-smoke.php": {
       "environment": "standalone-php"
     },
+    "tests/cross-site-links-invalidation-smoke.php": {
+      "environment": "standalone-php"
+    },
     "tests/cross-site-rest-dispatch-smoke.php": {
       "environment": "standalone-php"
     },

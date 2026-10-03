@@ -19,10 +19,91 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Object-cache group for cross-site term link results.
  *
  * Persistent (Redis) on this network, so entries survive across requests and
- * are shared by every consumer. Cache keys embed the current site key, so each
- * site in the network keys independently without needing a per-site group.
+ * are shared by every consumer. The group is registered as a global group so
+ * keys are network-scoped, not per-blog: invalidation must hit every site's
+ * cached results at once, and each key embeds the current site key
+ * (`links_{taxonomy}_{term_id}_{site_key}`), so entries stay unambiguous
+ * without a per-blog prefix.
+ *
+ * Invalidation contract (generation key, O(1)): every key is prefixed with a
+ * network-global generation counter stored in this group. Bumping the counter
+ * (see extrachill_cross_site_links_flush_cache_group()) instantly orphans all
+ * previous-generation entries; they age out via their TTL. Never call
+ * wp_cache_flush_group() here — on the Redis Object Cache drop-in that is a
+ * full-keyspace SCAN, not an O(group) operation.
  */
 const EXTRACHILL_CROSS_SITE_LINKS_CACHE_GROUP = 'extrachill_cross_site_links';
+
+/**
+ * Register the cross-site links cache group as network-global.
+ *
+ * Cross-site link answers change when relevant content is published on ANY
+ * network site, so a generation bump on one site must orphan cached results
+ * everywhere. Global-group keys drop the per-blog prefix, which is safe here
+ * because every key already embeds the current site key.
+ *
+ * @return void
+ */
+function extrachill_register_cross_site_links_cache_group() {
+	if ( function_exists( 'wp_cache_add_global_groups' ) ) {
+		wp_cache_add_global_groups( array( EXTRACHILL_CROSS_SITE_LINKS_CACHE_GROUP ) );
+	}
+}
+add_action( 'init', 'extrachill_register_cross_site_links_cache_group', 0 );
+
+/**
+ * Current generation of the cross-site links cache, read once per request.
+ *
+ * The generation is an integer stored in the cache group itself. On a cold
+ * key it is initialized to 1 with wp_cache_add() (atomic — concurrent cold
+ * requests converge on the winner's value).
+ *
+ * @param bool $reset True to drop the per-request static after a generation
+ *                    bump so later reads build the new keys. Internal use.
+ * @return int Current generation (>= 1).
+ */
+function extrachill_cross_site_links_cache_generation( $reset = false ) {
+	static $generation = null;
+
+	if ( $reset ) {
+		$generation = null;
+	}
+
+	if ( null !== $generation ) {
+		return $generation;
+	}
+
+	$found = wp_cache_get( 'generation', EXTRACHILL_CROSS_SITE_LINKS_CACHE_GROUP );
+
+	if ( false !== $found && (int) $found >= 1 ) {
+		$generation = (int) $found;
+		return $generation;
+	}
+
+	if ( wp_cache_add( 'generation', 1, EXTRACHILL_CROSS_SITE_LINKS_CACHE_GROUP ) ) {
+		$generation = 1;
+		return $generation;
+	}
+
+	// Another request initialized the counter first; read its value.
+	$found      = (int) wp_cache_get( 'generation', EXTRACHILL_CROSS_SITE_LINKS_CACHE_GROUP );
+	$generation = $found >= 1 ? $found : 1;
+
+	return $generation;
+}
+
+/**
+ * Build a generation-prefixed cache key for this group.
+ *
+ * All cross-site-links cache keys must route through this helper so a
+ * generation bump invalidates every entry at once.
+ *
+ * @param string $key Bare key (e.g. "links_artist_12_main").
+ * @return string Generation-prefixed key (e.g. "g7:links_artist_12_main").
+ */
+function extrachill_cross_site_links_cache_key( $key ) {
+	return 'g' . extrachill_cross_site_links_cache_generation() . ':' . $key;
+}
 
 /**
  * Get cross-site links for a taxonomy term where content exists.
@@ -41,10 +122,11 @@ const EXTRACHILL_CROSS_SITE_LINKS_CACHE_GROUP = 'extrachill_cross_site_links';
  * Extra-Chill/extrachill-network#50). Without this caching layer each render
  * would repeat the full cross-site cost every time.
  *
- * Results are cached in the persistent object cache keyed by
+ * Results are cached in the persistent object cache keyed by generation +
  * taxonomy + term_id + current_site_key (the output is site-relative because
- * the current site is skipped). TTL is filterable; default 1 hour. Invalidated
- * on save/delete of the relevant CPTs across the network (see
+ * the current site is skipped). TTL is filterable; default 1 hour.
+ * Invalidated via generation-key bump on publish-state changes and deletes of
+ * the relevant CPTs across the network (see
  * extrachill_cross_site_links_flush_cache_group()).
  *
  * @param WP_Term|int $term     Term object or term ID.
@@ -61,7 +143,9 @@ function extrachill_get_cross_site_term_links( $term, $taxonomy ) {
 	}
 
 	$current_site_key = extrachill_get_current_site_key();
-	$cache_key        = 'links_' . $taxonomy . '_' . (int) $term->term_id . '_' . (string) $current_site_key;
+	$cache_key        = extrachill_cross_site_links_cache_key(
+		'links_' . $taxonomy . '_' . (int) $term->term_id . '_' . (string) $current_site_key
+	);
 
 	$cached = wp_cache_get( $cache_key, EXTRACHILL_CROSS_SITE_LINKS_CACHE_GROUP );
 	if ( false !== $cached ) {
@@ -546,7 +630,7 @@ function extrachill_build_term_archive_url( $term_slug, $taxonomy, $blog_id ) {
 }
 
 /**
- * Flush the cross-site term links object-cache group.
+ * Invalidate the cross-site term links cache by bumping the generation key.
  *
  * The cached result of extrachill_get_cross_site_term_links() answers "does
  * this term have published content on the other network sites?" — an answer
@@ -555,18 +639,45 @@ function extrachill_build_term_archive_url( $term_slug, $taxonomy, $blog_id ) {
  * invalidation isn't practical because the cache is keyed by term across
  * sites, so a single content change can affect many cached entries.
  *
- * The pragmatic, correct strategy is a group-level flush on content change of
- * the relevant CPTs, backstopped by the short default TTL. The flush is cheap:
- * the persistent object cache (Redis drop-in) supports native group flushing
- * via wp_cache_flush_group(), so this clears only this group — not the whole
- * cache.
+ * Contract: an O(1) increment of the network-global generation counter. Every
+ * cache key in this group is generation-prefixed (see
+ * extrachill_cross_site_links_cache_key()), so the bump instantly orphans all
+ * previous-generation entries; they age out via their TTL. This replaces the
+ * former wp_cache_flush_group() call, which the Redis Object Cache drop-in
+ * implements as a full-keyspace SCAN — an O(keyspace) stall (~0.8-1.5s at
+ * 1M+ keys) that ran ~100x/hour under aggregator import load. Never call
+ * wp_cache_flush_group() on this group.
+ *
+ * Coalesced per request: a batch of N inserts in one import job bumps the
+ * generation once, since one bump already orphans everything. The guard is
+ * the generation value seen at bump time, so a bump from another actor
+ * (another worker, another site) re-arms it rather than suppressing a needed
+ * bump.
  *
  * @return void
  */
 function extrachill_cross_site_links_flush_cache_group() {
-	if ( function_exists( 'wp_cache_flush_group' ) ) {
-		wp_cache_flush_group( EXTRACHILL_CROSS_SITE_LINKS_CACHE_GROUP );
+	static $last_bumped_generation = null;
+
+	// Fresh read (not the per-request static): concurrent bumps from other
+	// requests must be visible here for the coalescing guard to re-arm.
+	$generation = (int) wp_cache_get( 'generation', EXTRACHILL_CROSS_SITE_LINKS_CACHE_GROUP );
+
+	if ( null !== $last_bumped_generation && $generation === $last_bumped_generation ) {
+		return;
 	}
+
+	$next = wp_cache_incr( 'generation', 1, EXTRACHILL_CROSS_SITE_LINKS_CACHE_GROUP );
+
+	if ( false === $next ) {
+		$next = $generation + 1;
+		wp_cache_set( 'generation', $next, EXTRACHILL_CROSS_SITE_LINKS_CACHE_GROUP );
+	}
+
+	$last_bumped_generation = (int) $next;
+
+	// Drop the per-request static so later reads/writes build the new keys.
+	extrachill_cross_site_links_cache_generation( true );
 }
 
 /**
@@ -594,22 +705,31 @@ function extrachill_cross_site_links_invalidating_post_types() {
 }
 
 /**
- * Maybe flush the cross-site links cache when relevant content changes.
+ * Maybe bump the cross-site links generation when publish state changes.
  *
- * Fires on save_post. Skips autosaves/revisions and post types that can't
- * affect cross-site link answers, so routine edits elsewhere don't thrash the
- * cache.
+ * Fires on transition_post_status, not save_post: an update to an
+ * already-published post (an aggregator price edit, a typo fix) does not
+ * change the "does this term have published content on site X" answer, while
+ * every wp_insert_post/wp_update_post fires save_post. A bump only happens
+ * when a post enters or leaves 'publish', which is exactly when cached
+ * cross-site answers can go stale. Skips autosaves/revisions and post types
+ * that can't affect cross-site link answers.
  *
- * @param int     $post_id Post ID.
- * @param WP_Post $post    Post object.
+ * @param string  $new_status New post status.
+ * @param string  $old_status Old post status.
+ * @param WP_Post $post       Post object.
  * @return void
  */
-function extrachill_cross_site_links_maybe_flush_on_save( $post_id, $post ) {
-	if ( wp_is_post_autosave( $post_id ) || wp_is_post_revision( $post_id ) ) {
+function extrachill_cross_site_links_maybe_flush_on_transition( $new_status, $old_status, $post ) {
+	if ( $new_status === $old_status ) {
 		return;
 	}
 
-	if ( ! $post instanceof WP_Post ) {
+	if ( 'publish' !== $new_status && 'publish' !== $old_status ) {
+		return;
+	}
+
+	if ( ! $post instanceof WP_Post || wp_is_post_autosave( $post ) || wp_is_post_revision( $post ) ) {
 		return;
 	}
 
@@ -619,10 +739,13 @@ function extrachill_cross_site_links_maybe_flush_on_save( $post_id, $post ) {
 
 	extrachill_cross_site_links_flush_cache_group();
 }
-add_action( 'save_post', 'extrachill_cross_site_links_maybe_flush_on_save', 10, 2 );
+add_action( 'transition_post_status', 'extrachill_cross_site_links_maybe_flush_on_transition', 10, 3 );
 
 /**
- * Flush on hard delete of a relevant post.
+ * Bump the cross-site links generation on hard delete of a relevant post.
+ *
+ * Deleted posts have no transition pair (status goes straight to removal), so
+ * the deleted_post hook remains the invalidation point here.
  *
  * @param int     $post_id Post ID.
  * @param WP_Post $post    Post object (WP 5.5+ passes this).
