@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.29.2] - 2026-10-03
+
+### Fixed
+- replace O(keyspace) group flush with O(1) generation-key invalidation
+
 ## [2.29.1] - 2026-10-02
 
 ### Fixed
