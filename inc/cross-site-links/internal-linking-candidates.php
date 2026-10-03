@@ -263,11 +263,14 @@ function extrachill_add_cross_site_linking_candidates( $candidates, $post_id, $s
 
 				$url      = (string) $link['url'];
 				$site_key = isset( $link['site_key'] ) ? (string) $link['site_key'] : '';
-				if ( 'events' === $site_key && function_exists( 'extrachill_build_term_archive_url' ) ) {
-					$canonical_url = extrachill_build_term_archive_url( (string) $term->slug, $taxonomy, (int) ( $link['blog_id'] ?? $events_blog_id ) );
-					if ( $canonical_url ) {
-						$url = $canonical_url;
-					}
+				// Resolver results may be cached from before URL normalization;
+				// canonicalize every cross-site URL to its target blog's slash rule.
+				if ( ! empty( $link['blog_id'] ) && function_exists( 'extrachill_normalize_url_for_blog' ) ) {
+					$url = extrachill_normalize_url_for_blog( $url, (int) $link['blog_id'] );
+				}
+				// Never write a query-string URL (e.g. a ?p= permalink) into post content.
+				if ( false !== strpos( $url, '?' ) ) {
+					continue;
 				}
 				if ( 'location' === $taxonomy && 'wire' === $site_key && ! extrachill_internal_linking_is_wire_location_relevant( $post_id ) ) {
 					continue;

@@ -322,8 +322,8 @@ function extrachill_get_artist_profile_by_slug( $slug ) {
 		// get_permalink() yields ?p=. Build the pretty URL and apply the target
 		// blog's own trailing-slash rule (user_trailingslashit() would use the
 		// origin blog's $wp_rewrite and add a 301-ing slash).
-		if ( '' !== $permalink && '/' === substr( (string) get_option( 'permalink_structure' ), -1 ) ) {
-			$permalink = trailingslashit( $permalink );
+		if ( '' !== $permalink && function_exists( 'extrachill_normalize_url_for_blog' ) ) {
+			$permalink = extrachill_normalize_url_for_blog( $permalink, $artist_blog_id );
 		}
 
 		if ( ! $permalink ) {
