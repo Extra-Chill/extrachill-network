@@ -264,6 +264,7 @@ function extrachill_get_cross_site_term_links_uncached( $term, $taxonomy ) {
 		if ( ! $url ) {
 			continue;
 		}
+		$url = extrachill_normalize_url_for_blog( $url, $blog_id );
 
 		$links[] = array(
 			'blog_id'   => $blog_id,
@@ -599,6 +600,32 @@ function extrachill_check_term_on_site( $term_slug, $taxonomy, $blog_id ) {
 }
 
 /**
+ * Normalize a URL to a blog's own trailing-slash rule.
+ *
+ * get_term_link()/get_permalink() under switch_to_blog() apply the ORIGIN
+ * blog's $wp_rewrite trailing-slash rule, so URLs built cross-site can carry
+ * a slash the target blog 301s away (or lack one it adds). Query-string and
+ * fragment URLs are returned unchanged.
+ *
+ * @param string $url     URL on the target blog.
+ * @param int    $blog_id Target blog ID.
+ * @return string Canonical URL for that blog.
+ */
+function extrachill_normalize_url_for_blog( $url, $blog_id ) {
+	$url = (string) $url;
+	if ( '' === $url || false !== strpbrk( $url, '?#' ) ) {
+		return $url;
+	}
+
+	$structure = (string) get_blog_option( (int) $blog_id, 'permalink_structure' );
+	if ( '' === $structure ) {
+		return $url;
+	}
+
+	return '/' === substr( $structure, -1 ) ? trailingslashit( $url ) : untrailingslashit( $url );
+}
+
+/**
  * Build taxonomy archive URL for a site
  *
  * @param string $term_slug Term slug.
@@ -623,16 +650,7 @@ function extrachill_build_term_archive_url( $term_slug, $taxonomy, $blog_id ) {
 			return null;
 		}
 
-		// get_term_link() under switch_to_blog() applies the ORIGIN blog's
-		// trailing-slash rule ($wp_rewrite is not switched). Normalize to the
-		// target blog's own permalink structure so the URL is canonical and
-		// does not 301.
-		$structure = (string) get_option( 'permalink_structure' );
-		if ( '' !== $structure ) {
-			$url = '/' === substr( $structure, -1 ) ? trailingslashit( $url ) : untrailingslashit( $url );
-		}
-
-		return $url;
+		return extrachill_normalize_url_for_blog( $url, $blog_id );
 	} finally {
 		restore_current_blog();
 	}
