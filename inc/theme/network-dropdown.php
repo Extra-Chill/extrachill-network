@@ -101,7 +101,7 @@ function extrachill_network_dropdown( $current_label ) {
 	<span class="ec-mini-dropdown" aria-expanded="false">
 		<button class="ec-mini-dropdown-toggle network-dropdown-toggle" aria-haspopup="true">
 			<?php echo esc_html( $current_label ); ?>
-			<?php echo ec_icon( 'chevron-down' ); ?>
+			<?php echo ec_icon( 'chevron-down' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- ec_icon() returns trusted local SVG sprite markup. ?>
 		</button>
 		<ul class="ec-mini-dropdown-menu" role="menu">
 			<?php foreach ( $other_sites as $site ) : ?>

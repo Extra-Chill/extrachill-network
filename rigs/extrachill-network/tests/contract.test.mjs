@@ -1,0 +1,347 @@
+/**
+ * Env-independent contract test for the extrachill-network rig's recipe
+ * builder. No live WP Codebox infrastructure is touched here; this only
+ * asserts the shape of the generated wp-codebox/workspace-recipe/v1 document.
+ */
+import { strict as assert } from 'node:assert';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { assembleDemoArgs, buildRecipe, demoEncodeArgs, demoLoadCuts, demoTrimmedTime, journeyMarkers, paceDemoSteps, domainIdsMuPluginSource, DOMAIN_IDS_MU_PLUGIN_FILENAME, SANDBOX_COMPAT_MU_PLUGIN_FILENAME, journeySeedSetting, journeySelection, validateJourneyDocument } from '../run.mjs';
+
+const packageRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const topology = JSON.parse(await readFile(path.join(packageRoot, 'network-topology.json'), 'utf8'));
+const components = JSON.parse(await readFile(path.join(packageRoot, 'components.json'), 'utf8'));
+
+const temporary = await mkdtemp(path.join(os.tmpdir(), 'extrachill-network-contract-'));
+const themeDir = path.join(temporary, 'extrachill-theme');
+const artifactsDir = path.join(temporary, 'artifacts');
+process.env.HOMEBOY_ARTIFACT_ROOT = artifactsDir;
+
+try {
+  await mkdir(themeDir, { recursive: true });
+  await writeFile(path.join(themeDir, 'style.css'), '/*\nTheme Name: Extra Chill\n*/\n');
+  await writeFile(path.join(themeDir, 'index.php'), '<?php\n');
+
+  // 1. No theme source supplied: recipe still builds (dry-run/check must not
+  // require a local checkout of the theme repo), just without a theme mount.
+  const withoutTheme = await buildRecipe({}, packageRoot);
+  assert.equal(withoutTheme.schema, 'wp-codebox/workspace-recipe/v1');
+  assert.equal(withoutTheme.runtime.backend, 'wordpress');
+  assert.equal(withoutTheme.inputs.extra_themes, undefined);
+  assert.equal(withoutTheme.inputs.siteSeeds.length, 1);
+  const seed = withoutTheme.inputs.siteSeeds[0];
+  assert.equal(seed.type, 'parent_site');
+  assert.equal(seed.bootstrap.multisite.enabled, true);
+  assert.equal(seed.bootstrap.multisite.install, 'subdomain');
+  assert.equal(seed.bootstrap.multisite.sites.length, topology.sites.length);
+  assert.equal(seed.bootstrap.domains.filter((domain) => domain.primary).length, 1);
+  assert.equal(withoutTheme.inputs.extra_plugins.length, components.plugins.length);
+  for (const plugin of withoutTheme.inputs.extra_plugins) {
+    assert.equal(plugin.activate, false, `${plugin.slug} must mount without wp-codebox's own activation; the rig activates plugins itself per-site`);
+    assert.match(plugin.source, /^https:\/\//, `${plugin.slug} must default to a remote source`);
+  }
+  assert.equal(withoutTheme.workflow.steps.length, 2 + topology.sites.length, 'activate + assert + browser-probe-per-site (no theme step when extrachill_theme_source is unset)');
+
+  // 1b. The domain-ID mu-plugin is mounted on every boot: file mount exists,
+  // the source was generated into the artifacts root, and the generated PHP
+  // covers every topology domain with a constant mapping.
+  const muMount = withoutTheme.inputs.mounts.find((mount) => mount.metadata?.kind === 'extrachill-network-domain-ids');
+  assert.ok(muMount, 'the generated EC_BLOG_ID mu-plugin must be mounted on every boot');
+  assert.equal(muMount.type, 'file');
+  assert.match(muMount.target, /^\/wordpress\/wp-content\/mu-plugins\//);
+  const muSource = await readFile(muMount.source, 'utf8');
+  assert.match(muSource, /events\.extrachill\.com'\s+=>\s+'EC_BLOG_ID_EVENTS'/);
+  for (const site of topology.sites) {
+    assert.ok(
+      muSource.includes(`'${site.domain}' => 'EC_BLOG_ID_`),
+      `generated mu-plugin must map topology domain ${site.domain}`,
+    );
+  }
+  assert.match(muSource, /WP_INSTALLING/, 'mu-plugin must skip while installing');
+  assert.match(muSource, /function_exists\( ?'get_sites' ?\)/, 'mu-plugin must skip requests where the multisite API is not loaded yet');
+
+  // 1b'. The sandbox-compat mu-plugin is mounted on every boot
+  // (extrachill-network#302): http URL resolution, Playground redirect-host
+  // re-merge, SQLite advisory-lock answers.
+  const compatMount = withoutTheme.inputs.mounts.find((mount) => mount.metadata?.kind === 'extrachill-network-sandbox-compat');
+  assert.ok(compatMount, 'the sandbox-compat mu-plugin must be mounted on every boot');
+  assert.equal(compatMount.target, `/wordpress/wp-content/mu-plugins/${SANDBOX_COMPAT_MU_PLUGIN_FILENAME}`);
+  const compatSource = await readFile(compatMount.source, 'utf8');
+  assert.match(compatSource, /'ec_site_url_override'/);
+  // Redirect hosts and the production egress fence are WP Codebox's job since v0.28.2 (#2533, #2534).
+  assert.doesNotMatch(compatSource, /'allowed_redirect_hosts'|'pre_http_request'/);
+  assert.match(compatSource, /'clean_url', 'ec_rig_downgrade_network_urls'/);
+  assert.match(compatSource, /GET_LOCK\|RELEASE_LOCK\|IS_FREE_LOCK/);
+  assert.match(compatSource, /'extrachill_api_rate_limit_store'/);
+  assert.match(compatSource, /'extrachill_users_registration_admitter'/);
+
+  // 1c. domainIdsMuPluginSource refuses a topology that dropped a mapped domain.
+  assert.throws(
+    () => domainIdsMuPluginSource({ sites: topology.sites.filter((site) => site.domain !== 'events.extrachill.com') }),
+    /events\.extrachill\.com/,
+  );
+
+  // 1d. journeySelection validates its shape.
+  assert.deepEqual(journeySelection({}), []);
+  assert.deepEqual(journeySelection({ extrachill_journeys: ['gardner-event-rsvp'] }), ['gardner-event-rsvp']);
+  assert.throws(() => journeySelection({ extrachill_journeys: 'gardner-event-rsvp' }), /array/);
+  assert.throws(() => journeySelection({ extrachill_journeys: [42] }), /non-empty journey ID/);
+  assert.throws(() => journeySelection({ extrachill_journeys: ['a', 'a'] }), /more than once/);
+
+  // 2. Local theme checkout path: mounts as a directory, adds a theme
+  // activation workflow step (matching wordpress-multisite-e2e's own pattern).
+  const withLocalTheme = await buildRecipe({ extrachill_theme_source: themeDir }, packageRoot);
+  const themeMount = withLocalTheme.inputs.mounts.find((mount) => mount.metadata?.kind === 'wordpress-theme');
+  assert.ok(themeMount, 'local theme checkout mounts as a directory beside the mu-plugin');
+  assert.equal(themeMount.source, themeDir);
+  assert.equal(withLocalTheme.inputs.extra_themes, undefined);
+  assert.ok(withLocalTheme.workflow.steps.some((step) => step.metadata?.kind === 'wordpress-theme-activation'));
+
+  // 3. Remote https zip theme source: forward-compatible inputs.extra_themes
+  // (Automattic/wp-codebox#2519). No local mount, no activation step needed
+  // since wp-codebox's own extra_themes activation handles it.
+  const withRemoteTheme = await buildRecipe({ extrachill_theme_source: 'https://github.com/Extra-Chill/extrachill/releases/latest/download/extrachill.zip' }, packageRoot);
+  assert.equal(withRemoteTheme.inputs.mounts.find((mount) => mount.metadata?.kind === 'wordpress-theme'), undefined);
+  assert.equal(withRemoteTheme.inputs.extra_themes.length, 1);
+  assert.equal(withRemoteTheme.inputs.extra_themes[0].activate, true);
+  assert.ok(!withRemoteTheme.workflow.steps.some((step) => step.metadata?.kind === 'wordpress-theme-activation'));
+
+  // 4. Component source overrides and a release-set pin change the resolved
+  // source without touching the checked-in default manifest.
+  const overridden = await buildRecipe({
+    extrachill_component_source_overrides: { 'extrachill-network': '/abs/local/extrachill-network' },
+    extrachill_release_set: { 'extrachill-users': { ref: 'v0.42.8' } },
+  }, packageRoot);
+  const overriddenNetwork = overridden.inputs.extra_plugins.find((plugin) => plugin.slug === 'extrachill-network');
+  assert.equal(overriddenNetwork.source, '/abs/local/extrachill-network');
+  const pinnedUsers = overridden.inputs.extra_plugins.find((plugin) => plugin.slug === 'extrachill-users');
+  assert.equal(pinnedUsers.source, 'https://github.com/Extra-Chill/extrachill-users/releases/download/v0.42.8/extrachill-users.zip');
+
+  // 5. Excluded components (no public source) are not mounted by default and
+  // require both the opt-in flag and an explicit override to appear.
+  assert.ok(!withoutTheme.inputs.extra_plugins.some((plugin) => plugin.slug === 'intelligence'));
+  const withIntelligence = await buildRecipe({
+    extrachill_include_excluded_components: ['intelligence'],
+    extrachill_component_source_overrides: { intelligence: '/abs/local/intelligence' },
+  }, packageRoot);
+  assert.ok(withIntelligence.inputs.extra_plugins.some((plugin) => plugin.slug === 'intelligence' && plugin.source === '/abs/local/intelligence'));
+
+  // 6. wp.org sources hit the always-allowed default download host with no
+  // extra WP_CODEBOX_ALLOWED_DOWNLOAD_HOSTS configuration required.
+  const woocommerce = withoutTheme.inputs.extra_plugins.find((plugin) => plugin.slug === 'woocommerce');
+  assert.equal(woocommerce.source, 'https://downloads.wordpress.org/plugin/woocommerce.zip');
+
+  // 7. Every browser-probe step targets a real declared site domain and
+  // blocks all other network egress.
+  const probes = withoutTheme.workflow.steps.filter((step) => step.metadata?.kind === 'extrachill-network-baseline-page-load');
+  assert.equal(probes.length, topology.sites.length);
+  for (const site of topology.sites) {
+    const probe = probes.find((step) => step.metadata.domain === site.domain);
+    assert.ok(probe, `missing baseline browser probe for ${site.domain}`);
+    assert.ok(probe.args.includes(`route-host=${site.domain}`));
+    assert.ok(probe.args.includes('network-policy=block'));
+  }
+
+  // 8. Journey contract: selecting a journey appends seed -> steps -> grade
+  // after the baseline, merges its runtimeEnv, and stamps every step.
+  const withJourney = await buildRecipe({ extrachill_journeys: ['gardner-event-rsvp'] }, packageRoot);
+  const journeyMeta = withJourney.metadata?.extrachillJourneys;
+  assert.deepEqual(journeyMeta, [{ id: 'gardner-event-rsvp', persona: 'extra-chill-users/chris-gardner', sites: ['events.extrachill.com', 'extrachill.com'] }]);
+  assert.equal(withJourney.inputs.runtimeEnv?.WP_AGENT_RUNTIME, '1', 'journey runtimeEnv merges into the recipe inputs');
+  assert.equal(withoutTheme.inputs.runtimeEnv, undefined, 'no runtimeEnv when no journey is selected');
+
+  const kinds = withJourney.workflow.steps.map((step) => step.metadata?.kind ?? 'baseline');
+  const firstJourneyIndex = kinds.indexOf('journey-seed');
+  assert.ok(firstJourneyIndex > 0, 'journey seed step exists');
+  assert.equal(kinds[kinds.indexOf('extrachill-network-assertion')], 'extrachill-network-assertion');
+  assert.ok(firstJourneyIndex > kinds.lastIndexOf('extrachill-network-baseline-page-load'), 'journeys run after the full baseline');
+  const gradeIndex = kinds.lastIndexOf('journey-grade');
+  assert.ok(gradeIndex > firstJourneyIndex, 'grade runs after the journey steps');
+  for (let i = firstJourneyIndex + 1; i < gradeIndex; ++i) {
+    assert.equal(withJourney.workflow.steps[i].metadata.journey, 'gardner-event-rsvp', `step ${i} belongs to the journey`);
+  }
+  // Journey isolation: every journey step may fail without stopping the
+  // recipe; baseline steps (activation, assertion, page probes) stay fatal.
+  for (const step of withJourney.workflow.steps) {
+    if (step.metadata?.journey) {
+      assert.equal(step.allowFailure, true, `journey step ${step.metadata.kind} must be isolated (allowFailure)`);
+    }
+  }
+  assert.equal(withJourney.workflow.steps.find((step) => step.metadata?.kind === 'extrachill-network-assertion')?.allowFailure, undefined, 'baseline assertion stays fatal');
+
+  const seedStep = withJourney.workflow.steps[firstJourneyIndex];
+  assert.equal(seedStep.command, 'wordpress.run-php');
+  assert.match(seedStep.args[0], /^code-file=/, 'seed runs a code-file from the journey directory');
+  const gradeStep = withJourney.workflow.steps[gradeIndex];
+  assert.equal(gradeStep.command, 'wordpress.run-php');
+  assert.match(gradeStep.args[0], /^code-file=/);
+
+  // 8b. Journey browser steps are domain-scoped: absolute URLs on declared
+  // sites, route-host/allow-host within the journey's sites, no egress leaks.
+  const journeyBrowserSteps = withJourney.workflow.steps.filter((step) => step.metadata?.kind === 'journey-browser-step');
+  assert.ok(journeyBrowserSteps.length >= 5, 'the gardner-event-rsvp journey ships multiple browser steps');
+  for (const step of journeyBrowserSteps) {
+    const urlArg = step.args.find((arg) => arg.startsWith('url='));
+    assert.ok(urlArg, 'journey browser step carries an absolute url');
+    const host = new URL(urlArg.slice('url='.length)).host;
+    assert.ok(['events.extrachill.com', 'extrachill.com'].includes(host), `journey step targets declared site, got ${host}`);
+    assert.ok(step.args.some((arg) => arg === `route-host=${host}`), 'journey step pins route-host to the url host');
+    assert.ok(step.args.includes('network-policy=block'), 'journey step blocks other network egress');
+  }
+
+  // 8c. Unknown journeys, foreign domains, and missing persona files fail loudly.
+  await assert.rejects(
+    () => buildRecipe({ extrachill_journeys: ['nope'] }, packageRoot),
+    /Unknown extrachill_journeys entry 'nope'/,
+  );
+
+  const doc = (overrides = {}) => ({
+    schema: 'extrachill-network/journey/v1',
+    id: 'gardner-event-rsvp',
+    sites: ['events.extrachill.com'],
+    persona: { file: 'gardner.v1.json' },
+    steps: [{ command: 'wordpress.browser-actions', args: ['url=http://events.extrachill.com/', 'route-host=events.extrachill.com'] }],
+    ...overrides,
+  });
+  await assert.rejects(validateJourneyDocument(doc({ schema: 'other/v1' }), 'gardner-event-rsvp', topology), /must declare schema/);
+  await assert.rejects(validateJourneyDocument(doc({ id: 'other' }), 'gardner-event-rsvp', topology), /must match the directory name/);
+  await assert.rejects(validateJourneyDocument(doc({ sites: [] }), 'gardner-event-rsvp', topology), /non-empty "sites"/);
+  await assert.rejects(validateJourneyDocument(doc({ sites: ['nonexistent.example'] }), 'gardner-event-rsvp', topology), /never by blog ID/);
+  await assert.rejects(validateJourneyDocument(doc(), 'gardner-event-rsvp', topology, async () => false), /missing from rigs\/extrachill-network\/personas\//);
+  await assert.rejects(validateJourneyDocument(doc({ grade: { codeFile: 'grade.php' } }), 'gardner-event-rsvp', topology, async () => true, async () => false), /grade\.php' does not exist/);
+  await assert.rejects(validateJourneyDocument(doc({ steps: [{ command: 'wordpress.browser-actions', args: ['url=/events/x'] }] }), 'gardner-event-rsvp', topology), /non-absolute url/);
+  await assert.rejects(validateJourneyDocument(doc({ steps: [{ command: 'wordpress.browser-actions', args: ['url=http://artist.extrachill.com/'] }] }), 'gardner-event-rsvp', topology), /outside the journey's declared sites/);
+  await assert.rejects(validateJourneyDocument(doc({ steps: [{ command: 'wordpress.browser-actions', args: ['url=http://events.extrachill.com/', 'route-host=extrachill.com'] }] }), 'gardner-event-rsvp', topology), /route-host/);
+
+  // Repeatable allow-host/route-host (a journey step driving a real
+  // cross-site flow, e.g. a browser-handoff redirect, legitimately declares
+  // more than one host): every declared host is checked, not just the first.
+  const multiHostDoc = {
+    schema: 'extrachill-network/journey/v1',
+    id: 'gardner-event-rsvp',
+    sites: ['events.extrachill.com', 'extrachill.com'],
+    steps: [{ command: 'wordpress.browser-actions', args: ['url=http://events.extrachill.com/', 'route-host=events.extrachill.com', 'allow-host=events.extrachill.com', 'allow-host=extrachill.com'] }],
+  };
+  await validateJourneyDocument(multiHostDoc, 'gardner-event-rsvp', topology);
+  await assert.rejects(
+    validateJourneyDocument({ ...multiHostDoc, steps: [{ ...multiHostDoc.steps[0], args: [...multiHostDoc.steps[0].args, 'allow-host=outside.example'] }] }, 'gardner-event-rsvp', topology),
+    /allow-host to 'outside\.example'/,
+  );
+  await assert.rejects(validateJourneyDocument(doc({ steps: [{ command: 'wordpress.browser-actions', metadata: { kind: 'baseline' }, args: [] }] }), 'gardner-event-rsvp', topology), /reserved metadata kind/);
+
+  const demoDoc = doc({ demo: { video: { viewport: '390x844', size: '390x844', output: { width: 390, height: 844, fps: 30 } }, presentation: {}, theme: 'extra-chill.json', steps: [] } });
+  await validateJourneyDocument(demoDoc, 'gardner-event-rsvp', topology);
+  await assert.rejects(validateJourneyDocument({ ...demoDoc, demo: { ...demoDoc.demo, video: { viewport: 'phone' } } }, 'gardner-event-rsvp', topology), /viewport must be WxH/);
+  await assert.rejects(validateJourneyDocument({ ...demoDoc, demo: { ...demoDoc.demo, theme: 'missing.json' } }, 'gardner-event-rsvp', topology), /unknown demo theme/);
+  await assert.rejects(validateJourneyDocument({ ...demoDoc, demo: { ...demoDoc.demo, video: { ...demoDoc.demo.video, maxSeconds: 0 } } }, 'gardner-event-rsvp', topology), /maxSeconds/);
+  const homepageDemo = JSON.parse(await readFile(path.join(packageRoot, 'journeys', 'calendar-going-share', 'journey.json'), 'utf8'));
+  assert.ok(homepageDemo.demo.video.maxSeconds <= 59, 'calendar demo is capped under one minute');
+  const recorded = [
+    { kind: 'navigate', videoOffsetMs: { startMs: 0, endMs: 5000 } },
+    { kind: 'annotate', videoOffsetMs: { startMs: 5000, endMs: 5010 } },
+    { kind: 'waitFor', waitFor: 'duration', videoOffsetMs: { startMs: 5010, endMs: 7010 } },
+    { kind: 'click', videoOffsetMs: { startMs: 7010, endMs: 26000 } },
+    { kind: 'waitFor', waitFor: 'duration', videoOffsetMs: { startMs: 26000, endMs: 26900 } },
+    { kind: 'waitFor', waitFor: 'load', videoOffsetMs: { startMs: 26900, endMs: 48000 } },
+    { kind: 'click', videoOffsetMs: { startMs: 48000, endMs: 49000 } },
+    { kind: 'expect', videoOffsetMs: { startMs: 49000, endMs: 49100 } },
+  ];
+  const cuts = demoLoadCuts(recorded, 600);
+  assert.deepEqual(cuts, [[600, 5000], [7610, 26000], [26900, 48000]], 'navigations and navigating clicks (even across a pacing settle) are cut; authored waits and in-page clicks are kept');
+  assert.equal(demoTrimmedTime(49100, cuts), 49100 - 4400 - 18390 - 21100);
+  assert.equal(demoTrimmedTime(3000, cuts), 600, 'a time inside a cut maps to the cut start');
+  assert.match(demoEncodeArgs('in.webm', 'out.mp4', { video: { viewport: '540x960' } }, [[600, 5000]])[6], /^select='not\(between\(t,0\.600,5\.000\)\)',setpts=N\/FRAME_RATE\/TB,format=yuv420p$/);
+  assert.deepEqual(demoLoadCuts([{ kind: 'annotate', videoOffsetMs: { startMs: 2500, endMs: 2510 } }]), [[0, 2500]], 'lead-in before the first step is cut');
+  assert.match(homepageDemo.steps[0].args.find((arg) => arg.startsWith('url=')), /^url=http:\/\/extrachill\.com\/$/, 'calendar demo starts on the homepage');
+  await assert.rejects(validateJourneyDocument({ ...demoDoc, demo: { ...demoDoc.demo, environment: { colorScheme: 'sepia' } } }, 'gardner-event-rsvp', topology), /colorScheme/);
+  await assert.rejects(validateJourneyDocument({ ...demoDoc, demo: { ...demoDoc.demo, cover: { marker: 'missing' } } }, 'gardner-event-rsvp', topology), /cover.marker/);
+  await assert.rejects(validateJourneyDocument({ ...demoDoc, steps: [{ marker: 'known' }], demo: { ...demoDoc.demo, steps: [{ after: 'missing' }] } }, 'gardner-event-rsvp', topology), /unknown markers/);
+  const theme = { accentColor: '#53940b' };
+  assert.deepEqual(assembleDemoArgs(demoDoc.demo, theme), ['capture=steps,console,errors,network,screenshot,video', 'viewport=390x844', 'video-size=390x844', 'presentation-json={}', 'annotation-theme-json={"accentColor":"#53940b"}', 'is-mobile=true', 'has-touch=true']);
+  assert.ok(assembleDemoArgs({ ...demoDoc.demo, environment: { colorScheme: 'dark' } }).includes('browser-environment-json={"colorScheme":"dark"}'));
+  const pacingInput = JSON.stringify([{ kind: 'navigate' }, { kind: 'annotate', shape: 'caption' }, { kind: 'click' }]);
+  assert.deepEqual(JSON.parse(paceDemoSteps(pacingInput, { settleMs: 1800, minCaptionMs: 2500 })), [{ kind: 'navigate' }, { kind: 'waitFor', waitFor: 'duration', duration: '1800ms' }, { kind: 'annotate', shape: 'caption' }, { kind: 'waitFor', waitFor: 'duration', duration: '2500ms' }, { kind: 'click' }, { kind: 'waitFor', waitFor: 'duration', duration: '1800ms' }]);
+  assert.equal(paceDemoSteps(pacingInput), pacingInput);
+  assert.ok(!assembleDemoArgs({ ...demoDoc.demo, video: { viewport: '1280x720' } }).includes('is-mobile=true'));
+  assert.deepEqual(demoEncodeArgs('in.webm', 'out.mp4', { video: { viewport: '540x960', output: { width: 1080, height: 1920, fps: 30 } } }).slice(5, 7), ['-vf', 'scale=1080:1920:flags=lanczos,fps=30,format=yuv420p']);
+  const demoJourney = JSON.parse(await readFile(path.join(packageRoot, 'journeys', 'calendar-going-share', 'journey.json'), 'utf8'));
+  assert.ok(journeyMarkers(demoJourney).includes('going'), 'calendar-going-share must mark its Going step');
+  assert.ok(journeyMarkers(demoJourney).includes(demoJourney.demo.cover.marker), 'cover marker exists in the journey');
+  const calendarSeed = await readFile(path.join(packageRoot, 'journeys', 'calendar-going-share', 'seed.php'), 'utf8');
+  const calendarGrade = await readFile(path.join(packageRoot, 'journeys', 'calendar-going-share', 'grade.php'), 'utf8');
+  const featuredSlug = calendarSeed.match(/array\( '(channel-bluff-[^']+)'/)[1];
+  assert.ok(calendarGrade.includes(`'${featuredSlug}'`), 'journey featured slug matches its grade');
+  const shippedTheme = JSON.parse(await readFile(path.join(packageRoot, 'demo-themes', 'extra-chill.json'), 'utf8'));
+  for (const key of ['accentColor', 'textColor', 'background', 'fontFamily']) assert.ok(key in shippedTheme, `extra-chill theme declares ${key}`);
+  const demoRecipe = await buildRecipe({ extrachill_journeys: ['calendar-going-share'], extrachill_demo: true }, packageRoot);
+  assert.ok(demoRecipe.workflow.steps.some((step) => step.metadata?.journey === 'calendar-going-share' && step.args?.includes('viewport=540x960') && step.args?.some((arg) => arg.startsWith('annotation-theme-json={'))));
+  const calendarRegression = await buildRecipe({ extrachill_journeys: ['calendar-going-share'] }, packageRoot);
+  const calendarDemoBrowser = demoRecipe.workflow.steps.find((step) => step.metadata?.kind === 'journey-browser-step' && step.metadata?.journey === 'calendar-going-share');
+  const calendarRegressionBrowser = calendarRegression.workflow.steps.find((step) => step.metadata?.kind === 'journey-browser-step' && step.metadata?.journey === 'calendar-going-share');
+  assert.ok(calendarDemoBrowser.args.includes('browser-environment-json={"colorScheme":"dark"}'));
+  assert.ok(!calendarRegressionBrowser.args.some((arg) => arg.startsWith('browser-environment-json=')));
+  assert.equal(calendarRegressionBrowser.args.find((arg) => arg.startsWith('steps-json=')), demoJourney.steps[0].args.find((arg) => arg.startsWith('steps-json=')), 'regression steps remain unpaced');
+  await assert.rejects(buildRecipe({ extrachill_journeys: ['gardner-event-rsvp'], extrachill_demo: true }, packageRoot), /has no demo contract/);
+  const allowedRecipeStepKeys = new Set(['command', 'args', 'metadata', 'allowFailure', 'timeoutMs', 'env', 'code', 'codeFile']);
+  for (const step of demoRecipe.workflow.steps) {
+    for (const key of Object.keys(step)) assert.ok(allowedRecipeStepKeys.has(key), `recipe step key '${key}' would fail the WP Codebox recipe schema`);
+  }
+
+  // 8d. fixtureMuPlugins: journey-owned files mount into mu-plugins/ under a
+  // journey-namespaced target, generically -- the rig never inspects their
+  // content -- and a missing file fails validation loudly.
+  await assert.rejects(
+    validateJourneyDocument(doc({ fixtureMuPlugins: ['missing.php'] }), 'gardner-event-rsvp', topology, async () => true, async () => false),
+    /fixtureMuPlugins entry 'missing\.php' does not exist/,
+  );
+  await assert.rejects(
+    validateJourneyDocument(doc({ fixtureMuPlugins: [] }), 'gardner-event-rsvp', topology),
+    /fixtureMuPlugins must be a non-empty array/,
+  );
+
+  // 9. journeySeedSetting: opaque passthrough, validated shape only.
+  assert.equal(journeySeedSetting({}), undefined);
+  assert.equal(journeySeedSetting({ extrachill_journey_seed: 'campaign-001' }), 'campaign-001');
+  assert.throws(() => journeySeedSetting({ extrachill_journey_seed: '' }), /non-empty string/);
+  assert.throws(() => journeySeedSetting({ extrachill_journey_seed: 42 }), /non-empty string/);
+
+  const withSeed = await buildRecipe({ extrachill_journeys: ['gardner-event-rsvp'], extrachill_journey_seed: 'campaign-001' }, packageRoot);
+  const seedStepIndex = withSeed.workflow.steps.findIndex((step) => step.metadata?.kind === 'journey-seed-setting');
+  assert.ok(seedStepIndex > -1, 'a journey seed is selected passes through as one generic run-php step');
+  assert.ok(seedStepIndex < withSeed.workflow.steps.findIndex((step) => step.metadata?.kind === 'journey-seed'), 'the seed-setting step runs before any journey seed step');
+  assert.equal(withoutTheme.workflow.steps.some((step) => step.metadata?.kind === 'journey-seed-setting'), false, 'no journey selected means no seed-setting step');
+
+  // 8e. allow-host (and route-host) accept a comma-separated host list, but
+  // every listed host must still be a declared site -- a step may name more
+  // than one declared site (a real cross-site click-through), never widen
+  // beyond the journey's own sites.
+  await assert.doesNotReject(
+    validateJourneyDocument(
+      doc({
+        sites: ['events.extrachill.com', 'extrachill.com'],
+        steps: [{ command: 'wordpress.browser-actions', args: ['url=http://events.extrachill.com/', 'route-host=events.extrachill.com', 'allow-host=events.extrachill.com,extrachill.com'] }],
+      }),
+      'gardner-event-rsvp',
+      topology,
+    ),
+  );
+  await assert.rejects(
+    validateJourneyDocument(
+      doc({
+        sites: ['events.extrachill.com', 'extrachill.com'],
+        steps: [{ command: 'wordpress.browser-actions', args: ['url=http://events.extrachill.com/', 'route-host=events.extrachill.com', 'allow-host=events.extrachill.com,artist.extrachill.com'] }],
+      }),
+      'gardner-event-rsvp',
+      topology,
+    ),
+    /outside the journey's declared sites/,
+  );
+
+  console.log('extrachill-network rig contract ok');
+} finally {
+  delete process.env.HOMEBOY_ARTIFACT_ROOT;
+  await rm(temporary, { recursive: true, force: true });
+}

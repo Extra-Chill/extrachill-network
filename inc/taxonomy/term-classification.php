@@ -158,6 +158,28 @@ function extrachill_network_maybe_schedule_term_classification( $new_status, $ol
 		return;
 	}
 
+	/*
+	 * publish -> publish is an update, not a publication.
+	 *
+	 * The pending branch above already excludes no-op transitions; this one
+	 * did not, so every save of an already-published post scheduled a paid
+	 * classification. That is fine for an editor changing the body text and
+	 * wrong for metadata churn: an importer refreshing post_date on 10,146
+	 * unchanged events in one evening scheduled a job for each.
+	 *
+	 * The downstream identical-fingerprint check cannot absorb this, because
+	 * it only recognises classifications that succeeded — and 86% of events
+	 * on this network have no provenance, so they never look done and never
+	 * converge. Compare against what was already attempted instead.
+	 */
+	$is_noop_transition = $old_status === $new_status;
+	if ( $is_noop_transition && ! empty( $post->ID ) ) {
+		$fingerprint = extrachill_network_term_classification_fingerprint( $post );
+		if ( extrachill_network_term_classification_already_attempted( $post->ID, $fingerprint ) ) {
+			return;
+		}
+	}
+
 	$site_key = function_exists( 'extrachill_get_current_site_key' ) ? extrachill_get_current_site_key() : null;
 	if ( ! $site_key ) {
 		return;
@@ -169,6 +191,33 @@ function extrachill_network_maybe_schedule_term_classification( $new_status, $ol
 
 	$content_text = trim( wp_strip_all_tags( (string) $post->post_title . ' ' . strip_shortcodes( (string) $post->post_content ) ) );
 	if ( mb_strlen( $content_text ) < (int) apply_filters( 'extrachill_network_term_classification_min_length', 40, $post ) ) {
+		return;
+	}
+
+	/**
+	 * Whether a post is worth classifying automatically.
+	 *
+	 * Classification costs an inference call per post, so a site that knows
+	 * some of its content will never be browsed should be able to say so.
+	 * The canonical case is the events site: terms exist to make upcoming
+	 * shows discoverable, and 74% of its 131,008 published events are already
+	 * in the past, where no amount of classification changes what anyone
+	 * finds.
+	 *
+	 * This deliberately guards only the automatic path. An explicit call to
+	 * extrachill_network_schedule_term_classification(), including a forced
+	 * reclassification from the CLI or an ability, still runs — a human
+	 * asking for the work is not the case this is protecting against.
+	 *
+	 * Whether a given post matters is domain knowledge owned by the plugin
+	 * that defines the post type, not by this one, which is why it is a seam
+	 * rather than a condition here.
+	 *
+	 * @param bool    $should_classify Default true.
+	 * @param WP_Post $post            Post being considered.
+	 * @param string  $site_key        Network site key.
+	 */
+	if ( ! apply_filters( 'extrachill_network_should_classify_post', true, $post, $site_key ) ) {
 		return;
 	}
 

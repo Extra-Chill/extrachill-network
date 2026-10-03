@@ -1,5 +1,256 @@
 # Changelog
 
+## [2.29.1] - 2026-10-02
+
+### Fixed
+- journeys render the styled theme, and demo renders encode
+
+## [2.29.0] - 2026-10-02
+
+### Added
+- dark-mode, paced Channel Bluff calendar demo with a cover frame
+
+## [2.28.0] - 2026-10-02
+
+### Added
+- journey demo mode, rendering instructional walkthrough videos from the journey contract
+
+## [2.27.6] - 2026-10-01
+
+### Fixed
+- keep upload URLs on the switched blog's host
+
+## [2.27.5] - 2026-10-01
+
+### Fixed
+- block events crawlers and reconcile live server block
+
+## [2.27.4] - 2026-09-30
+
+### Fixed
+- purge the page cache once after every deploy
+
+## [2.27.3] - 2026-09-29
+
+### Fixed
+- send all platform mail as the system via PermissionHelper::run_as_system
+
+## [2.27.2] - 2026-09-27
+
+### Changed
+- anonymous event submission journey (extrachill-events#910)
+
+## [2.27.1] - 2026-09-27
+
+### Fixed
+- return a refused queued fallback instead of fataling
+
+## [2.27.0] - 2026-09-27
+
+### Added
+- returning-artist journey — reach and edit an existing Link Page from anywhere
+
+## [2.26.1] - 2026-09-27
+
+### Fixed
+- isolate journeys so one journey's crash can't discard the others
+
+## [2.26.0] - 2026-09-27
+
+### Added
+- route /join by Link Page kind — artist, venue, or promoter
+
+## [2.25.0] - 2026-09-27
+
+### Added
+- musician Link Page onboarding journey as a nightly regression test
+
+## [2.24.1] - 2026-09-27
+
+### Fixed
+- deliver principal-less transactional mail (password resets) via system flag + queued fallback
+
+## [2.24.0] - 2026-09-26
+
+### Added
+- journey contract + Gardner Oct 21 event-RSVP journey on the full network
+
+## [2.23.2] - 2026-09-26
+
+### Changed
+- assert the real deploy gate and its fixed bugs, not a stale marker
+
+## [2.23.1] - 2026-09-26
+
+### Fixed
+- rewrite migrate_post image URLs host-agnostically, gate --delete-source on unrewritten URLs
+
+## [2.23.0] - 2026-09-25
+
+### Added
+- core-based image optimization (WebP on upload, serve existing WebP siblings) to replace Imagify
+
+## [2.22.0] - 2026-09-25
+
+### Added
+- send /join onboarding to the right link page destination
+
+## [2.21.0] - 2026-09-25
+
+### Added
+- answer Link Pages /edit endpoints
+
+## [2.20.0] - 2026-09-25
+
+### Added
+- answer Link Pages public host and root page settings
+
+## [2.19.8] - 2026-09-25
+
+### Fixed
+- route extrachill.link/join to artist signup from the host integration
+
+## [2.19.7] - 2026-09-24
+
+### Fixed
+- bail cleanly from bootstrap when loaded outside multisite
+
+## [2.19.6] - 2026-09-23
+
+### Fixed
+- post link page click beacons to the serving site after the cutover
+
+## [2.19.5] - 2026-09-23
+
+### Changed
+- install the pinned Chromium before the deploy gate boots the rig
+
+## [2.19.4] - 2026-09-23
+
+### Changed
+- use homeboy-action's WP Codebox in the deploy gate
+
+## [2.19.3] - 2026-09-23
+
+### Changed
+- count planned results so the deploy gate actually runs
+
+## [2.19.2] - 2026-09-23
+
+### Changed
+- always pass --dry-run to the deploy gate's resolve step
+
+## [2.19.1] - 2026-09-23
+
+### Changed
+- run the extrachill-network rig as a pre-deploy gate
+- wire managed Homeboy CI gate
+
+## [2.19.0] - 2026-09-23
+
+### Added
+- answer Link Pages subscribe and edit endpoints for artist owners
+
+## [2.18.0] - 2026-09-23
+
+### Added
+- Extra Chill host integration for the owner-neutral Link Pages runtime
+
+## [2.17.6] - 2026-09-23
+
+### Changed
+- move extrachill-network Homeboy rig from Extra-Chill/.github
+
+### Fixed
+- exclude rigs/ from the release package-completeness check
+
+## [2.17.5] - 2026-09-22
+
+### Fixed
+- move the deploy schedule off the peak hour boundaries
+
+## [2.17.4] - 2026-09-22
+
+### Changed
+- seed the logo fixture instead of depending on a real main-site asset
+
+## [2.17.3] - 2026-09-22
+
+### Fixed
+- ability contracts are untestable and orphaned test files run nowhere
+
+## [2.17.2] - 2026-09-22
+
+### Fixed
+- return next_offset as 0, not null, when there is no next page
+
+## [2.17.1] - 2026-09-22
+
+### Fixed
+- grant id-token so the shared release workflow can start
+
+## [2.17.0] - 2026-09-22
+
+### Added
+- add extrachill/regenerate-og-card ability
+
+## [2.16.1] - 2026-09-22
+
+### Fixed
+- report deploy config faults without blaming the component
+
+## [2.16.0] - 2026-09-21
+
+### Added
+- supply a logo brand token for the event OG card
+
+## [2.15.2] - 2026-09-21
+
+### Fixed
+- content-address OG card cache keys so regeneration busts the CDN cache
+
+## [2.15.1] - 2026-09-21
+
+### Fixed
+- stop hiding components that never deployed
+
+## [2.15.0] - 2026-09-21
+
+### Added
+- report real deploys and failures to Discord, stay silent on no-ops
+- poll for tagged releases as the primary trigger; gate unattended runs on DEPLOY_AUTOMATION
+- push-based network deploy workflow with checked-in Homeboy config
+
+### Changed
+- adopt the shared Homeboy release train
+
+### Fixed
+- do not report a workflow failure as a failed deployment
+- export a github.com token so checkout-less resolution works
+- runner.temp is step-scoped — set HOMEBOY_OUTPUT_DIR from a step
+- move deploy.yml env into the job — runner/github.workspace are job-scoped
+
+## [2.14.0] - 2026-09-19
+
+### Added
+- gate the extrachill.link Link Pages site cutover behind a network option
+
+### Fixed
+- guard extrachill-root style dependency for non-EC themes
+
+## [2.13.0] - 2026-09-19
+
+### Added
+- let sites veto automatic term classification
+
+## [2.12.0] - 2026-09-19
+
+### Added
+- add an ability-permission audit tool that does not run under WP-CLI
+
+### Fixed
+- stop paying for classification on no-op publish transitions
+
 ## [2.11.0] - 2026-09-17
 
 ### Added

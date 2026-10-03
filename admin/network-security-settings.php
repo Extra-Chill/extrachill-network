@@ -78,7 +78,7 @@ function ec_render_network_security_page() {
 	<div class="wrap">
 		<h1><?php esc_html_e( 'Extra Chill Security Settings', 'extrachill-network' ); ?></h1>
 
-		<?php if ( isset( $_GET['updated'] ) ) : ?>
+		<?php if ( isset( $_GET['updated'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only notice flag from the post-save redirect; no data is processed. ?>
 			<div class="notice notice-success is-dismissible">
 				<p><?php esc_html_e( 'Security settings updated successfully.', 'extrachill-network' ); ?></p>
 			</div>

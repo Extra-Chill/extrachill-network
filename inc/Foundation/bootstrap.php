@@ -22,6 +22,8 @@ function extrachill_network_boot_foundation() {
 	}
 
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/blog-ids.php';
+	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/link-pages/site-integration.php';
+	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/media/image-optimization.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/mail.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/service-assertions.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/cross-site-rest.php';
@@ -30,6 +32,7 @@ function extrachill_network_boot_foundation() {
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/extrachill-turnstile.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/oauth-helpers.php';
 	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/object-cache-config.php';
+	require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/core/upload-url-host.php';
 
 	if ( function_exists( 'wp_register_ability' ) ) {
 		require_once EXTRACHILL_NETWORK_PLUGIN_DIR . 'inc/Abilities/CategoryRegistration.php';

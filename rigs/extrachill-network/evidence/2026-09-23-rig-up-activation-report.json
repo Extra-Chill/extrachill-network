@@ -1,0 +1,295 @@
+{
+  "schema": "extrachill-network/activation-report/v1",
+  "report": {
+    "sites": {
+      "extrachill.com": {
+        "theme": "extrachill",
+        "httpStatus": 200,
+        "expectedHttpStatus": [
+          200
+        ],
+        "fatalMarkerInBody": false,
+        "expectedActivePlugins": [
+          "co-authors-plus/co-authors-plus.php",
+          "data-machine-editor/data-machine-editor.php",
+          "data-machine-socials/data-machine-socials.php",
+          "extrachill-ai-adventure/extrachill-ai-adventure.php",
+          "extrachill-blog/extrachill-blog.php",
+          "extrachill-contact/extrachill-contact.php",
+          "extrachill-content-blocks/extrachill-content-blocks.php"
+        ],
+        "actualActivePlugins": [
+          "co-authors-plus/co-authors-plus.php",
+          "data-machine-editor/data-machine-editor.php",
+          "data-machine-socials/data-machine-socials.php",
+          "extrachill-ai-adventure/extrachill-ai-adventure.php",
+          "extrachill-blog/extrachill-blog.php",
+          "extrachill-contact/extrachill-contact.php",
+          "extrachill-content-blocks/extrachill-content-blocks.php"
+        ],
+        "missingPlugins": [],
+        "unexpectedActivePlugins": []
+      },
+      "community.extrachill.com": {
+        "theme": "extrachill",
+        "httpStatus": 200,
+        "expectedHttpStatus": [
+          200
+        ],
+        "fatalMarkerInBody": false,
+        "expectedActivePlugins": [
+          "bbpress/bbpress.php",
+          "blocks-everywhere/blocks-everywhere.php",
+          "extrachill-community/extrachill-community.php",
+          "extrachill-content-blocks/extrachill-content-blocks.php"
+        ],
+        "actualActivePlugins": [
+          "bbpress/bbpress.php",
+          "blocks-everywhere/blocks-everywhere.php",
+          "extrachill-community/extrachill-community.php",
+          "extrachill-content-blocks/extrachill-content-blocks.php"
+        ],
+        "missingPlugins": [],
+        "unexpectedActivePlugins": []
+      },
+      "shop.extrachill.com": {
+        "theme": "extrachill",
+        "httpStatus": 200,
+        "expectedHttpStatus": [
+          200
+        ],
+        "fatalMarkerInBody": false,
+        "expectedActivePlugins": [
+          "extrachill-shop/extrachill-shop.php",
+          "woocommerce/woocommerce.php"
+        ],
+        "actualActivePlugins": [
+          "extrachill-shop/extrachill-shop.php",
+          "woocommerce/woocommerce.php"
+        ],
+        "missingPlugins": [],
+        "unexpectedActivePlugins": []
+      },
+      "artist.extrachill.com": {
+        "theme": "extrachill",
+        "httpStatus": 200,
+        "expectedHttpStatus": [
+          200
+        ],
+        "fatalMarkerInBody": false,
+        "expectedActivePlugins": [
+          "extrachill-artist-platform/extrachill-artist-platform.php"
+        ],
+        "actualActivePlugins": [
+          "extrachill-artist-platform/extrachill-artist-platform.php"
+        ],
+        "missingPlugins": [],
+        "unexpectedActivePlugins": []
+      },
+      "events.extrachill.com": {
+        "theme": "extrachill",
+        "httpStatus": 200,
+        "expectedHttpStatus": [
+          200
+        ],
+        "fatalMarkerInBody": false,
+        "expectedActivePlugins": [
+          "data-machine-events/data-machine-events.php",
+          "extrachill-events/extrachill-events.php"
+        ],
+        "actualActivePlugins": [
+          "data-machine-events/data-machine-events.php",
+          "extrachill-events/extrachill-events.php"
+        ],
+        "missingPlugins": [],
+        "unexpectedActivePlugins": []
+      },
+      "newsletter.extrachill.com": {
+        "theme": "extrachill",
+        "httpStatus": 200,
+        "expectedHttpStatus": [
+          200
+        ],
+        "fatalMarkerInBody": false,
+        "expectedActivePlugins": [],
+        "actualActivePlugins": [],
+        "missingPlugins": [],
+        "unexpectedActivePlugins": []
+      },
+      "docs.extrachill.com": {
+        "theme": "extrachill",
+        "httpStatus": 200,
+        "expectedHttpStatus": [
+          200
+        ],
+        "fatalMarkerInBody": false,
+        "expectedActivePlugins": [
+          "extrachill-docs/extrachill-docs.php"
+        ],
+        "actualActivePlugins": [
+          "extrachill-docs/extrachill-docs.php"
+        ],
+        "missingPlugins": [],
+        "unexpectedActivePlugins": []
+      },
+      "wire.extrachill.com": {
+        "theme": "extrachill",
+        "httpStatus": 200,
+        "expectedHttpStatus": [
+          200
+        ],
+        "fatalMarkerInBody": false,
+        "expectedActivePlugins": [
+          "data-machine-socials/data-machine-socials.php",
+          "extrachill-news-wire/extrachill-news-wire.php"
+        ],
+        "actualActivePlugins": [
+          "data-machine-socials/data-machine-socials.php",
+          "extrachill-news-wire/extrachill-news-wire.php"
+        ],
+        "missingPlugins": [],
+        "unexpectedActivePlugins": []
+      },
+      "studio.extrachill.com": {
+        "theme": "extrachill",
+        "httpStatus": 200,
+        "expectedHttpStatus": [
+          200
+        ],
+        "fatalMarkerInBody": false,
+        "expectedActivePlugins": [
+          "blocks-everywhere/blocks-everywhere.php",
+          "data-machine-socials/data-machine-socials.php",
+          "extrachill-studio/extrachill-studio.php"
+        ],
+        "actualActivePlugins": [
+          "blocks-everywhere/blocks-everywhere.php",
+          "data-machine-socials/data-machine-socials.php",
+          "extrachill-studio/extrachill-studio.php"
+        ],
+        "missingPlugins": [],
+        "unexpectedActivePlugins": []
+      },
+      "extrachill.link": {
+        "theme": "extrachill",
+        "httpStatus": 200,
+        "expectedHttpStatus": [
+          200,
+          404
+        ],
+        "fatalMarkerInBody": false,
+        "expectedActivePlugins": [
+          "extrachill-artist-platform/extrachill-artist-platform.php"
+        ],
+        "actualActivePlugins": [
+          "extrachill-artist-platform/extrachill-artist-platform.php"
+        ],
+        "missingPlugins": [],
+        "unexpectedActivePlugins": []
+      },
+      "auth.extrachill.com": {
+        "theme": "extrachill",
+        "httpStatus": 200,
+        "expectedHttpStatus": [
+          200
+        ],
+        "fatalMarkerInBody": false,
+        "expectedActivePlugins": [
+          "extrachill-mcp/extrachill-mcp.php"
+        ],
+        "actualActivePlugins": [
+          "extrachill-mcp/extrachill-mcp.php"
+        ],
+        "missingPlugins": [],
+        "unexpectedActivePlugins": []
+      }
+    },
+    "network": {
+      "expected": [
+        "ai-provider-for-anthropic/plugin.php",
+        "ai-provider-for-openai/plugin.php",
+        "data-machine-business/data-machine-business.php",
+        "data-machine/data-machine.php",
+        "easy-wp-smtp/easy-wp-smtp.php",
+        "extrachill-analytics/extrachill-analytics.php",
+        "extrachill-api/extrachill-api.php",
+        "extrachill-cache/extrachill-cache.php",
+        "extrachill-cli/extrachill-cli.php",
+        "extrachill-events/extrachill-events-network-blocks.php",
+        "extrachill-link-pages/extrachill-link-pages.php",
+        "extrachill-network/extrachill-network.php",
+        "extrachill-newsletter/extrachill-newsletter.php",
+        "extrachill-search/extrachill-search.php",
+        "extrachill-seo/extrachill-seo.php",
+        "extrachill-users/extrachill-users.php",
+        "gutenberg/gutenberg.php",
+        "html-to-blocks-converter/html-to-blocks-converter.php",
+        "imagify/imagify.php",
+        "redis-cache/redis-cache.php",
+        "two-factor/two-factor.php",
+        "wp-native-auth/wp-native-auth.php"
+      ],
+      "actual": [
+        "ai-provider-for-anthropic/plugin.php",
+        "ai-provider-for-openai/plugin.php",
+        "data-machine-business/data-machine-business.php",
+        "data-machine/data-machine.php",
+        "easy-wp-smtp/easy-wp-smtp.php",
+        "extrachill-analytics/extrachill-analytics.php",
+        "extrachill-api/extrachill-api.php",
+        "extrachill-cache/extrachill-cache.php",
+        "extrachill-cli/extrachill-cli.php",
+        "extrachill-events/extrachill-events-network-blocks.php",
+        "extrachill-link-pages/extrachill-link-pages.php",
+        "extrachill-network/extrachill-network.php",
+        "extrachill-newsletter/extrachill-newsletter.php",
+        "extrachill-search/extrachill-search.php",
+        "extrachill-seo/extrachill-seo.php",
+        "extrachill-users/extrachill-users.php",
+        "gutenberg/gutenberg.php",
+        "html-to-blocks-converter/html-to-blocks-converter.php",
+        "imagify/imagify.php",
+        "redis-cache/redis-cache.php",
+        "two-factor/two-factor.php",
+        "wp-native-auth/wp-native-auth.php"
+      ],
+      "missing": [],
+      "unexpected": []
+    },
+    "excludedComponents": [
+      {
+        "slug": "wp-codebox",
+        "scope": "network",
+        "reason": "This rig runs the whole network inside a WP Codebox sandbox; mounting the WP Codebox WordPress companion plugin a second time inside its own disposable sandbox is out of scope and would be self-referential."
+      },
+      {
+        "slug": "chubes-gallery-lightbox",
+        "scope": "network",
+        "reason": "chubes4/chubes-gallery-lightbox has no GitHub Releases and is not listed on WordPress.org, so there is no zip to source by default. A local override can be added the same way extrachill_theme_source works once this is needed."
+      },
+      {
+        "slug": "wp-coding-agents-integration",
+        "scope": [
+          "extrachill.com"
+        ],
+        "reason": "Agent-runtime development tooling (wp-coding-agents bridge), not network product code the deploy gate is meant to verify."
+      },
+      {
+        "slug": "intelligence",
+        "scope": [
+          "studio.extrachill.com"
+        ],
+        "reason": "Private repository with no public source, per NETWORK-ARCHITECTURE.MD ('the installed repository is not publicly linkable'). Requires a local override to include in a run."
+      },
+      {
+        "slug": "mediavine-control-panel",
+        "scope": [
+          "extrachill.com",
+          "events.extrachill.com",
+          "wire.extrachill.com"
+        ],
+        "reason": "Proprietary vendor plugin Mediavine distributes directly to publisher accounts; there is no public zip to source."
+      }
+    ]
+  }
+}

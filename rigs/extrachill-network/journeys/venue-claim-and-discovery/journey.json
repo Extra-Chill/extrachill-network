@@ -1,0 +1,138 @@
+{
+  "schema": "extrachill-network/journey/v1",
+  "id": "venue-claim-and-discovery",
+  "title": "Venue claim acquisition and city-calendar venue discovery",
+  "description": "Walks the real venue archive page as four roles (logged-out, non-member, active venue member, administrator) to verify the contextual claim/manage disclosure the product actually renders (extrachill-events inc/core/booking-console.php ec_events_render_venue_archive_workspace_action()), then walks a real location archive with many venues to verify the collapsed venue-directory disclosure. Ported from extrachill-events/tests/browser/venue-claim-acquisition.evidence.js + venue-claim-archive-fixture.php and tests/browser/city-calendar-priority.evidence.js (extrachill-events#292). The originals ran against a fully mocked PHP fixture reproducing inc/templates/archive.php and inc/templates/location-venue-badges.php by hand; this journey exercises the REAL templates on a real seeded venue and a real seeded location on the network rig instead.",
+  "origin": {
+    "repository": "Extra-Chill/extrachill-events",
+    "files": [
+      "tests/browser/venue-claim-acquisition.evidence.js",
+      "tests/browser/venue-claim-archive-fixture.php",
+      "tests/browser/city-calendar-priority.evidence.js"
+    ]
+  },
+  "sites": ["events.extrachill.com"],
+  "runtimeEnv": {
+    "WP_AGENT_RUNTIME": "1"
+  },
+  "seed": { "codeFile": "seed.php", "timeoutMs": 120000 },
+  "steps": [
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "venue-claim-logged-out" },
+      "args": [
+        "url=http://events.extrachill.com/venue/venue-claim-fixture-room/",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "step-timeout=60s",
+        "timeout=150s",
+        "capture=steps,console,errors,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/venue/venue-claim-fixture-room/\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\"[data-venue-workspace-action]\"},{\"kind\":\"evaluate\",\"expression\":\"document.querySelector('[data-venue-workspace-action] a').textContent.trim()\",\"assert\":\"Sign in to claim or manage\"},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('[data-venue-workspace-action] a')||{}).getAttribute('href').includes('wp-login.php')\",\"assert\":true},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('.venue-booking-cta a')||{textContent:''}).textContent.trim()\",\"assert\":\"Submit a booking inquiry\"},{\"kind\":\"screenshot\",\"name\":\"venue-claim-logged-out\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "venue-claim-nonmember-desktop" },
+      "args": [
+        "url=http://events.extrachill.com/venue/venue-claim-fixture-room/",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "auth=wordpress-admin",
+        "auth-user-id=301",
+        "viewport=1280x900",
+        "step-timeout=60s",
+        "timeout=150s",
+        "capture=steps,console,errors,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/venue/venue-claim-fixture-room/\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\"[data-venue-workspace-action]\"},{\"kind\":\"evaluate\",\"expression\":\"document.querySelector('[data-venue-workspace-action] a').textContent.trim()\",\"assert\":\"Claim or request access\"},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('.venue-workspace-disclosure')||{}).getAttribute('open')\",\"assert\":null},{\"kind\":\"evaluate\",\"expression\":\"!!document.querySelector('.page-title') && !!document.querySelector('.venue-booking-cta') && !!document.querySelector('.venue-workspace-disclosure')\",\"assert\":true},{\"kind\":\"click\",\"selector\":\".venue-workspace-disclosure summary\"},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('.venue-workspace-disclosure')||{}).getAttribute('open')\"},{\"kind\":\"screenshot\",\"name\":\"venue-claim-nonmember-desktop\"},{\"kind\":\"evaluate\",\"expression\":\"document.documentElement.scrollWidth <= document.documentElement.clientWidth + 4\",\"assert\":true}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "venue-claim-nonmember-mobile" },
+      "args": [
+        "url=http://events.extrachill.com/venue/venue-claim-fixture-room/",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "auth=wordpress-admin",
+        "auth-user-id=301",
+        "viewport=390x844",
+        "step-timeout=60s",
+        "timeout=150s",
+        "capture=steps,console,errors,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/venue/venue-claim-fixture-room/\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\"[data-venue-workspace-action]\"},{\"kind\":\"evaluate\",\"expression\":\"document.documentElement.scrollWidth <= document.documentElement.clientWidth + 4\",\"assert\":true},{\"kind\":\"screenshot\",\"name\":\"venue-claim-nonmember-mobile\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "venue-claim-active-member" },
+      "args": [
+        "url=http://events.extrachill.com/venue/venue-claim-fixture-room/",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "auth=wordpress-admin",
+        "auth-user-id=302",
+        "step-timeout=60s",
+        "timeout=150s",
+        "capture=steps,console,errors,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/venue/venue-claim-fixture-room/\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\"[data-venue-workspace-action]\"},{\"kind\":\"evaluate\",\"expression\":\"document.querySelector('[data-venue-workspace-action] a').textContent.trim()\",\"assert\":\"Manage Venue\"},{\"kind\":\"screenshot\",\"name\":\"venue-claim-active-member\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "venue-claim-administrator" },
+      "args": [
+        "url=http://events.extrachill.com/venue/venue-claim-fixture-room/",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "auth=wordpress-admin",
+        "auth-user-id=1",
+        "step-timeout=60s",
+        "timeout=150s",
+        "capture=steps,console,errors,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/venue/venue-claim-fixture-room/\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\"[data-venue-workspace-action]\"},{\"kind\":\"evaluate\",\"expression\":\"document.querySelector('[data-venue-workspace-action] a').textContent.trim()\",\"assert\":\"Review venue claims\"},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('[data-venue-workspace-action] a')||{}).getAttribute('href').includes('tab-claims')\",\"assert\":true},{\"kind\":\"screenshot\",\"name\":\"venue-claim-administrator\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "city-calendar-venue-directory-desktop" },
+      "args": [
+        "url=http://events.extrachill.com/location/usa/south-carolina/charleston",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "viewport=1280x900",
+        "step-timeout=60s",
+        "timeout=150s",
+        "capture=steps,console,errors,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/location/usa/south-carolina/charleston\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\".location-archive-venue-directory\"},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('.location-archive-venue-directory')||{}).getAttribute('open')\",\"assert\":null},{\"kind\":\"evaluate\",\"expression\":\"document.querySelectorAll('.location-archive-venue-directory a').length >= 5\",\"assert\":true},{\"kind\":\"evaluate\",\"expression\":\"(()=>{const a=document.querySelector('.location-archive-venue-directory a');return a?a.offsetParent!==null:false;})()\"},{\"kind\":\"click\",\"selector\":\".location-archive-venue-directory__summary\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"300ms\"},{\"kind\":\"evaluate\",\"expression\":\"(document.querySelector('.location-archive-venue-directory')||{}).getAttribute('open')\",\"assert\":\"\"},{\"kind\":\"evaluate\",\"expression\":\"(()=>{const a=document.querySelector('.location-archive-venue-directory a');return a?a.offsetParent!==null:false;})()\"},{\"kind\":\"screenshot\",\"name\":\"city-calendar-priority-desktop\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": { "kind": "journey-browser-step", "step": "city-calendar-venue-directory-mobile" },
+      "args": [
+        "url=http://events.extrachill.com/location/usa/south-carolina/charleston",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "viewport=390x844",
+        "step-timeout=60s",
+        "timeout=150s",
+        "capture=steps,console,errors,screenshot,dom-snapshot",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/location/usa/south-carolina/charleston\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\".location-archive-venue-directory\"},{\"kind\":\"evaluate\",\"expression\":\"document.documentElement.scrollWidth <= document.documentElement.clientWidth + 4\",\"assert\":true},{\"kind\":\"screenshot\",\"name\":\"city-calendar-priority-mobile\"}]"
+      ]
+    }
+  ]
+}

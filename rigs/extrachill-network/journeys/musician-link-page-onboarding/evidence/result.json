@@ -1,0 +1,1110 @@
+{
+ "schema": "extrachill-network/journey-result/musician-link-page-onboarding/v1",
+ "fixture": {
+  "schema": "extrachill-network/journey-fixture/musician-link-page-onboarding/v1",
+  "main_blog_id": 1,
+  "artist_blog_id": 4,
+  "community_blog_id": 2,
+  "link_blog_id": 10,
+  "pages": {
+   "extrachill.com/power": 5,
+   "extrachill.com/login": 4,
+   "artist.extrachill.com/login": 3,
+   "artist.extrachill.com/create-artist": 4,
+   "artist.extrachill.com/manage-artist": 5,
+   "artist.extrachill.com/manage-link-page": 6,
+   "artist.extrachill.com/analytics": 8,
+   "community.extrachill.com/login": 3,
+   "community.extrachill.com/onboarding": 14,
+   "extrachill.link/login": 3
+  },
+  "musician_user_id": 601,
+  "cutover": true
+ },
+ "results": [
+  {
+   "id": "join-link-registration-creates-account",
+   "task": "A musician who clicks extrachill.link/join and registers ends up with an account.",
+   "outcome": "pass",
+   "evidence": {
+    "user_id": 602
+   },
+   "pinned_issue": null
+  },
+  {
+   "id": "join-registration-remembers-join-context",
+   "task": "The account created via /join is marked as a join-flow signup so onboarding routes it to the artist tools.",
+   "outcome": "pass",
+   "evidence": {
+    "onboarding_from_join": "1"
+   },
+   "pinned_issue": null
+  },
+  {
+   "id": "join-onboarding-marks-artist",
+   "task": "Finishing onboarding with \"I am a musician\" checked leaves the account able to create an artist profile.",
+   "outcome": "pass",
+   "evidence": {
+    "user_is_artist": "1",
+    "onboarding_completed": "1",
+    "blogs": [
+     2
+    ]
+   },
+   "pinned_issue": null
+  },
+  {
+   "id": "join-funnel-reaches-artist-profile",
+   "task": "The live join funnel ends with the musician holding an artist profile.",
+   "outcome": "pass",
+   "evidence": {
+    "artist_profile_ids": [
+     11
+    ]
+   },
+   "pinned_issue": null
+  },
+  {
+   "id": "create-artist-creates-profile",
+   "task": "Submitting the Create Artist Profile form creates an artist profile the musician manages.",
+   "outcome": "pass",
+   "evidence": {
+    "artist_profile_ids": [
+     12
+    ]
+   },
+   "pinned_issue": null
+  },
+  {
+   "id": "create-artist-provisions-link-page",
+   "task": "Creating an artist profile through the self-serve form leaves the musician with a Link Page (no hidden step).",
+   "outcome": "pass",
+   "evidence": {
+    "artist_id": 12,
+    "link_page_id": 5
+   },
+   "pinned_issue": null
+  },
+  {
+   "id": "artist-gets-link-page",
+   "task": "The artist's Link Page is stored on extrachill.link.",
+   "outcome": "pass",
+   "evidence": {
+    "artist_id": 12,
+    "artist_slug": "the-porch-lights",
+    "link_page_id": 5,
+    "link_post_type": "ec_link_page",
+    "inventory": [
+     {
+      "id": 5,
+      "slug": "the-porch-lights",
+      "title": "The Porch Lights",
+      "status": "publish",
+      "owner": ""
+     },
+     {
+      "id": 4,
+      "slug": "the-porch-lights-live",
+      "title": "The Porch Lights Live",
+      "status": "publish",
+      "owner": ""
+     }
+    ]
+   },
+   "pinned_issue": null
+  },
+  {
+   "id": "color-changes-persist",
+   "task": "The background and button colors the musician picked are saved.",
+   "outcome": "pass",
+   "evidence": {
+    "css_vars": {
+     "--link-page-background-color": "#1d3557",
+     "--link-page-text-color": "#f1faee",
+     "--link-page-link-text-color": "#ffffff",
+     "--link-page-button-bg-color": "#e63946",
+     "--link-page-button-border-color": "#0b5394",
+     "--link-page-button-hover-bg-color": "#53940b",
+     "--link-page-button-hover-text-color": "#ffffff",
+     "--link-page-muted-text-color": "#aaa",
+     "--link-page-overlay-color": "rgba(0, 0, 0, 0.5)",
+     "--link-page-input-bg": "#181818",
+     "--link-page-accent": "#888",
+     "--link-page-accent-hover": "#222",
+     "--link-page-background-type": "color",
+     "--link-page-background-gradient-start": "#0b5394",
+     "--link-page-background-gradient-end": "#53940b",
+     "--link-page-background-gradient-direction": "to right",
+     "--link-page-background-image-url": "",
+     "--link-page-image-size": "cover",
+     "--link-page-image-position": "center center",
+     "--link-page-image-repeat": "no-repeat",
+     "overlay": "1",
+     "--link-page-title-font-family": "'Loft Sans', Helvetica, Arial, sans-serif",
+     "--link-page-title-font-size": "2.1em",
+     "--link-page-body-font-family": "'Helvetica', Arial, sans-serif",
+     "--link-page-button-radius": "8px",
+     "--link-page-button-border-width": "0px",
+     "--link-page-profile-img-size": "30%",
+     "_link_page_profile_img_shape": "circle"
+    }
+   },
+   "pinned_issue": null
+  },
+  {
+   "id": "newsletter-settings-persist",
+   "task": "The inline subscribe form and the custom subscribe description are saved.",
+   "outcome": "pass",
+   "evidence": {
+    "subscribe_display_mode": "inline_form",
+    "subscribe_description": "Get show dates and new songs from The Porch Lights first. No spam, ever."
+   },
+   "pinned_issue": null
+  },
+  {
+   "id": "added-link-persists",
+   "task": "The Bandcamp link the musician added is saved.",
+   "outcome": "pass",
+   "evidence": {
+    "links": [
+     {
+      "id": "5-section-1",
+      "section_title": "",
+      "links": [
+       {
+        "id": "5-link-1",
+        "link_text": "Listen on Bandcamp",
+        "link_url": "https://porchlights.bandcamp.com"
+       }
+      ]
+     }
+    ]
+   },
+   "pinned_issue": null
+  },
+  {
+   "id": "fan-inline-subscription-lands",
+   "task": "A fan who types their email into the inline subscribe form shows up in the artist subscriber list.",
+   "outcome": "pass",
+   "evidence": {
+    "subscribers": [
+     {
+      "subscriber_email": "fan-of-porch-lights@example.test",
+      "source": "artist_subscribe_form"
+     }
+    ]
+   },
+   "pinned_issue": null
+  }
+ ],
+ "regressions": [],
+ "unpin": [],
+ "passed": 11,
+ "findings": 0,
+ "skipped": 0,
+ "redirects": [
+  {
+   "from": "http://extrachill.link/join?utm_source=power&utm_medium=network_bridge&utm_campaign=artist",
+   "to": "http://artist.extrachill.com/login/?from_join=true",
+   "status": 301,
+   "user": 0
+  },
+  {
+   "from": "http://extrachill.link/join",
+   "to": "http://artist.extrachill.com/login/?from_join=true",
+   "status": 301,
+   "user": 0
+  },
+  {
+   "from": "http://community.extrachill.com/onboarding/?ec_account_created=x4gLIC1TVOddwDT4dcBpRgE58UtxTiso",
+   "to": "/onboarding/",
+   "status": 302,
+   "user": 602
+  },
+  {
+   "from": "http://community.extrachill.com/wp-admin/admin-post.php",
+   "to": "http://artist.extrachill.com/create-artist/",
+   "status": 302,
+   "user": 602
+  },
+  {
+   "from": "http://artist.extrachill.com/manage-link-page/",
+   "to": "http://extrachill.link/edit?link_page=4",
+   "status": 302,
+   "user": 602
+  },
+  {
+   "from": "http://artist.extrachill.com/wp-admin/admin-post.php?action=ec_link_token_handoff&return=http%3A%2F%2Fextrachill.link%2Fedit%3Flink_page%3D4",
+   "to": "http://extrachill.link/edit?link_page=4#ec_link_token=pfDI1ThheXtrnMOLYSakRtgIm75C7QaNwaVhj_UqL5I&ec_link_token_expires=1790485763",
+   "status": 302,
+   "user": 602
+  },
+  {
+   "from": "http://artist.extrachill.com/wp-content/themes/extrachill/assets/fonts/WilcoLoftSans-Treble.woff",
+   "to": "http://artist.extrachill.com/wp-content/themes/extrachill/assets/fonts/WilcoLoftSans-Treble.woff/",
+   "status": 301,
+   "user": 0
+  },
+  {
+   "from": "http://extrachill.link/join",
+   "to": "http://artist.extrachill.com/login/?from_join=true",
+   "status": 301,
+   "user": 0
+  },
+  {
+   "from": "http://artist.extrachill.com/manage-link-page/",
+   "to": "http://extrachill.link/edit?link_page=5",
+   "status": 302,
+   "user": 601
+  },
+  {
+   "from": "http://artist.extrachill.com/wp-admin/admin-post.php?action=ec_link_token_handoff&return=http%3A%2F%2Fextrachill.link%2Fedit%3Flink_page%3D5",
+   "to": "http://extrachill.link/edit?link_page=5#ec_link_token=MhDA-Vn5GLyF85UTryE0TIeKYkTm_edsLYNzTvLL-Ns&ec_link_token_expires=1790485832",
+   "status": 302,
+   "user": 601
+  },
+  {
+   "from": "http://artist.extrachill.com/wp-content/themes/extrachill/assets/fonts/WilcoLoftSans-Treble.woff",
+   "to": "http://artist.extrachill.com/wp-content/themes/extrachill/assets/fonts/WilcoLoftSans-Treble.woff/",
+   "status": 301,
+   "user": 0
+  },
+  {
+   "from": "http://artist.extrachill.com/manage-link-page/",
+   "to": "http://extrachill.link/edit?link_page=5",
+   "status": 302,
+   "user": 601
+  },
+  {
+   "from": "http://artist.extrachill.com/manage-link-page/",
+   "to": "http://extrachill.link/edit?link_page=5",
+   "status": 302,
+   "user": 601
+  },
+  {
+   "from": "http://artist.extrachill.com/wp-admin/admin-post.php?action=ec_link_token_handoff&return=http%3A%2F%2Fextrachill.link%2Fedit%3Flink_page%3D5",
+   "to": "http://extrachill.link/edit?link_page=5#ec_link_token=kQhAFMyt4-lGPP3rjAf5udApFm_rn8maN44rKhqxG10&ec_link_token_expires=1790485942",
+   "status": 302,
+   "user": 601
+  },
+  {
+   "from": "http://artist.extrachill.com/wp-admin/admin-post.php?action=ec_link_token_handoff&return=http%3A%2F%2Fextrachill.link%2Fedit",
+   "to": "http://extrachill.link/edit#ec_link_token=GhaCEeG-gf4kYESGkixG-kaUss7wwzHsmT4sGLLoe-g&ec_link_token_expires=1790486022",
+   "status": 302,
+   "user": 601
+  },
+  {
+   "from": "http://artist.extrachill.com/wp-content/themes/extrachill/assets/fonts/WilcoLoftSans-Treble.woff",
+   "to": "http://artist.extrachill.com/wp-content/themes/extrachill/assets/fonts/WilcoLoftSans-Treble.woff/",
+   "status": 301,
+   "user": 0
+  },
+  {
+   "from": "http://artist.extrachill.com/wp-content/themes/extrachill/assets/fonts/WilcoLoftSans-Treble.woff",
+   "to": "http://artist.extrachill.com/wp-content/themes/extrachill/assets/fonts/WilcoLoftSans-Treble.woff/",
+   "status": 301,
+   "user": 0
+  },
+  {
+   "from": "http://artist.extrachill.com/wp-admin/admin-post.php?action=ec_link_token_handoff&return=http%3A%2F%2Fextrachill.link%2Fthe-porch-lights",
+   "to": "http://extrachill.link/the-porch-lights#ec_link_token_none=1",
+   "status": 302,
+   "user": 0
+  },
+  {
+   "from": "http://artist.extrachill.com/wp-admin/admin-post.php?action=ec_link_token_handoff&return=http%3A%2F%2Fextrachill.link%2Fedit",
+   "to": "http://extrachill.link/edit#ec_link_token=eseqCIPtXSZxnd9uBZ0iny9hgy7Ih_0sx0vwFm8F724&ec_link_token_expires=1790486174",
+   "status": 302,
+   "user": 601
+  },
+  {
+   "from": "http://artist.extrachill.com/wp-content/themes/extrachill/assets/fonts/WilcoLoftSans-Treble.woff",
+   "to": "http://artist.extrachill.com/wp-content/themes/extrachill/assets/fonts/WilcoLoftSans-Treble.woff/",
+   "status": 301,
+   "user": 0
+  },
+  {
+   "from": "http://artist.extrachill.com/wp-admin/admin-post.php?action=ec_link_token_handoff&return=http%3A%2F%2Fextrachill.link%2Fedit",
+   "to": "http://extrachill.link/edit#ec_link_token_none=1",
+   "status": 302,
+   "user": 0
+  }
+ ],
+ "handoff": [
+  {
+   "user": 602,
+   "return": "http://extrachill.link/edit?link_page=4",
+   "esc_url_raw": "http://extrachill.link/edit?link_page=4",
+   "allowed_hosts": [
+    "wordpress.org",
+    "api.wordpress.org",
+    "downloads.wordpress.org",
+    "extrachill.com",
+    "community.extrachill.com",
+    "shop.extrachill.com",
+    "artist.extrachill.com",
+    "events.extrachill.com",
+    "newsletter.extrachill.com",
+    "docs.extrachill.com",
+    "wire.extrachill.com",
+    "studio.extrachill.com",
+    "extrachill.link",
+    "www.extrachill.link",
+    "auth.extrachill.com"
+   ],
+   "validated": "http://extrachill.link/edit?link_page=4#ec_link_token_none=1",
+   "token_callable": true,
+   "home": "http://artist.extrachill.com/"
+  },
+  {
+   "user": 601,
+   "return": "http://extrachill.link/edit?link_page=5",
+   "esc_url_raw": "http://extrachill.link/edit?link_page=5",
+   "allowed_hosts": [
+    "wordpress.org",
+    "api.wordpress.org",
+    "downloads.wordpress.org",
+    "extrachill.com",
+    "community.extrachill.com",
+    "shop.extrachill.com",
+    "artist.extrachill.com",
+    "events.extrachill.com",
+    "newsletter.extrachill.com",
+    "docs.extrachill.com",
+    "wire.extrachill.com",
+    "studio.extrachill.com",
+    "extrachill.link",
+    "www.extrachill.link",
+    "auth.extrachill.com"
+   ],
+   "validated": "http://extrachill.link/edit?link_page=5#ec_link_token_none=1",
+   "token_callable": true,
+   "home": "http://artist.extrachill.com/"
+  },
+  {
+   "user": 601,
+   "return": "http://extrachill.link/edit?link_page=5",
+   "esc_url_raw": "http://extrachill.link/edit?link_page=5",
+   "allowed_hosts": [
+    "wordpress.org",
+    "api.wordpress.org",
+    "downloads.wordpress.org",
+    "extrachill.com",
+    "community.extrachill.com",
+    "shop.extrachill.com",
+    "artist.extrachill.com",
+    "events.extrachill.com",
+    "newsletter.extrachill.com",
+    "docs.extrachill.com",
+    "wire.extrachill.com",
+    "studio.extrachill.com",
+    "extrachill.link",
+    "www.extrachill.link",
+    "auth.extrachill.com"
+   ],
+   "validated": "http://extrachill.link/edit?link_page=5#ec_link_token_none=1",
+   "token_callable": true,
+   "home": "http://artist.extrachill.com/"
+  },
+  {
+   "user": 601,
+   "return": "http://extrachill.link/edit",
+   "esc_url_raw": "http://extrachill.link/edit",
+   "allowed_hosts": [
+    "wordpress.org",
+    "api.wordpress.org",
+    "downloads.wordpress.org",
+    "extrachill.com",
+    "community.extrachill.com",
+    "shop.extrachill.com",
+    "artist.extrachill.com",
+    "events.extrachill.com",
+    "newsletter.extrachill.com",
+    "docs.extrachill.com",
+    "wire.extrachill.com",
+    "studio.extrachill.com",
+    "extrachill.link",
+    "www.extrachill.link",
+    "auth.extrachill.com"
+   ],
+   "validated": "http://extrachill.link/edit#ec_link_token_none=1",
+   "token_callable": true,
+   "home": "http://artist.extrachill.com/"
+  },
+  {
+   "user": 601,
+   "return": "http://extrachill.link/edit",
+   "esc_url_raw": "http://extrachill.link/edit",
+   "allowed_hosts": [
+    "wordpress.org",
+    "api.wordpress.org",
+    "downloads.wordpress.org",
+    "extrachill.com",
+    "community.extrachill.com",
+    "shop.extrachill.com",
+    "artist.extrachill.com",
+    "events.extrachill.com",
+    "newsletter.extrachill.com",
+    "docs.extrachill.com",
+    "wire.extrachill.com",
+    "studio.extrachill.com",
+    "extrachill.link",
+    "www.extrachill.link",
+    "auth.extrachill.com"
+   ],
+   "validated": "http://extrachill.link/edit#ec_link_token_none=1",
+   "token_callable": true,
+   "home": "http://artist.extrachill.com/"
+  }
+ ],
+ "observed": [
+  {
+   "label": "o003",
+   "step": "",
+   "url": "http://extrachill.link/",
+   "value": "Extra Chill Link Pages"
+  },
+  {
+   "label": "o004",
+   "step": "",
+   "url": "http://extrachill.link/",
+   "value": "no-powered-footer"
+  },
+  {
+   "label": "o005",
+   "step": "",
+   "url": "http://extrachill.link/",
+   "value": []
+  },
+  {
+   "label": "o006",
+   "step": "",
+   "url": "http://extrachill.com/power/",
+   "value": "Extra Chill Open site search Toggle account menu Latest Interviews Reviews Extra Chill \u203a The Power of Extra Chill Extra Chill is not a blog. It's a whole network. One independent music scene with many doors. Pick the part that feels like home. Pick a door Live Music Calendar 0 events across 0 cities Concerts everywhere \u2014 big cities and small, big artists and small \u2014 free to browse, no login wall. Browse the calendar The Community 533 active members across 352 topics Forums for musicians, fans, and industry folks \u2014 the online music scene, in conversation. Join the conversation Festival Wire 0 dispatches Timely, no-nonsense coverage of festival news and lineups as it breaks. Read the Wire Artist Platform 0 artist profiles A free link page for your music, shows, and merch, with a mailing list and analytics built in. Get your free link page The Publication 1 article Where it all started in 2011 \u2014 independent music journalism, written by people who show up. Read the blog The Open-Source Platform The whole network is open source and built in public. Peek under the hood. See the code on GitHub Independent since 2011 Extra Chill is grassroots, open source, and built for the people who make music scenes matter. No corporate playbook. No algorithm deciding who deserves a voice. 0 ONLINE NOW 0 TOTAL MEMBERS \u2190 Back to Extra Chill Network Blog Community Events Calendar Artist Platform Newsletter Shop Explore Interviews Live Reviews Festival Wire Song Meanings Music News About The Power of"
+  },
+  {
+   "label": "o007",
+   "step": "",
+   "url": "http://extrachill.com/power/",
+   "value": [
+    "Live Music Calendar | Browse the calendar -> http://events.extrachill.com?utm_source=power&utm_medium=network_bridge&utm_campaign=events",
+    "The Community | Join the conversation -> http://community.extrachill.com?utm_source=power&utm_medium=network_bridge&utm_campaign=community",
+    "Festival Wire | Read the Wire -> http://wire.extrachill.com?utm_source=power&utm_medium=network_bridge&utm_campaign=wire",
+    "Artist Platform | Get your free link page -> http://extrachill.link/join?utm_source=power&utm_medium=network_bridge&utm_campaign=artist",
+    "The Publication | Read the blog -> http://extrachill.com/",
+    "The Open-Source Platform | See the code on GitHub -> https://github.com/Extra-Chill"
+   ]
+  },
+  {
+   "label": "o008",
+   "step": "",
+   "url": "http://extrachill.com/power/",
+   "value": true
+  },
+  {
+   "label": "o009",
+   "step": "",
+   "url": "http://extrachill.com/power/",
+   "value": true
+  },
+  {
+   "label": "o001",
+   "step": "",
+   "url": "http://artist.extrachill.com/login/?from_join=true#tab-register",
+   "value": "http://artist.extrachill.com/login/?from_join=true#tab-register"
+  },
+  {
+   "label": "o001",
+   "step": "",
+   "url": "http://artist.extrachill.com/login/?from_join=true#tab-register",
+   "value": "http://artist.extrachill.com/login/?from_join=true#tab-register"
+  },
+  {
+   "label": "o012",
+   "step": "",
+   "url": "http://artist.extrachill.com/login/?from_join=true#tab-register",
+   "value": "Extra Chill Open site search Toggle account menu Extra Chill \u203a Artist Platform \u203a Login Login Login Register Email Password Confirm Password Email me the Extra Chill newsletter 0 ONLINE NOW 0 TOTAL MEMBERS \u2190 Back to Artist Platform Network Blog Community Events Calendar Artist Platform Newsletter Shop Explore Interviews Live Reviews Festival Wire Song Meanings Music News About The Power of Extra Chill Documentation Tech Support Contact Us In the Press Contribute Subscribe \u00a9 2026 Extra Chill. All rights reserved. Affiliate Disclosure Privacy Policy"
+  },
+  {
+   "label": "o001",
+   "step": "",
+   "url": "http://community.extrachill.com/onboarding/",
+   "value": "http://community.extrachill.com/onboarding/"
+  },
+  {
+   "label": "o013",
+   "step": "",
+   "url": "http://community.extrachill.com/onboarding/",
+   "value": "Extra Chill Open site search Toggle account menu Recent Live Shows & Scenes Music Discussion You're in! Your Extra Chill account is ready. Set up your profile whenever you have time. Customize Your Profile Extra Chill \u203a Community \u203a Onboarding Onboarding Welcome to Extra Chill! Let's set up your profile. Choose your username Letters, numbers, hyphens, and underscores only. 3-60 characters. Local Scene (optional) Find people and live music near you. You can change this anytime. Who can see your Local Scene? Public Private I love music I am a musician I work in the music industry To create your artist profile, please select \"I am a musician\" or \"I work in the music industry\". Complete Setup 1 ONLINE NOW 0 TOTAL MEMBERS \u2190 Back to Community Network Blog Community Events Calendar Artist Platform Newsletter Shop Explore Interviews Live Reviews Festival Wire Song Meanings Music News About The Power of Extra Chill Documentation Tech Support Contact Us In the Press Contribute Subscribe \u00a9 2026 Ex"
+  },
+  {
+   "label": "o014",
+   "step": "",
+   "url": "http://community.extrachill.com/onboarding/",
+   "value": [
+    "Choose your username",
+    "Local Scene (optional)",
+    "Public",
+    "Private",
+    "I love music",
+    "I am a musician",
+    "I work in the music industry"
+   ]
+  },
+  {
+   "label": "o001",
+   "step": "",
+   "url": "http://artist.extrachill.com/create-artist/",
+   "value": "http://artist.extrachill.com/create-artist/"
+  },
+  {
+   "label": "o015",
+   "step": "",
+   "url": "http://artist.extrachill.com/create-artist/",
+   "value": "Extra Chill Open site search Toggle account menu Create Artist Profile Extra Chill \u203a Artist Platform \u203a Create Artist Create Artist Profile Set up your artist profile to start building your presence on Extra Chill. Artist Name * Profile Picture No profile image selected yet. Create Artist Profile 0 ONLINE NOW 0 TOTAL MEMBERS \u2190 Back to Artist Platform Network Blog Community Events Calendar Artist Platform Newsletter Shop Explore Interviews Live Reviews Festival Wire Song Meanings Music News About The Power of Extra Chill Documentation Tech Support Contact Us In the Press Contribute Subscribe \u00a9 2026 Extra Chill. All rights reserved. Affiliate Disclosure Privacy Policy"
+  },
+  {
+   "label": "o001",
+   "step": "",
+   "url": "http://extrachill.link/edit?link_page=4",
+   "value": "http://extrachill.link/edit?link_page=4"
+  },
+  {
+   "label": "o017",
+   "step": "",
+   "url": "http://artist.extrachill.com/",
+   "value": "Extra Chill Open site search Toggle account menu Create Artist Profile Extra Chill \u203a Artist Platform Welcome, Sam Porch (Fixture Musician)! Create your artist profile to get a custom link page at extrachill.link, analytics dashboard, and subscriber tools. Create Artist Profile Learn More Discover Artists The Porch Lights Live View Profile Browse All Artists 0 ONLINE NOW 0 TOTAL MEMBERS \u2190 Back to Extra Chill Network Blog Community Events Calendar Artist Platform Newsletter Shop Explore Interviews Live Reviews Festival Wire Song Meanings Music News About The Power of Extra Chill Documentation Tech Support Contact Us In the Press Contribute Subscribe \u00a9 2026 Extra Chill. All rights reserved. Affiliate Disclosure Privacy Policy"
+  },
+  {
+   "label": "o018",
+   "step": "",
+   "url": "http://artist.extrachill.com/",
+   "value": [
+    "Extra Chill -> http://artist.extrachill.com/",
+    "[icon] -> http://community.extrachill.com/notifications",
+    "View Profile -> http://community.extrachill.com/u/porch_lights_fixture",
+    "Edit Profile -> http://community.extrachill.com/u/porch_lights_fixture/edit/",
+    "Create Artist Profile -> http://artist.extrachill.com/create-artist/",
+    "Settings -> http://community.extrachill.com/settings/",
+    "Log Out -> http://artist.extrachill.com/?custom_logout=1&logout_nonce=1fc322a893"
+   ]
+  },
+  {
+   "label": "o001",
+   "step": "",
+   "url": "http://extrachill.link/edit?link_page=5",
+   "value": "http://extrachill.link/edit?link_page=5"
+  },
+  {
+   "label": "o019",
+   "step": "",
+   "url": "http://extrachill.link/edit?link_page=5",
+   "value": "Extra Chill Open site search Toggle account menu https://extrachill.link/the-porch-lights/ View page QR Code Manage Artist Analytics Artist Platform Saved Info Links Socials Customize Advanced Display Name Link Page Bio Profile Image Preview Live preview of your public Link Page. The Porch Lights Subscribe Share Powered by Extra Chill 0 ONLINE NOW 0 TOTAL MEMBERS \u2190 Back to Extra Chill Network Blog Community Events Calendar Artist Platform Newsletter Shop Explore Interviews Live Reviews Festival Wire Song Meanings Music News About The Power of Extra Chill Documentation Tech Support Contact Us In the Press Contribute Subscribe \u00a9 2026 Extra Chill. All rights reserved. Affiliate Disclosure Privacy Policy"
+  },
+  {
+   "label": "o020",
+   "step": "",
+   "url": "http://extrachill.link/edit?link_page=5",
+   "value": [
+    "https://extrachill.link/the-porch-lights/ -> https://extrachill.link/the-porch-lights/",
+    "View page -> https://extrachill.link/the-porch-lights/",
+    "Manage Artist -> http://artist.extrachill.com/manage-artist/",
+    "Analytics -> http://artist.extrachill.com/analytics/",
+    "Artist Platform -> http://artist.extrachill.com/"
+   ]
+  },
+  {
+   "label": "o021",
+   "step": "",
+   "url": "http://extrachill.link/edit?link_page=5",
+   "value": "Extra Chill Open site search Toggle account menu Loading editor... 0 ONLINE NOW 0 TOTAL MEMBERS \u2190 Back to Extra Chill Network Blog Community Events Calendar Artist Platform Newsletter Shop Explore Interviews Live Reviews Festival Wire Song Meanings Music News About The Power of Extra Chill Documentation Tech Support Contact Us In the Press Contribute Subscribe \u00a9 2026 Extra Chill. All rights reserved. Affiliate Disclosure Privacy Policy"
+  },
+  {
+   "label": "o022",
+   "step": "",
+   "url": "http://extrachill.link/edit?link_page=5",
+   "value": []
+  },
+  {
+   "label": "o023",
+   "step": "",
+   "url": "http://artist.extrachill.com/manage-artist/",
+   "value": [
+    "A: My Link Page",
+    "A: Manage Link Page"
+   ]
+  },
+  {
+   "label": "o024",
+   "step": "",
+   "url": "http://artist.extrachill.com/",
+   "value": [
+    "Extra Chill -> http://artist.extrachill.com/",
+    "[icon] -> http://community.extrachill.com/notifications",
+    "View Profile -> http://community.extrachill.com/u/porch_lights_fixture",
+    "Edit Profile -> http://community.extrachill.com/u/porch_lights_fixture/edit/",
+    "Manage Artist -> http://artist.extrachill.com/manage-artist/",
+    "My Link Page -> http://artist.extrachill.com/manage-link-page/",
+    "Settings -> http://community.extrachill.com/settings/",
+    "Log Out -> http://artist.extrachill.com/?custom_logout=1&logout_nonce=78e24c8c24"
+   ]
+  },
+  {
+   "label": "o025",
+   "step": "",
+   "url": "http://artist.extrachill.com/",
+   "value": [
+    "Edit Profile -> http://community.extrachill.com/u/porch_lights_fixture/edit/",
+    "Manage Artist -> http://artist.extrachill.com/manage-artist/",
+    "My Link Page -> http://artist.extrachill.com/manage-link-page/",
+    "Manage Artist -> http://artist.extrachill.com/manage-artist/",
+    "Manage Link Page -> https://extrachill.link/edit?link_page=5",
+    "Manage Artist -> http://artist.extrachill.com/manage-artist/",
+    "Manage Link Page -> https://extrachill.link/edit?link_page=5"
+   ]
+  },
+  {
+   "label": "o026",
+   "step": "",
+   "url": "http://artist.extrachill.com/manage-artist/",
+   "value": [
+    "Edit Profile -> http://community.extrachill.com/u/porch_lights_fixture/edit/",
+    "My Link Page -> http://artist.extrachill.com/manage-link-page/",
+    "Manage Link Page -> https://extrachill.link/edit?link_page=5"
+   ]
+  },
+  {
+   "label": "o001",
+   "step": "",
+   "url": "http://extrachill.link/edit?link_page=5",
+   "value": "http://extrachill.link/edit?link_page=5"
+  },
+  {
+   "label": "o027",
+   "step": "",
+   "url": "http://extrachill.link/edit?link_page=5",
+   "value": "Extra Chill Open site search Toggle account menu Loading editor... 2 ONLINE NOW 0 TOTAL MEMBERS \u2190 Back to Extra Chill Network Blog Community Events Calendar Artist Platform Newsletter Shop Explore Interviews Live Reviews Festival Wire Song Meanings Music News About The Power of Extra Chill Documentation Tech Support Contact Us In the Press Contribute Subscribe \u00a9 2026 Extra Chill. All rights reserved. Affiliate Disclosure Privacy Policy"
+  },
+  {
+   "label": "o028",
+   "step": "",
+   "url": "http://extrachill.link/edit?link_page=5",
+   "value": false
+  },
+  {
+   "label": "o029",
+   "step": "",
+   "url": "http://artist.extrachill.com/analytics/",
+   "value": [
+    "View Link Page -> https://extrachill.link/the-porch-lights"
+   ]
+  },
+  {
+   "label": "o030",
+   "step": "",
+   "url": "http://community.extrachill.com/",
+   "value": [
+    "Extra Chill -> http://community.extrachill.com/",
+    "[icon] -> http://community.extrachill.com/notifications",
+    "View Profile -> http://community.extrachill.com/u/porch_lights_fixture",
+    "Edit Profile -> http://community.extrachill.com/u/porch_lights_fixture/edit/",
+    "Manage Artist -> http://artist.extrachill.com/manage-artist/",
+    "My Link Page -> http://artist.extrachill.com/manage-link-page/",
+    "Settings -> http://community.extrachill.com/settings/",
+    "Log Out -> http://community.extrachill.com/?custom_logout=1&logout_nonce=78e24c8c24"
+   ]
+  },
+  {
+   "label": "o033",
+   "step": "",
+   "url": "http://artist.extrachill.com/",
+   "value": [
+    "My Link Page -> http://artist.extrachill.com/manage-link-page/",
+    "Manage Link Page -> https://extrachill.link/edit?link_page=5",
+    "Manage Link Page -> https://extrachill.link/edit?link_page=5"
+   ]
+  },
+  {
+   "label": "o001",
+   "step": "",
+   "url": "http://extrachill.link/edit",
+   "value": "http://extrachill.link/edit"
+  },
+  {
+   "label": "o034",
+   "step": "",
+   "url": "http://extrachill.link/edit",
+   "value": "\n\t\tLoading your link page editor\u2026\n\t"
+  },
+  {
+   "label": "o035",
+   "step": "",
+   "url": "http://extrachill.link/edit",
+   "value": {
+    "status": 200,
+    "body": "{\"adapter\":\"extrachill-artist-platform\",\"scripts\":[{\"src\":\"http:\\/\\/artist.extrachill.com\\/wp-content\\/plugins\\/extrachill-artist-platform\\/build\\/blocks\\/link-page-editor\\/adapter.js?ver=e39aa313e453ee156660\"}],\"identities\":[{\"id\":12,\"label\":\"The Porch Lights\",\"publicUrl\":\"https:\\/\\/extrachill.link\\/the-porch-lights\\/\"}],\"initialIdentity\":12,\"managementUrl\":\"http:\\/\\/artist.extrachill.com\\/manage",
+    "cfg": "http://artist.extrachill.com/wp-json/extrachill/v1/link-pages/editor-configuration"
+   }
+  },
+  {
+   "label": "o036",
+   "step": "",
+   "url": "http://extrachill.link/edit",
+   "value": [
+    "Info",
+    "Links",
+    "Socials",
+    "Customize",
+    "Advanced"
+   ]
+  },
+  {
+   "label": "o037",
+   "step": "",
+   "url": "http://extrachill.link/edit",
+   "value": [
+    "Extra Chill -> http://extrachill.link/",
+    "[icon] -> http://community.extrachill.com/notifications",
+    "View Profile -> http://community.extrachill.com/u/porch_lights_fixture",
+    "Edit Profile -> http://community.extrachill.com/u/porch_lights_fixture/edit/",
+    "Manage Artist -> http://artist.extrachill.com/manage-artist/",
+    "My Link Page -> http://artist.extrachill.com/manage-link-page/",
+    "Settings -> http://community.extrachill.com/settings/",
+    "Log Out -> http://extrachill.link/edit?custom_logout=1&logout_nonce=364e609038",
+    "https://extrachill.link/the-porch-lights/ -> https://extrachill.link/the-porch-lights/",
+    "View page -> https://extrachill.link/the-porch-lights/",
+    "Manage Artist -> http://artist.extrachill.com/manage-artist/",
+    "Analytics -> http://artist.extrachill.com/analytics/",
+    "Artist Platform -> http://artist.extrachill.com/",
+    "\u2190 Back to Extra Chill -> http://extrachill.com",
+    "Facebook -> https://facebook.com/extrachill",
+    "Twitter -> https://twitter.com/extra_chill",
+    "Instagram -> https://instagram.com/extrachill",
+    "YouTube -> https://youtube.com/@extra-chill",
+    "Pinterest -> https://pinterest.com/extrachill",
+    "GitHub -> https://github.com/Extra-Chill",
+    "Network -> http://extrachill.com",
+    "Blog -> http://extrachill.com/blog",
+    "Community -> http://community.extrachill.com",
+    "Events Calendar -> http://events.extrachill.com",
+    "Artist Platform -> http://artist.extrachill.com",
+    "Newsletter -> http://newsletter.extrachill.com",
+    "Shop -> http://shop.extrachill.com",
+    "Explore -> http://extrachill.com/blog",
+    "Interviews -> http://extrachill.com/category/interviews/",
+    "Live Reviews -> http://extrachill.com/category/live-music-reviews/",
+    "Festival Wire -> http://wire.extrachill.com",
+    "Song Meanings -> http://extrachill.com/category/song-meanings/",
+    "Music News -> http://extrachill.com/category/music-news/",
+    "About -> http://extrachill.com/about/",
+    "The Power of Extra Chill -> http://extrachill.com/power/",
+    "Documentation -> http://docs.extrachill.com",
+    "Tech Support -> http://community.extrachill.com/r/tech-support",
+    "Contact Us -> http://extrachill.com/contact/",
+    "In the Press -> http://extrachill.com/about/in-the-press/",
+    "Contribute -> http://extrachill.com/contribute",
+    "Extra Chill -> http://extrachill.com",
+    "Affiliate Disclosure -> http://extrachill.com/affiliate-disclosure/",
+    "Privacy Policy -> http://extrachill.com/privacy-policy/"
+   ]
+  },
+  {
+   "label": "o038",
+   "step": "",
+   "url": "http://extrachill.link/edit",
+   "value": "https://extrachill.link/the-porch-lights/"
+  },
+  {
+   "label": "o039",
+   "step": "",
+   "url": "http://extrachill.link/edit",
+   "value": [
+    "Title Font",
+    "Body Font",
+    "Title Size",
+    "Profile Image Size",
+    "Background Type",
+    "Background Color",
+    "Text Color",
+    "Button Color",
+    "Link Text Color",
+    "Button Hover Color",
+    "Button Border Color",
+    "Button Radius",
+    "Overlay",
+    "Image Shape"
+   ]
+  },
+  {
+   "label": "o040",
+   "step": "",
+   "url": "http://extrachill.link/edit",
+   "value": "#1d3557 / rgb(29, 53, 87)"
+  },
+  {
+   "label": "o041",
+   "step": "",
+   "url": "http://extrachill.link/edit",
+   "value": [
+    "Enable Link Expiration Dates",
+    "Enable Temporary Redirect",
+    "Disable Inline YouTube Player",
+    "Meta Pixel ID",
+    "Google Tag ID",
+    "Subscription Display",
+    "Subscribe Form Description"
+   ]
+  },
+  {
+   "label": "o042",
+   "step": "",
+   "url": "http://extrachill.link/edit",
+   "value": true
+  },
+  {
+   "label": "o043",
+   "step": "",
+   "url": "http://extrachill.link/edit",
+   "value": "no-status"
+  },
+  {
+   "label": "o044",
+   "step": "",
+   "url": "http://extrachill.link/edit",
+   "value": "Saving..."
+  },
+  {
+   "label": "o045",
+   "step": "",
+   "url": "http://extrachill.link/edit",
+   "value": "https://extrachill.link/the-porch-lights/"
+  },
+  {
+   "label": "o001",
+   "step": "",
+   "url": "http://extrachill.link/the-porch-lights",
+   "value": "http://extrachill.link/the-porch-lights"
+  },
+  {
+   "label": "o046",
+   "step": "",
+   "url": "http://extrachill.link/the-porch-lights",
+   "value": "rgb(29, 53, 87)"
+  },
+  {
+   "label": "o047",
+   "step": "",
+   "url": "http://extrachill.link/the-porch-lights",
+   "value": "Subscribe to The Porch Lights Get show dates and new songs from The Porch Lights first. No spam, ever. Email Address Subscribe"
+  },
+  {
+   "label": "o048",
+   "step": "",
+   "url": "http://extrachill.link/the-porch-lights",
+   "value": [
+    "Listen on Bandcamp -> https://porchlights.bandcamp.com",
+    "Powered by Extra Chill -> https://extrachill.com/power/?utm_source=linkpage&utm_medium=footer&utm_campaign=power",
+    "Facebook -> #",
+    "X -> #",
+    "LinkedIn -> #",
+    "Email -> #"
+   ]
+  },
+  {
+   "label": "o049",
+   "step": "",
+   "url": "http://extrachill.link/the-porch-lights",
+   "value": "https://extrachill.link/edit?link_page=5"
+  },
+  {
+   "label": "o050",
+   "step": "",
+   "url": "http://extrachill.link/edit",
+   "value": "ERR:Failed to execute 'querySelector' on 'Document': '.ec-lpe-field:has(> label:text-is('Background Color')) > input' is not a valid selector."
+  },
+  {
+   "label": "o001",
+   "step": "",
+   "url": "http://extrachill.link/the-porch-lights",
+   "value": "http://extrachill.link/the-porch-lights"
+  },
+  {
+   "label": "o051",
+   "step": "",
+   "url": "http://extrachill.link/the-porch-lights",
+   "value": 13459
+  },
+  {
+   "label": "o002",
+   "step": "",
+   "url": "http://extrachill.link/the-porch-lights",
+   "value": true
+  },
+  {
+   "label": "o053",
+   "step": "",
+   "url": "http://extrachill.link/the-porch-lights",
+   "value": "http://artist.extrachill.com/wp-json/extrachill/v1/artists/12/subscribe"
+  },
+  {
+   "label": "o052",
+   "step": "",
+   "url": "http://extrachill.link/the-porch-lights",
+   "value": {
+    "status": 200,
+    "type": "basic",
+    "len": 13418,
+    "head": "<!DOCTYPE html>\n<html lang=\"en-US\">\n<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>The Porch Lights | extrachill.link</title>\n<!-- SEO: Canonical -->\n<link rel=\"canonical\" href=\"https://extrachill.link/the-porch-lights/\" />\n\n<!-- Open Graph -->\n"
+   }
+  },
+  {
+   "label": "o054",
+   "step": "",
+   "url": "http://extrachill.link/the-porch-lights",
+   "value": "Thank you for subscribing!"
+  },
+  {
+   "label": "o002",
+   "step": "",
+   "url": "http://extrachill.link/edit",
+   "value": true
+  },
+  {
+   "label": "o001",
+   "step": "",
+   "url": "http://extrachill.link/edit",
+   "value": "http://extrachill.link/edit"
+  }
+ ],
+ "fatals": [],
+ "trace": [
+  "72a7e8e7 /?musician_journey_observe=1 shutdown",
+  "ecd1d3a6 /the-porch-lights wp",
+  "ecd1d3a6 /the-porch-lights template_redirect:end",
+  "ecd1d3a6 /the-porch-lights template_include single-post.php",
+  "ecd1d3a6 /the-porch-lights public_head",
+  "ecd1d3a6 /the-porch-lights public_body_open",
+  "ecd1d3a6 /the-porch-lights shutdown",
+  "58c08b9c /?musician_journey_observe=1 shutdown",
+  "9e9f7962 /?musician_journey_observe=1 shutdown",
+  "fb96b9bd /?musician_journey_observe=1 shutdown",
+  "dc78797a /?musician_journey_observe=1 shutdown",
+  "f6c69ad1 /?musician_journey_observe=1 shutdown",
+  "18016578 /?musician_journey_observe=1 shutdown",
+  "40aff8b2 /?musician_journey_observe=1 shutdown",
+  "1852d025 /?musician_journey_observe=1 shutdown",
+  "fe52f30b /edit wp",
+  "fe52f30b /edit template_redirect:end",
+  "fe52f30b /edit template_include front-page.php",
+  "fe52f30b /edit wp_head",
+  "fe52f30b /edit wp_footer",
+  "fe52f30b /edit shutdown",
+  "01a75d19 /?musician_journey_observe=1 shutdown",
+  "684c9e29 /the-porch-lights wp",
+  "684c9e29 /the-porch-lights template_redirect:end",
+  "684c9e29 /the-porch-lights template_include single-post.php",
+  "684c9e29 /the-porch-lights public_head",
+  "684c9e29 /the-porch-lights public_body_open",
+  "684c9e29 /the-porch-lights shutdown",
+  "81a9de77 /?musician_journey_observe=1 shutdown",
+  "84811519 /?musician_journey_observe=1 shutdown",
+  "090ddbc6 /the-porch-lights/ wp",
+  "090ddbc6 /the-porch-lights/ template_redirect:end",
+  "090ddbc6 /the-porch-lights/ template_include single-post.php",
+  "090ddbc6 /the-porch-lights/ public_head",
+  "090ddbc6 /the-porch-lights/ public_body_open",
+  "090ddbc6 /the-porch-lights/ shutdown",
+  "d55442ee /?musician_journey_observe=1 shutdown",
+  "a8004c8c /?musician_journey_observe=1 shutdown",
+  "8cff927c /?musician_journey_observe=1 shutdown",
+  "178783f3 /?musician_journey_observe=1 shutdown",
+  "7a63d194 /edit wp",
+  "7a63d194 /edit template_redirect:end",
+  "7a63d194 /edit template_include front-page.php",
+  "7a63d194 /edit wp_head",
+  "7a63d194 /edit wp_footer",
+  "7a63d194 /edit shutdown",
+  "273642a3 /edit wp",
+  "273642a3 /edit template_redirect:end",
+  "273642a3 /edit template_include front-page.php",
+  "273642a3 /edit wp_head",
+  "273642a3 /edit wp_footer",
+  "273642a3 /edit shutdown",
+  "45779de2 /?musician_journey_observe=1 shutdown",
+  "b6122567 /edit wp",
+  "b6122567 /edit template_redirect:end",
+  "b6122567 /edit template_include front-page.php",
+  "b6122567 /edit wp_head",
+  "b6122567 /edit wp_footer",
+  "b6122567 /edit shutdown",
+  "7ed7c0bf /?musician_journey_observe=1 shutdown"
+ ],
+ "auth_rest": [
+  {
+   "route": "/extrachill/v1/auth/register",
+   "status": 200,
+   "code": null,
+   "message": "",
+   "remote_addr": "127.0.0.1",
+   "ext_cache": null
+  },
+  {
+   "route": "/extrachill/v1/artists/12/subscribe",
+   "status": 200,
+   "code": null,
+   "message": "Thank you for subscribing!",
+   "remote_addr": "127.0.0.1",
+   "ext_cache": null
+  }
+ ],
+ "rest_diag": [
+  {
+   "route": "/extrachill/v1/link-pages/editor-configuration",
+   "has_auth_header": true,
+   "server_auth": true,
+   "user": 602
+  },
+  {
+   "route": "/extrachill/v1/link-pages/editor-configuration",
+   "has_auth_header": true,
+   "server_auth": true,
+   "user": 601
+  },
+  {
+   "route": "/extrachill/v1/link-pages/editor-configuration",
+   "has_auth_header": true,
+   "server_auth": true,
+   "user": 601
+  },
+  {
+   "route": "/extrachill/v1/link-pages/editor-configuration",
+   "has_auth_header": true,
+   "server_auth": true,
+   "user": 601
+  },
+  {
+   "route": "/extrachill/v1/link-pages/editor-configuration",
+   "has_auth_header": true,
+   "server_auth": true,
+   "user": 601
+  },
+  {
+   "route": "/extrachill/v1/link-pages/editor-configuration",
+   "has_auth_header": true,
+   "server_auth": true,
+   "user": 601
+  },
+  {
+   "route": "/extrachill/v1/link-pages/editor-configuration",
+   "has_auth_header": true,
+   "server_auth": true,
+   "user": 601
+  },
+  {
+   "route": "/extrachill/v1/link-pages/editor-configuration",
+   "has_auth_header": true,
+   "server_auth": true,
+   "user": 601
+  }
+ ]
+}

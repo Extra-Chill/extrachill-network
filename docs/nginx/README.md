@@ -27,19 +27,21 @@ That config previously lived only on the VPS (and as scribbles in agent memory f
 
 ## Relationship to live config
 
-This directory is a **canonical reference** — snippets and the reasoning behind them. It explains *why* the edge is shaped the way it is.
+This directory is a **canonical reference** — snippets and the reasoning behind them. It explains *why* the edge is shaped the way it is. The deployable http-scope file is `deploy/nginx/conf.d/bot-blocking.conf`.
 
 The site server block is no longer deployed from here. `deploy/nginx/sites-enabled/extrachill` is now the whole-file source of truth for it: byte-for-byte what is live, applied by `homeboy-edge-apply` from a merged commit. See [`deploy/nginx/README.md`](../../deploy/nginx/README.md).
 
 Live install paths on the production VPS:
 
 ```
-/etc/nginx/conf.d/bot-blocking.conf        ← copy from docs/nginx/bot-blocking.conf (by hand)
+/etc/nginx/conf.d/bot-blocking.conf        ← applied from deploy/nginx/conf.d/bot-blocking.conf
 /etc/nginx/conf.d/cloudflare-real-ip.conf  ← real-IP recovery (already deployed, separate scope)
 /etc/nginx/sites-enabled/extrachill        ← applied from deploy/nginx/sites-enabled/extrachill
 ```
 
-Note that `server-snippet.conf` describes more than is currently live: the author-enumeration guard and the `/wp-login.php` + `/login/` rate-limit locations are documented here but are **not** present in the live server block. Reconciling that is tracked separately; now that the live file is committed under `deploy/`, the difference is a readable diff rather than an SSH session.
+The author-enumeration guard and `/wp-login.php` + `/login/` rate-limit locations are now present in `deploy/nginx/sites-enabled/extrachill` as well as documented in `server-snippet.conf`.
+
+The deployed server block depends on `$crawler_block_net`, `$events_scraper`, and `zone=wp_login` from `deploy/nginx/conf.d/bot-blocking.conf`. Apply it with `homeboy-edge-apply extrachill-nginx-bots` before `homeboy-edge-apply extrachill-nginx`; otherwise `nginx -t` fails and the apply rolls back. See [`deploy/nginx/README.md`](../../deploy/nginx/README.md) for the root-owned target configuration and first-time adoption. Because Matrix is decommissioned, remove the `/.well-known/matrix/server` probe from the root-owned homeboy-edge target config before applying.
 
 If the live config drifts (someone hand-edits the VPS or the CF dashboard), the right reconciliation is to update this directory to match the live state, then commit. Never let the live state run ahead of the docs silently.
 
@@ -57,9 +59,10 @@ Assuming a Debian/Ubuntu nginx package (the auto-include `/etc/nginx/conf.d/*.co
 
 ### nginx
 
-1. Copy the http-scope file into `/etc/nginx/conf.d/`:
+1. Apply the http-scope file before the server block:
    ```bash
-   sudo cp docs/nginx/bot-blocking.conf /etc/nginx/conf.d/bot-blocking.conf
+   sudo /usr/local/sbin/homeboy-edge-apply extrachill-nginx-bots
+   sudo /usr/local/sbin/homeboy-edge-apply extrachill-nginx
    ```
 
 2. Open the site server block (e.g. `/etc/nginx/sites-available/extrachill`) and paste the contents of `server-snippet.conf` into the HTTPS server block:

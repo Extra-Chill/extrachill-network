@@ -19,7 +19,7 @@ add_filter( 'extrachill_404_message', 'extrachill_network_404_message' );
 add_filter( 'extrachill_fallback_error_heading', 'extrachill_network_fallback_error_heading' );
 add_action( 'extrachill_404_content_links', 'extrachill_network_404_content_links' );
 
-function extrachill_network_preload_fonts( $fonts ) {
+function extrachill_network_preload_fonts( $fonts ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- filter contract; the incoming value is intentionally overridden.
 	return array(
 		array(
 			'url'  => get_template_directory_uri() . '/assets/fonts/WilcoLoftSans-Treble.woff2',
@@ -34,15 +34,15 @@ function extrachill_network_preload_fonts( $fonts ) {
 	);
 }
 
-function extrachill_network_404_heading( $heading ) {
+function extrachill_network_404_heading( $heading ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- filter contract; the incoming value is intentionally overridden.
 	return "Well, that's not very chill of us.";
 }
 
-function extrachill_network_404_message( $message ) {
+function extrachill_network_404_message( $message ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- filter contract; the incoming value is intentionally overridden.
 	return "We can't find what you're looking for. Try a search instead.";
 }
 
-function extrachill_network_fallback_error_heading( $heading ) {
+function extrachill_network_fallback_error_heading( $heading ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- filter contract; the incoming value is intentionally overridden.
 	return 'Yeah, something is royally f*cked.';
 }
 

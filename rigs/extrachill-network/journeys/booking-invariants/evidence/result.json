@@ -1,0 +1,382 @@
+{
+  "schema": "extrachill-network/journey-result/booking-invariants/v1",
+  "scenario": "booking-invariants",
+  "assertions": 32,
+  "skipped": 10,
+  "passed": 32,
+  "findings": [],
+  "cases": [
+    {
+      "id": "render-main",
+      "passed": true,
+      "evidence": {
+        "rendered": true,
+        "context": true,
+        "private": false,
+        "endpoint": true,
+        "no_cache": true
+      }
+    },
+    {
+      "id": "render-studio",
+      "passed": true,
+      "evidence": {
+        "rendered": true,
+        "context": true,
+        "private": false,
+        "endpoint": true,
+        "no_cache": true
+      }
+    },
+    {
+      "id": "render-events",
+      "passed": true,
+      "evidence": {
+        "rendered": true,
+        "context": true,
+        "private": false,
+        "endpoint": true,
+        "no_cache": true
+      }
+    },
+    {
+      "id": "turnstile-before-mutation",
+      "passed": true,
+      "evidence": {
+        "status": 403,
+        "data": {
+          "code": "turnstile_missing_token",
+          "message": "Security verification is required.",
+          "data": {
+            "status": 403
+          }
+        }
+      }
+    },
+    {
+      "id": "inquiry-exact-retry",
+      "passed": true,
+      "evidence": {
+        "first": {
+          "public_id": "ab4c8f12-2069-441d-bf8d-1968d88ebdd1",
+          "venue_term_id": 13,
+          "submitted_at": "2026-09-26 21:24:36",
+          "capability": "5a5fe906b4391620a0c997d4ed5871b571d934b44cb8e926a8e66ed54c4800a4"
+        },
+        "retry": {
+          "public_id": "ab4c8f12-2069-441d-bf8d-1968d88ebdd1",
+          "venue_term_id": 13,
+          "submitted_at": "2026-09-26 21:24:36",
+          "capability": "5a5fe906b4391620a0c997d4ed5871b571d934b44cb8e926a8e66ed54c4800a4"
+        }
+      }
+    },
+    {
+      "id": "inquiry-changed-retry-conflicts",
+      "passed": true,
+      "evidence": {
+        "code": "booking_idempotency_conflict"
+      }
+    },
+    {
+      "id": "inquiry-identity-injection-rejected",
+      "passed": true,
+      "evidence": {
+        "code": "ability_invalid_input"
+      }
+    },
+    {
+      "id": "inquiry-key-scoped-by-venue",
+      "passed": true,
+      "evidence": {
+        "other": {
+          "public_id": "f34872f8-f2d9-4649-bc82-3fcce9cf7343",
+          "venue_term_id": 14,
+          "submitted_at": "2026-09-26 21:24:37",
+          "capability": "528a5202f41e560f82f720dbaf727c502e359d199b4a525f5b3af3e497d3a5e8"
+        }
+      }
+    },
+    {
+      "id": "inquiry-one-visible-booking",
+      "passed": true,
+      "evidence": {
+        "booking": {
+          "id": 4,
+          "public_id": "ab4c8f12-2069-441d-bf8d-1968d88ebdd1",
+          "venue_term_id": 13,
+          "artist_term_id": null,
+          "artist_profile_id": null,
+          "artist_name": "E2E Ensemble",
+          "submitter_user_id": null,
+          "contact_name": "E2E Contact",
+          "contact_email": "e2e-contact@example.test",
+          "contact_phone": null,
+          "inquiry_idempotency_key": "booking-e2e-07eac108d13f",
+          "inquiry_request_hash": "9722ac4f08f039915c7049b59e8c6be7e85521dcf120f9891ea10c446d1d3ef5",
+          "admission_owner_token": null,
+          "requested_space_key": "main-room",
+          "space_key": null,
+          "status": "submitted",
+          "version": 2,
+          "requested_start_at": "2028-01-05 20:00:00",
+          "requested_end_at": "2028-01-05 23:00:00",
+          "performance_start_at": null,
+          "performance_end_at": null,
+          "event_id": null,
+          "created_at": "2026-09-26 21:24:36",
+          "updated_at": "2026-09-26 21:24:36",
+          "intake": {
+            "version": 1,
+            "data": {
+              "config_revision": 1,
+              "message": "Stateful booking network invariant proposal.",
+              "fields": [],
+              "consent": {
+                "id": "booking-privacy",
+                "version": 1,
+                "accepted": true
+              }
+            }
+          },
+          "production": null,
+          "deal": null,
+          "confirmed_deal": null
+        }
+      }
+    },
+    {
+      "id": "concurrent-booking-cas-single-winner",
+      "passed": true,
+      "skipped": true,
+      "reason": "A real two-connection compare-and-swap race requires a real MySQL server. This rig's default WordPress runtime database is SQLite (wp-codebox's own adversarial-adapter.ts documents no supported multi-connection injection primitive on it), so no real MySQL connection is reachable to race against. Filed as a documented rig gap rather than silently passed or dropped.",
+      "evidence": {
+        "race_created": true,
+        "race_booking_found": true
+      }
+    },
+    {
+      "id": "cross-venue-private-read-denied",
+      "passed": true,
+      "evidence": {
+        "code": "ability_invalid_permissions"
+      }
+    },
+    {
+      "id": "anonymous-private-list-denied",
+      "passed": true,
+      "evidence": {
+        "code": "ability_invalid_permissions"
+      }
+    },
+    {
+      "id": "operator-direct-authorization-diagnostic",
+      "passed": true,
+      "evidence": {
+        "result": "authorized",
+        "message": null,
+        "has_feature_access": true,
+        "user_can_manage_options": false,
+        "active_membership": {
+          "id": 2,
+          "venue_term_id": 13,
+          "user_id": 203,
+          "is_owner": true,
+          "status": "active",
+          "version": 1,
+          "created_by_user_id": 1,
+          "created_at": "2026-09-26 21:24:28",
+          "updated_at": "2026-09-26 21:24:28",
+          "revoked_at": null
+        }
+      }
+    },
+    {
+      "id": "operator-private-read-allowed",
+      "passed": true,
+      "evidence": {
+        "code": ""
+      }
+    },
+    {
+      "id": "invalid-transition-rejected",
+      "passed": true,
+      "evidence": {
+        "code": "booking_transition_forbidden"
+      }
+    },
+    {
+      "id": "stale-transition-conflicts",
+      "passed": true,
+      "evidence": {
+        "code": "booking_version_conflict"
+      }
+    },
+    {
+      "id": "valid-review-negotiation-sequence",
+      "passed": true,
+      "evidence": {
+        "code": ""
+      }
+    },
+    {
+      "id": "message-exact-retry",
+      "passed": true,
+      "skipped": true,
+      "reason": "send-booking-message returns booking_message_delivery_uncertain in this runtime (no real mail transport to confirm delivery), so the exact-retry identity check has no success object to compare.",
+      "evidence": {
+        "message": "booking_message_delivery_uncertain",
+        "retry": ""
+      }
+    },
+    {
+      "id": "message-changed-retry-conflicts",
+      "passed": true,
+      "evidence": {
+        "code": "booking_message_idempotency_conflict"
+      }
+    },
+    {
+      "id": "performance-and-deal-selected",
+      "passed": true,
+      "evidence": {
+        "performance_code": "",
+        "deal_code": ""
+      }
+    },
+    {
+      "id": "hold-created",
+      "passed": true,
+      "evidence": {
+        "hold": {
+          "hold": {
+            "booking_id": 4,
+            "venue_term_id": 13,
+            "space_key": "main-room",
+            "start_at": "2028-01-05 20:00:00",
+            "end_at": "2028-01-05 23:00:00",
+            "expires_at": "2026-09-27 21:24:37",
+            "status": "active",
+            "version": 1,
+            "created_by_user_id": 203,
+            "created_at": "2026-09-26 21:24:37",
+            "updated_at": "2026-09-26 21:24:37",
+            "released_at": null,
+            "released_by_user_id": null,
+            "release_reason": null,
+            "expired_at": null,
+            "converted_at": null,
+            "converted_by_user_id": null,
+            "id": 2
+          },
+          "booking_version": 7
+        }
+      }
+    },
+    {
+      "id": "hold-confirmation-sequence",
+      "passed": true,
+      "evidence": {
+        "held_code": "",
+        "confirmed_code": ""
+      }
+    },
+    {
+      "id": "event-conversion-succeeds",
+      "passed": true,
+      "skipped": true,
+      "reason": "Canonical event conversion serializes on the MySQL-only GET_LOCK primitive, which this runtime does not provide.",
+      "evidence": {
+        "code": "booking_event_ability_unavailable"
+      }
+    },
+    {
+      "id": "event-conversion-idempotent",
+      "passed": true,
+      "skipped": true,
+      "reason": "The first conversion could not run in this runtime, so idempotent-retry behavior cannot be observed.",
+      "evidence": {
+        "retry": "booking_event_ability_unavailable"
+      }
+    },
+    {
+      "id": "event-reschedule-succeeds",
+      "passed": true,
+      "skipped": true,
+      "reason": "Canonical event conversion did not run in this runtime, so there is no converted event to reschedule.",
+      "evidence": {
+        "code": "booking_event_ability_unavailable"
+      }
+    },
+    {
+      "id": "linked-cancellation-succeeds",
+      "passed": true,
+      "skipped": true,
+      "reason": "Canonical event conversion did not run in this runtime, so there is nothing to cancel.",
+      "evidence": []
+    },
+    {
+      "id": "cancelled-event-and-timezone-align",
+      "passed": true,
+      "skipped": true,
+      "reason": "Canonical event conversion did not run in this runtime, so there is no converted event to inspect.",
+      "evidence": []
+    },
+    {
+      "id": "terminal-booking-message-rejected",
+      "passed": true,
+      "skipped": true,
+      "reason": "Canonical event conversion did not run in this runtime, so there is no terminal booking state to test against.",
+      "evidence": []
+    },
+    {
+      "id": "activity-ledger-terminal-markers",
+      "passed": true,
+      "skipped": true,
+      "reason": "Canonical event conversion did not run in this runtime, so the conversion-terminal activity markers never fire.",
+      "evidence": {
+        "kinds": [
+          "booking_correspondence_source_completed",
+          "deal_confirmed",
+          "status_changed",
+          "hold_created",
+          "deal_draft_updated",
+          "performance_selected",
+          "booking_message_dispatching",
+          "booking_message_requested",
+          "status_changed",
+          "status_changed",
+          "booking_message_dispatching",
+          "booking_message_requested",
+          "notification_requested",
+          "inquiry_submitted"
+        ]
+      }
+    },
+    {
+      "id": "event-source-link-unique",
+      "passed": true,
+      "skipped": true,
+      "reason": "Canonical event conversion did not run in this runtime, so there is no converted event to link.",
+      "evidence": {
+        "count": 0
+      }
+    },
+    {
+      "id": "config-update-increments-once",
+      "passed": true,
+      "evidence": {
+        "before": 1,
+        "after": 2,
+        "code": ""
+      }
+    },
+    {
+      "id": "stale-config-update-conflicts",
+      "passed": true,
+      "evidence": {
+        "code": "booking_config_revision_conflict"
+      }
+    }
+  ]
+}

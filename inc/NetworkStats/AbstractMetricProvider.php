@@ -201,7 +201,8 @@ abstract class AbstractMetricProvider implements MetricProvider {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$count = $wpdb->get_var(
 				$wpdb->prepare(
-					"SELECT COUNT(DISTINCT post_id) FROM {$table} WHERE post_status = %s AND start_datetime >= %s",
+					'SELECT COUNT(DISTINCT post_id) FROM %i WHERE post_status = %s AND start_datetime >= %s',
+					$table,
 					'publish',
 					$today_start
 				)

@@ -236,6 +236,10 @@ function ec_mail_site_id() {
  * when `mail_site_id` is provided — callers must NOT wrap this in their
  * own `switch_to_blog()`.
  *
+ * Every send runs as the system through extrachill_mail_run_as_system(), so
+ * it works the same whoever owns the request (visitor, customer, contributor,
+ * background worker). WP_Error results are normalized to the array envelope.
+ *
  * @see datamachine/send-email
  *
  * @param array $args Arguments forwarded to the ability. Required keys
@@ -268,7 +272,7 @@ function ec_send_email( array $args ) {
 		);
 	}
 
-	return $ability->execute( $args );
+	return extrachill_mail_normalize_result( extrachill_mail_run_as_system( static fn() => $ability->execute( $args ) ) );
 }
 
 /**
@@ -306,7 +310,60 @@ function ec_send_email_queued( array $args ) {
 		);
 	}
 
-	return $ability->execute( $args );
+	return extrachill_mail_normalize_result( extrachill_mail_run_as_system( static fn() => $ability->execute( $args ) ) );
+}
+
+/**
+ * Run a platform mail send as the system.
+ *
+ * Extra Chill product mail (RSVP passes, order notices, editorial alerts,
+ * digests, contact-form and registration mail) is sent by trusted server code
+ * on the platform's behalf, not by whichever user owns the current request.
+ * Data Machine's mail abilities gate the site default sender on the acting
+ * principal: without this, a send during a contributor's or customer's request
+ * is refused, a queued send records that user as issuer and is denied at the
+ * worker, and a no-user send only passes under WP-CLI.
+ *
+ * PermissionHelper::run_as_system() (data-machine#3572) is a PHP-only context,
+ * unreachable from REST or MCP. Callers must NOT wrap ec_send_email() or
+ * ec_send_email_queued() in their own PermissionHelper context.
+ *
+ * @param callable $send Send callback.
+ * @return mixed Ability result.
+ */
+function extrachill_mail_run_as_system( callable $send ) {
+	$helper = '\\DataMachine\\Abilities\\PermissionHelper';
+	if ( class_exists( $helper ) && method_exists( $helper, 'run_as_system' ) ) {
+		return $helper::run_as_system( $send );
+	}
+	return $send();
+}
+
+/**
+ * Normalize an ability result into the documented array envelope.
+ *
+ * Abilities return WP_Error on permission or validation failure. These
+ * wrappers document an array return and callers index into it, so a WP_Error
+ * becomes `[ 'success' => false, 'error' => ..., 'error_code' => ... ]`.
+ *
+ * @param mixed $result Ability result.
+ * @return array
+ */
+function extrachill_mail_normalize_result( $result ) {
+	if ( is_wp_error( $result ) ) {
+		return array(
+			'success'    => false,
+			'error'      => $result->get_error_message(),
+			'error_code' => $result->get_error_code(),
+		);
+	}
+	if ( ! is_array( $result ) ) {
+		return array(
+			'success' => false,
+			'error'   => 'Mail ability returned ' . gettype( $result ) . ' instead of an array.',
+		);
+	}
+	return $result;
 }
 
 /**

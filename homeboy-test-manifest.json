@@ -28,7 +28,13 @@
     "tests/cross-site-rest-dispatch-smoke.php": {
       "environment": "standalone-php"
     },
+    "tests/deploy-workflow-smoke.php": {
+      "environment": "standalone-php"
+    },
     "tests/experiment-assignment-smoke.php": {
+      "environment": "standalone-php"
+    },
+    "tests/ExperimentAdminPermissionCliProbe.php": {
       "environment": "standalone-php"
     },
     "tests/frontend-path-resolver-smoke.php": {
@@ -37,10 +43,16 @@
     "tests/frontend-path-resolver-runtime-smoke.php": {
       "environment": "standalone-php"
     },
+    "tests/mail-system-send-smoke.php": {
+      "environment": "standalone-php"
+    },
     "tests/genre-vocabulary-smoke.php": {
       "environment": "standalone-php"
     },
     "tests/mediavine-cache-purge-smoke.php": {
+      "environment": "standalone-php"
+    },
+    "tests/multisite-guard-smoke.php": {
       "environment": "standalone-php"
     },
     "tests/network-bridge-composer-fallback-smoke.php": {
@@ -49,13 +61,25 @@
     "tests/network-term-classification-smoke.php": {
       "environment": "standalone-php"
     },
+    "tests/og-card-content-addressed-cache-smoke.php": {
+      "environment": "standalone-php"
+    },
+    "tests/og-card-regeneration-ability-smoke.php": {
+      "environment": "standalone-php"
+    },
     "tests/service-assertion-smoke.php": {
+      "environment": "standalone-php"
+    },
+    "tests/sunrise-cutover-smoke.php": {
       "environment": "standalone-php"
     },
     "tests/taxonomy-registration-smoke.php": {
       "environment": "standalone-php"
     },
     "tests/user-profile-links-smoke.php": {
+      "environment": "standalone-php"
+    },
+    "tests/media-webp-smoke.php": {
       "environment": "standalone-php"
     }
   }

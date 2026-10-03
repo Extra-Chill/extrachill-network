@@ -414,6 +414,29 @@ namespace {
 	ntc_assert( ! is_wp_error( $closed_result ), 'Closed topics remain eligible for manual classification.' );
 	$GLOBALS['ntc_posts'][2][50]->post_status = 'publish';
 
+	// Metadata churn on an already-published post must not buy a second job.
+	//
+	// The prior job is marked final so duplicate-active-job suppression cannot
+	// account for the result: without the no-op guard this post has no
+	// provenance, so it would look unclassified and schedule again on every
+	// touch. That is what a bulk post_date rewrite across 10,146 unchanged
+	// events cost in one evening.
+	ntc_reset_scheduler();
+	extrachill_network_maybe_schedule_term_classification( 'publish', 'publish', $GLOBALS['ntc_posts'][2][50] );
+	ntc_assert_same( 1, count( \DataMachine\Engine\Tasks\TaskScheduler::$jobs ), 'First touch of unseen text schedules.' );
+	foreach ( \DataMachine\Engine\Tasks\TaskScheduler::$jobs as $id => $job ) {
+		\DataMachine\Engine\Tasks\TaskScheduler::$jobs[ $id ]['status'] = 'completed';
+	}
+	extrachill_network_maybe_schedule_term_classification( 'publish', 'publish', $GLOBALS['ntc_posts'][2][50] );
+	ntc_assert_same( 1, count( \DataMachine\Engine\Tasks\TaskScheduler::$jobs ), 'Unchanged text does not reschedule on repeat publish->publish touches.' );
+
+	// A real edit still classifies — the guard keys on text, not on frequency.
+	$original_content                            = $GLOBALS['ntc_posts'][2][50]->post_content;
+	$GLOBALS['ntc_posts'][2][50]->post_content .= ' An edit that genuinely changes the classified text of this topic.';
+	extrachill_network_maybe_schedule_term_classification( 'publish', 'publish', $GLOBALS['ntc_posts'][2][50] );
+	ntc_assert_same( 2, count( \DataMachine\Engine\Tasks\TaskScheduler::$jobs ), 'Changed text still schedules on publish->publish.' );
+	$GLOBALS['ntc_posts'][2][50]->post_content = $original_content;
+
 	foreach ( array( array( 'draft', 'draft' ), array( 'trash', 'publish' ), array( 'auto-draft', 'draft' ) ) as $transition ) {
 		ntc_reset_scheduler();
 		extrachill_network_maybe_schedule_term_classification( $transition[0], $transition[1], $GLOBALS['ntc_posts'][2][50] );
@@ -434,6 +457,27 @@ namespace {
 	extrachill_network_maybe_schedule_term_classification( 'publish', 'publish', $GLOBALS['ntc_posts'][2][50] );
 	ntc_assert_same( 0, count( \DataMachine\Engine\Tasks\TaskScheduler::$jobs ), 'Classifier-originated writes cannot loop.' );
 	$GLOBALS['extrachill_network_term_classifier_writing'] = false;
+
+	// A site can veto automatic classification for content it knows nobody
+	// will browse — the events site skipping past shows, for instance.
+	ntc_reset_scheduler();
+	$GLOBALS['ntc_filters']['extrachill_network_should_classify_post'][] = static fn( $should, $post, $site ) => false;
+	extrachill_network_maybe_schedule_term_classification( 'publish', 'draft', $GLOBALS['ntc_posts'][2][50] );
+	ntc_assert_same( 0, count( \DataMachine\Engine\Tasks\TaskScheduler::$jobs ), 'A vetoed post does not schedule automatically.' );
+
+	// The veto must not reach explicit requests: a human asking for the work
+	// is not what it protects against.
+	$forced = extrachill_network_classify_post_terms(
+		array( 'site' => 'community', 'post_id' => 50, 'force' => true, 'dry_run' => true ),
+		static fn(): array => array()
+	);
+	ntc_assert( ! is_wp_error( $forced ), 'An explicit classification request bypasses the veto.' );
+	$GLOBALS['ntc_filters']['extrachill_network_should_classify_post'] = array();
+
+	ntc_reset_scheduler();
+	extrachill_network_maybe_schedule_term_classification( 'publish', 'draft', $GLOBALS['ntc_posts'][2][50] );
+	ntc_assert_same( 1, count( \DataMachine\Engine\Tasks\TaskScheduler::$jobs ), 'Removing the veto restores automatic scheduling.' );
+	ntc_reset_scheduler();
 
 	$unsupported = new WP_Post( 99, 'page', 'publish', 'Long enough unsupported title', 'Long enough unsupported content for policy exclusion.' );
 	extrachill_network_maybe_schedule_term_classification( 'publish', 'draft', $unsupported );

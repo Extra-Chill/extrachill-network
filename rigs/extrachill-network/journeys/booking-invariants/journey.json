@@ -1,0 +1,24 @@
+{
+  "schema": "extrachill-network/journey/v1",
+  "id": "booking-invariants",
+  "title": "Venue booking backend invariants: idempotency, concurrency, authorization, conversion",
+  "description": "Proves the venue-booking backend invariants a persona journey cannot: exact/changed-payload idempotency, identity-injection rejection, venue-scoped idempotency keys, private authorization, stale-version conflicts, valid/invalid status transitions, message idempotency, performance/deal selection, holds, confirmation, canonical event conversion and its own idempotency, reschedule, linked cancellation, timezone alignment, event-source uniqueness, and configuration-revision conflicts. Ported from extrachill-events/tests/NetworkE2E/booking/{topology.php,assert.php} and .github/workflows/booking-network-e2e.yml (extrachill-events#292) onto the full 11-site network rig. This journey and journeys/gardner-venue-booking are complementary: this one proves the invariants hold; that one proves a nontechnical operator can actually use the surface built on top of them.",
+  "origin": {
+    "repository": "Extra-Chill/extrachill-events",
+    "files": [
+      ".github/workflows/booking-network-e2e.yml",
+      "tests/NetworkE2E/booking/topology.php",
+      "tests/NetworkE2E/booking/assert.php",
+      "tests/NetworkE2E/booking/run.mjs",
+      "tests/NetworkE2E/booking/action-model.json",
+      "docs/booking-network-e2e.md"
+    ]
+  },
+  "sites": ["events.extrachill.com", "extrachill.com", "studio.extrachill.com"],
+  "runtimeEnv": {
+    "WP_AGENT_RUNTIME": "1"
+  },
+  "seed": { "codeFile": "seed.php", "timeoutMs": 180000 },
+  "grade": { "codeFile": "grade.php", "timeoutMs": 300000 },
+  "steps": []
+}

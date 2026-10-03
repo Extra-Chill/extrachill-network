@@ -27,6 +27,19 @@ function ec_update_turnstile_secret_key( $secret_key ) {
 }
 
 /**
+ * Log a Turnstile diagnostic message to the PHP error log.
+ *
+ * Single choke point for all Turnstile logging so the raw error_log() usage
+ * stays documented in one place.
+ *
+ * @param string $message Log message (already prefixed with the component name).
+ */
+function ec_turnstile_log( $message ) {
+	// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- deliberate server-side diagnostics for the captcha verification path.
+	error_log( $message );
+}
+
+/**
  * Verify Cloudflare Turnstile response via API with comprehensive error logging.
  *
  * Filterable via 'extrachill_bypass_turnstile_verification' for dev environments.
@@ -41,13 +54,13 @@ function ec_verify_turnstile_response( $response ) {
 	$response = sanitize_text_field( wp_unslash( $response ) );
 
 	if ( empty( $response ) ) {
-		error_log( 'ExtraChill Turnstile: Empty response token received' );
+		ec_turnstile_log( 'ExtraChill Turnstile: Empty response token received' );
 		return false;
 	}
 
 	$secret_key = ec_get_turnstile_secret_key();
 	if ( empty( $secret_key ) ) {
-		error_log( 'ExtraChill Turnstile: Secret key not configured in network settings' );
+		ec_turnstile_log( 'ExtraChill Turnstile: Secret key not configured in network settings' );
 		return false;
 	}
 
@@ -67,13 +80,13 @@ function ec_verify_turnstile_response( $response ) {
 	);
 
 	if ( is_wp_error( $http_response ) ) {
-		error_log( 'ExtraChill Turnstile Verification Error: ' . $http_response->get_error_message() );
+		ec_turnstile_log( 'ExtraChill Turnstile Verification Error: ' . $http_response->get_error_message() );
 		return false;
 	}
 
 	$response_code = wp_remote_retrieve_response_code( $http_response );
 	if ( 200 !== $response_code ) {
-		error_log( 'ExtraChill Turnstile Verification HTTP Error: Code ' . $response_code . ' Body: ' . wp_remote_retrieve_body( $http_response ) );
+		ec_turnstile_log( 'ExtraChill Turnstile Verification HTTP Error: Code ' . $response_code . ' Body: ' . wp_remote_retrieve_body( $http_response ) );
 		return false;
 	}
 
@@ -81,19 +94,19 @@ function ec_verify_turnstile_response( $response ) {
 	$result        = json_decode( $response_body, true );
 
 	if ( null === $result ) {
-		error_log( 'ExtraChill Turnstile Verification JSON Decode Error: Body - ' . $response_body );
+		ec_turnstile_log( 'ExtraChill Turnstile Verification JSON Decode Error: Body - ' . $response_body );
 		return false;
 	}
 
 	if ( isset( $result['success'] ) && true === $result['success'] ) {
-		error_log( 'ExtraChill Turnstile: Verification successful' );
+		ec_turnstile_log( 'ExtraChill Turnstile: Verification successful' );
 		return true;
 	}
 
 	if ( isset( $result['error-codes'] ) && is_array( $result['error-codes'] ) ) {
-		error_log( 'ExtraChill Turnstile Verification Failed: ' . implode( ', ', $result['error-codes'] ) );
+		ec_turnstile_log( 'ExtraChill Turnstile Verification Failed: ' . implode( ', ', $result['error-codes'] ) );
 	} else {
-		error_log( 'ExtraChill Turnstile Verification Unexpected Response: ' . $response_body );
+		ec_turnstile_log( 'ExtraChill Turnstile Verification Unexpected Response: ' . $response_body );
 	}
 
 	return false;
@@ -176,7 +189,7 @@ function ec_enqueue_turnstile_script( $handle = 'cloudflare-turnstile' ) {
 		$handle,
 		'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=ecTurnstileBoot',
 		array( $boot_handle ),
-		null,
+		null, // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion -- third-party Cloudflare API endpoint is intentionally unversioned.
 		true
 	);
 }

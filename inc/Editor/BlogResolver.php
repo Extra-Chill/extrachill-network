@@ -25,20 +25,20 @@ class BlogResolver {
 	 * whether they need to switch_to_blog().
 	 *
 	 * @param array    $input   Ability input.
-	 * @param int|null $default Optional default blog_id when input has none.
+	 * @param int|null $fallback Optional default blog_id when input has none.
 	 *                          Falls back to get_current_blog_id() when null.
 	 * @return int Resolved blog_id (always > 0).
 	 */
-	public static function resolve( array $input, ?int $default = null ): int {
+	public static function resolve( array $input, ?int $fallback = null ): int {
 		if ( isset( $input['blog_id'] ) ) {
 			$blog_id = (int) $input['blog_id'];
-			if ( $blog_id > 0 ) {
+			if ( 0 < $blog_id ) {
 				return $blog_id;
 			}
 		}
 
-		if ( null !== $default && $default > 0 ) {
-			return $default;
+		if ( null !== $fallback && 0 < $fallback ) {
+			return $fallback;
 		}
 
 		return (int) get_current_blog_id();
@@ -54,17 +54,17 @@ class BlogResolver {
 	 *
 	 * @template T
 	 * @param int      $blog_id Target blog ID.
-	 * @param callable $fn      Callable executed inside the target blog.
+	 * @param callable $callback Callable executed inside the target blog.
 	 * @return mixed Whatever the callable returns.
 	 */
-	public static function withBlog( int $blog_id, callable $fn ) {
-		if ( $blog_id <= 0 || $blog_id === (int) get_current_blog_id() ) {
-			return $fn();
+	public static function withBlog( int $blog_id, callable $callback ) {
+		if ( 0 >= $blog_id || (int) get_current_blog_id() === $blog_id ) {
+			return $callback();
 		}
 
 		switch_to_blog( $blog_id );
 		try {
-			return $fn();
+			return $callback();
 		} finally {
 			restore_current_blog();
 		}
