@@ -384,6 +384,7 @@ export async function validateJourneyDocument(journey, id, topology, personaExis
       throw new Error(`Journey '${id}' demo.video.viewport must be WxH.`);
     }
     if (demo.video.size !== undefined && !/^\d+x\d+$/.test(demo.video.size)) throw new Error(`Journey '${id}' demo.video.size must be WxH.`);
+    if (demo.video.maxSeconds !== undefined && (!Number.isInteger(demo.video.maxSeconds) || demo.video.maxSeconds <= 0)) throw new Error(`Journey '${id}' demo.video.maxSeconds must be a positive integer.`);
     if (demo.video.output !== undefined && (!isRecord(demo.video.output) || !['width', 'height', 'fps'].every((key) => Number.isInteger(demo.video.output[key]) && demo.video.output[key] > 0))) throw new Error(`Journey '${id}' demo.video.output requires positive integer width, height, and fps.`);
     if (typeof demo.theme !== 'string' || !/^[a-z0-9-]+\.json$/.test(demo.theme)) throw new Error(`Journey '${id}' demo.theme must name a JSON theme file.`);
     try { await readFile(path.join(packageRoot, 'demo-themes', demo.theme), 'utf8'); } catch { throw new Error(`Journey '${id}' references unknown demo theme '${demo.theme}'.`); }
@@ -1297,6 +1298,10 @@ async function renderJourneyDemos(recipe, journeys) {
     const markers = new Set(journeyMarkers(journey));
     const match = summaries.find(({ summary }) => (summary.video.markers ?? []).some((marker) => markers.has(marker.name)));
     if (!match) throw new Error(`Demo video for journey '${journey.id}' was not found in the run artifacts.`);
+    const maxSeconds = journey.demo.video.maxSeconds;
+    if (maxSeconds && (match.summary.video.durationMs ?? 0) > maxSeconds * 1000) {
+      throw new Error(`Demo video for journey '${journey.id}' runs ${(match.summary.video.durationMs / 1000).toFixed(1)}s, over its ${maxSeconds}s limit (demo.video.maxSeconds).`);
+    }
     const output = path.join(packageRoot, 'evidence', 'demo', `${journey.id}.mp4`);
     await mkdir(path.dirname(output), { recursive: true });
     const input = path.join(match.dir, match.summary.video.path);
