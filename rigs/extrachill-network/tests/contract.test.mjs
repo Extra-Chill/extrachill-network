@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { assembleDemoArgs, buildRecipe, demoEncodeArgs, journeyMarkers, paceDemoSteps, domainIdsMuPluginSource, DOMAIN_IDS_MU_PLUGIN_FILENAME, SANDBOX_COMPAT_MU_PLUGIN_FILENAME, journeySeedSetting, journeySelection, validateJourneyDocument } from '../run.mjs';
+import { assembleDemoArgs, buildRecipe, demoEncodeArgs, demoLoadCuts, demoTrimmedTime, journeyMarkers, paceDemoSteps, domainIdsMuPluginSource, DOMAIN_IDS_MU_PLUGIN_FILENAME, SANDBOX_COMPAT_MU_PLUGIN_FILENAME, journeySeedSetting, journeySelection, validateJourneyDocument } from '../run.mjs';
 
 const packageRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const topology = JSON.parse(await readFile(path.join(packageRoot, 'network-topology.json'), 'utf8'));
@@ -239,6 +239,22 @@ try {
   await assert.rejects(validateJourneyDocument({ ...demoDoc, demo: { ...demoDoc.demo, video: { ...demoDoc.demo.video, maxSeconds: 0 } } }, 'gardner-event-rsvp', topology), /maxSeconds/);
   const homepageDemo = JSON.parse(await readFile(path.join(packageRoot, 'journeys', 'calendar-going-share', 'journey.json'), 'utf8'));
   assert.ok(homepageDemo.demo.video.maxSeconds <= 59, 'calendar demo is capped under one minute');
+  const recorded = [
+    { kind: 'navigate', videoOffsetMs: { startMs: 0, endMs: 5000 } },
+    { kind: 'annotate', videoOffsetMs: { startMs: 5000, endMs: 5010 } },
+    { kind: 'waitFor', waitFor: 'duration', videoOffsetMs: { startMs: 5010, endMs: 7010 } },
+    { kind: 'click', videoOffsetMs: { startMs: 7010, endMs: 26000 } },
+    { kind: 'waitFor', waitFor: 'duration', videoOffsetMs: { startMs: 26000, endMs: 26900 } },
+    { kind: 'waitFor', waitFor: 'load', videoOffsetMs: { startMs: 26900, endMs: 48000 } },
+    { kind: 'click', videoOffsetMs: { startMs: 48000, endMs: 49000 } },
+    { kind: 'expect', videoOffsetMs: { startMs: 49000, endMs: 49100 } },
+  ];
+  const cuts = demoLoadCuts(recorded, 600);
+  assert.deepEqual(cuts, [[600, 5000], [7610, 26000], [26900, 48000]], 'navigations and navigating clicks (even across a pacing settle) are cut; authored waits and in-page clicks are kept');
+  assert.equal(demoTrimmedTime(49100, cuts), 49100 - 4400 - 18390 - 21100);
+  assert.equal(demoTrimmedTime(3000, cuts), 600, 'a time inside a cut maps to the cut start');
+  assert.match(demoEncodeArgs('in.webm', 'out.mp4', { video: { viewport: '540x960' } }, [[600, 5000]])[6], /^select='not\(between\(t,0\.600,5\.000\)\)',setpts=N\/FRAME_RATE\/TB,format=yuv420p$/);
+  assert.deepEqual(demoLoadCuts([{ kind: 'annotate', videoOffsetMs: { startMs: 2500, endMs: 2510 } }]), [[0, 2500]], 'lead-in before the first step is cut');
   assert.match(homepageDemo.steps[0].args.find((arg) => arg.startsWith('url=')), /^url=http:\/\/extrachill\.com\/$/, 'calendar demo starts on the homepage');
   await assert.rejects(validateJourneyDocument({ ...demoDoc, demo: { ...demoDoc.demo, environment: { colorScheme: 'sepia' } } }, 'gardner-event-rsvp', topology), /colorScheme/);
   await assert.rejects(validateJourneyDocument({ ...demoDoc, demo: { ...demoDoc.demo, cover: { marker: 'missing' } } }, 'gardner-event-rsvp', topology), /cover.marker/);

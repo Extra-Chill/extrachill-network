@@ -385,6 +385,7 @@ export async function validateJourneyDocument(journey, id, topology, personaExis
     }
     if (demo.video.size !== undefined && !/^\d+x\d+$/.test(demo.video.size)) throw new Error(`Journey '${id}' demo.video.size must be WxH.`);
     if (demo.video.maxSeconds !== undefined && (!Number.isInteger(demo.video.maxSeconds) || demo.video.maxSeconds <= 0)) throw new Error(`Journey '${id}' demo.video.maxSeconds must be a positive integer.`);
+    if (demo.video.loadKeepMs !== undefined && (!Number.isInteger(demo.video.loadKeepMs) || demo.video.loadKeepMs < 0)) throw new Error(`Journey '${id}' demo.video.loadKeepMs must be a non-negative integer.`);
     if (demo.video.output !== undefined && (!isRecord(demo.video.output) || !['width', 'height', 'fps'].every((key) => Number.isInteger(demo.video.output[key]) && demo.video.output[key] > 0))) throw new Error(`Journey '${id}' demo.video.output requires positive integer width, height, and fps.`);
     if (typeof demo.theme !== 'string' || !/^[a-z0-9-]+\.json$/.test(demo.theme)) throw new Error(`Journey '${id}' demo.theme must name a JSON theme file.`);
     try { await readFile(path.join(packageRoot, 'demo-themes', demo.theme), 'utf8'); } catch { throw new Error(`Journey '${id}' references unknown demo theme '${demo.theme}'.`); }
@@ -441,9 +442,71 @@ export function paceDemoSteps(raw, pacing = {}) {
   return JSON.stringify(paced);
 }
 
-export function demoEncodeArgs(input, output, demo) {
+/**
+ * Video ranges to cut from a demo recording: the dead time while a page loads.
+ *
+ * Rig page loads take seconds (a cold sandbox can take tens of seconds on one
+ * click), which the viewer should never sit through. Every step that waits on
+ * a navigation -- `navigate`, `waitFor` load states, and the `click` that
+ * triggers one -- keeps at most `keepMs` of its footage (the start, so the tap
+ * and the first paint stay visible) and the rest is cut. Authored pacing
+ * (duration waits) and every other step are never trimmed.
+ *
+ * @param {Array<object>} steps  steps.jsonl records with videoOffsetMs.
+ * @param {number} keepMs        Footage kept per load step.
+ * @returns {Array<[number, number]>} Sorted, merged [startMs, endMs) cuts.
+ */
+export function demoLoadCuts(steps, keepMs = 600) {
+  const loadStates = new Set(['load', 'domcontentloaded', 'networkidle']);
+  const cuts = [];
+  const waitsOnLoad = (step) => step?.kind === 'waitFor' && loadStates.has(step.waitFor);
+  for (const [index, step] of steps.entries()) {
+    const offset = step.videoOffsetMs;
+    if (!offset || !(offset.endMs > offset.startMs)) continue;
+    // A click followed by a load wait triggered a navigation. Demo pacing may
+    // insert one settle wait between them, so look one step further.
+    const isDurationWait = (candidate) => candidate?.kind === 'waitFor' && candidate.waitFor === 'duration';
+    const navigatingClick = step.kind === 'click' && (waitsOnLoad(steps[index + 1]) || (isDurationWait(steps[index + 1]) && waitsOnLoad(steps[index + 2])));
+    const isLoad = step.kind === 'navigate' || waitsOnLoad(step) || navigatingClick;
+    if (!isLoad) continue;
+    // A load wait right after another load step continues the same page
+    // transition, whose kept footage was already taken: cut all of it.
+    const previous = steps[index - 1];
+    const beforePrevious = steps[index - 2];
+    const continuesTransition = waitsOnLoad(step) && (['click', 'navigate'].includes(previous?.kind) || waitsOnLoad(previous) || (isDurationWait(previous) && ['click', 'navigate'].includes(beforePrevious?.kind)));
+    const start = continuesTransition ? offset.startMs : offset.startMs + keepMs;
+    if (offset.endMs - start > 50) cuts.push([start, offset.endMs]);
+  }
+  // Blank frames before the first step (context start, first request) never show.
+  const firstStart = steps.find((step) => step.videoOffsetMs)?.videoOffsetMs.startMs ?? 0;
+  if (firstStart > 50) cuts.push([0, firstStart]);
+  cuts.sort((a, b) => a[0] - b[0]);
+  const merged = [];
+  for (const cut of cuts) {
+    const last = merged[merged.length - 1];
+    if (last && cut[0] <= last[1]) last[1] = Math.max(last[1], cut[1]);
+    else merged.push([...cut]);
+  }
+  return merged;
+}
+
+/** Map a source-video time to the trimmed timeline. */
+export function demoTrimmedTime(ms, cuts) {
+  let removed = 0;
+  for (const [start, end] of cuts) {
+    if (ms >= end) removed += end - start;
+    else if (ms > start) return start - removed;
+  }
+  return ms - removed;
+}
+
+export function demoEncodeArgs(input, output, demo, cuts = []) {
   const out = demo.video.output;
+  const keep = cuts.length
+    ? [`select='not(${cuts.map(([a, b]) => `between(t,${(a / 1000).toFixed(3)},${(b / 1000).toFixed(3)})`).join('+')})'`, 'setpts=N/FRAME_RATE/TB']
+    : [];
   const filters = [
+    ...keep,
     ...(out ? [`scale=${out.width}:${out.height}:flags=lanczos`] : []),
     ...(out?.fps ? [`fps=${out.fps}`] : []),
     'format=yuv420p',
@@ -1298,14 +1361,19 @@ async function renderJourneyDemos(recipe, journeys) {
     const markers = new Set(journeyMarkers(journey));
     const match = summaries.find(({ summary }) => (summary.video.markers ?? []).some((marker) => markers.has(marker.name)));
     if (!match) throw new Error(`Demo video for journey '${journey.id}' was not found in the run artifacts.`);
+    const stepRecords = (await readFile(path.join(match.dir, 'files', 'browser', 'steps.jsonl'), 'utf8').catch(() => ''))
+      .split('\n').filter(Boolean).map((line) => JSON.parse(line));
+    const cuts = demoLoadCuts(stepRecords, journey.demo.video.loadKeepMs ?? 600);
+    const sourceMs = match.summary.video.durationMs ?? 0;
+    const trimmedMs = demoTrimmedTime(sourceMs, cuts);
     const maxSeconds = journey.demo.video.maxSeconds;
-    if (maxSeconds && (match.summary.video.durationMs ?? 0) > maxSeconds * 1000) {
-      throw new Error(`Demo video for journey '${journey.id}' runs ${(match.summary.video.durationMs / 1000).toFixed(1)}s, over its ${maxSeconds}s limit (demo.video.maxSeconds).`);
+    if (maxSeconds && trimmedMs > maxSeconds * 1000) {
+      throw new Error(`Demo video for journey '${journey.id}' runs ${(trimmedMs / 1000).toFixed(1)}s after trimming load time (recorded ${(sourceMs / 1000).toFixed(1)}s), over its ${maxSeconds}s limit (demo.video.maxSeconds).`);
     }
     const output = path.join(packageRoot, 'evidence', 'demo', `${journey.id}.mp4`);
     await mkdir(path.dirname(output), { recursive: true });
     const input = path.join(match.dir, match.summary.video.path);
-    const encoded = spawnSync('ffmpeg', demoEncodeArgs(input, output, journey.demo), { stdio: 'inherit' });
+    const encoded = spawnSync('ffmpeg', demoEncodeArgs(input, output, journey.demo, cuts), { stdio: 'inherit' });
     if (encoded.status !== 0) throw new Error(`ffmpeg failed encoding demo for ${journey.id}.`);
     if (journey.demo.cover) {
       const coverMarker = (match.summary.video.markers ?? []).find((marker) => marker.name === journey.demo.cover.marker);
