@@ -456,7 +456,16 @@ export function paceDemoSteps(raw, pacing = {}) {
  * @param {number} keepMs        Footage kept per load step.
  * @returns {Array<[number, number]>} Sorted, merged [startMs, endMs) cuts.
  */
-export function demoLoadCuts(steps, keepMs = 600) {
+// A presented click spends its opening moments gliding the cursor to the
+// target and playing click feedback; the navigation only starts after that.
+export const DEMO_CLICK_FEEDBACK_MS = 250;
+export function demoClickLeadMs(presentation) {
+  const move = Number(presentation?.motion?.moveDurationMs ?? 0);
+  const feedback = presentation?.clickFeedback === false || presentation?.clickFeedback?.enabled === false ? 0 : DEMO_CLICK_FEEDBACK_MS;
+  return Math.max(0, (Number.isFinite(move) ? move : 0) + feedback);
+}
+
+export function demoLoadCuts(steps, keepMs = 600, clickLeadMs = 0) {
   const loadStates = new Set(['load', 'domcontentloaded', 'networkidle']);
   const cuts = [];
   const waitsOnLoad = (step) => step?.kind === 'waitFor' && loadStates.has(step.waitFor);
@@ -474,7 +483,8 @@ export function demoLoadCuts(steps, keepMs = 600) {
     const previous = steps[index - 1];
     const beforePrevious = steps[index - 2];
     const continuesTransition = waitsOnLoad(step) && (['click', 'navigate'].includes(previous?.kind) || waitsOnLoad(previous) || (isDurationWait(previous) && ['click', 'navigate'].includes(beforePrevious?.kind)));
-    const start = continuesTransition ? offset.startMs : offset.startMs + keepMs;
+    // Keep a navigating click's cursor glide and feedback, then keepMs of the transition.
+    const start = continuesTransition ? offset.startMs : offset.startMs + (navigatingClick ? clickLeadMs : 0) + keepMs;
     if (offset.endMs - start > 50) cuts.push([start, offset.endMs]);
   }
   // Blank frames before the first step (context start, first request) never show.
@@ -1371,7 +1381,7 @@ async function renderJourneyDemos(recipe, journeys) {
     if (!match) throw new Error(`Demo video for journey '${journey.id}' was not found in the run artifacts.`);
     const stepRecords = (await readFile(path.join(match.dir, 'files', 'browser', 'steps.jsonl'), 'utf8').catch(() => ''))
       .split('\n').filter(Boolean).map((line) => JSON.parse(line));
-    const cuts = demoLoadCuts(stepRecords, journey.demo.video.loadKeepMs ?? 600);
+    const cuts = demoLoadCuts(stepRecords, journey.demo.video.loadKeepMs ?? 600, demoClickLeadMs(journey.demo.presentation));
     const sourceMs = match.summary.video.durationMs ?? 0;
     const trimmedMs = demoTrimmedTime(sourceMs, cuts);
     const maxSeconds = journey.demo.video.maxSeconds;
