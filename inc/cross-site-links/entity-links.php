@@ -314,8 +314,10 @@ function extrachill_get_artist_profile_by_slug( $slug ) {
 		}
 
 		$artist_id = (int) $posts[0];
-		$permalink = get_permalink( $artist_id );
-		$permalink = $permalink ? (string) $permalink : '';
+		$artist_post = get_post( $artist_id );
+		$post_type   = get_post_type_object( 'artist_profile' );
+		$rewrite     = $post_type && ! empty( $post_type->rewrite['slug'] ) ? trim( $post_type->rewrite['slug'], '/' ) : 'artists';
+		$permalink   = $artist_post ? home_url( user_trailingslashit( $rewrite . '/' . $artist_post->post_name, 'single' ) ) : '';
 
 		if ( ! $permalink ) {
 			return false;
