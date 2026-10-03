@@ -127,6 +127,18 @@ function extrachill_internal_linking_min_events_archive_count( $taxonomy, $post_
 }
 
 /**
+ * Whether a source article is news-adjacent enough for wire location links.
+ *
+ * @param int $post_id Source post ID.
+ * @return bool
+ */
+function extrachill_internal_linking_is_wire_location_relevant( $post_id ) {
+	$categories = apply_filters( 'extrachill_internal_linking_wire_location_categories', array( 'music-news', 'festival-news', 'festival-recap', 'festival-preview' ), $post_id );
+	$assigned   = wp_get_post_categories( $post_id, array( 'fields' => 'slugs' ) );
+	return (bool) array_intersect( (array) $categories, (array) $assigned );
+}
+
+/**
  * Site keys treated as forward surfaces.
  *
  * Candidates on these sites get a score boost so they outrank same-site
@@ -249,17 +261,25 @@ function extrachill_add_cross_site_linking_candidates( $candidates, $post_id, $s
 					continue;
 				}
 
-				$url     = (string) $link['url'];
+				$url      = (string) $link['url'];
+				$site_key = isset( $link['site_key'] ) ? (string) $link['site_key'] : '';
+				if ( 'events' === $site_key && function_exists( 'extrachill_build_term_archive_url' ) ) {
+					$canonical_url = extrachill_build_term_archive_url( (string) $term->slug, $taxonomy, (int) ( $link['blog_id'] ?? $events_blog_id ) );
+					if ( $canonical_url ) {
+						$url = $canonical_url;
+					}
+				}
+				if ( 'location' === $taxonomy && 'wire' === $site_key && ! extrachill_internal_linking_is_wire_location_relevant( $post_id ) ) {
+					continue;
+				}
 				$url_key = trailingslashit( $url );
 				if ( isset( $seen_urls[ $url_key ] ) ) {
 					continue;
 				}
 				$seen_urls[ $url_key ] = true;
-
-				$site_key   = isset( $link['site_key'] ) ? (string) $link['site_key'] : '';
-				$is_forward = in_array( $site_key, $forward_keys, true );
-				$term_name  = isset( $link['term_name'] ) ? (string) $link['term_name'] : $term->name;
-				$site_label = isset( $link['label'] ) ? (string) $link['label'] : ucfirst( $site_key );
+				$is_forward            = in_array( $site_key, $forward_keys, true );
+				$term_name             = isset( $link['term_name'] ) ? (string) $link['term_name'] : $term->name;
+				$site_label            = isset( $link['label'] ) ? (string) $link['label'] : ucfirst( $site_key );
 
 				// Title is what the AI weaves the anchor around. Use the term
 				// name so the link reads naturally in prose (e.g. the artist or
@@ -313,6 +333,8 @@ function extrachill_add_cross_site_linking_candidates( $candidates, $post_id, $s
 
 	return array_merge( $candidates, $cross_site );
 }
+
+add_filter( 'datamachine_internal_linking_candidates', 'extrachill_add_cross_site_linking_candidates', 10, 6 );
 
 /**
  * Resolve the events archive candidate for an entity term using TOTAL events.
@@ -421,4 +443,3 @@ function extrachill_internal_linking_merge_events_archive_link( $links, $events_
 
 	return $merged;
 }
-add_filter( 'datamachine_internal_linking_candidates', 'extrachill_add_cross_site_linking_candidates', 10, 6 );

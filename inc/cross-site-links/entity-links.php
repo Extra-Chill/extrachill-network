@@ -313,9 +313,18 @@ function extrachill_get_artist_profile_by_slug( $slug ) {
 			return false;
 		}
 
-		$artist_id = (int) $posts[0];
-		$permalink = get_permalink( $artist_id );
-		$permalink = $permalink ? (string) $permalink : '';
+		$artist_id   = (int) $posts[0];
+		$artist_post = get_post( $artist_id );
+		$post_type   = get_post_type_object( 'artist_profile' );
+		$rewrite     = $post_type && ! empty( $post_type->rewrite['slug'] ) ? trim( $post_type->rewrite['slug'], '/' ) : 'artists';
+		$permalink   = $artist_post ? home_url( $rewrite . '/' . $artist_post->post_name ) : '';
+		// The artist CPT is not registered when switched from another blog, so
+		// get_permalink() yields ?p=. Build the pretty URL and apply the target
+		// blog's own trailing-slash rule (user_trailingslashit() would use the
+		// origin blog's $wp_rewrite and add a 301-ing slash).
+		if ( '' !== $permalink && '/' === substr( (string) get_option( 'permalink_structure' ), -1 ) ) {
+			$permalink = trailingslashit( $permalink );
+		}
 
 		if ( ! $permalink ) {
 			return false;

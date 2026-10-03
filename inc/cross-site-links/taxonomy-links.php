@@ -623,6 +623,15 @@ function extrachill_build_term_archive_url( $term_slug, $taxonomy, $blog_id ) {
 			return null;
 		}
 
+		// get_term_link() under switch_to_blog() applies the ORIGIN blog's
+		// trailing-slash rule ($wp_rewrite is not switched). Normalize to the
+		// target blog's own permalink structure so the URL is canonical and
+		// does not 301.
+		$structure = (string) get_option( 'permalink_structure' );
+		if ( '' !== $structure ) {
+			$url = '/' === substr( $structure, -1 ) ? trailingslashit( $url ) : untrailingslashit( $url );
+		}
+
 		return $url;
 	} finally {
 		restore_current_blog();

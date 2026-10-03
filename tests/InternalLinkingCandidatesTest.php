@@ -241,4 +241,21 @@ class InternalLinkingCandidatesTest extends WP_UnitTestCase {
 
 		$this->assertCount( 1, $result, 'already-linked cross-site URL is not duplicated' );
 	}
+
+	/** Wire location archives are withheld from non-news source articles. */
+	public function test_wire_location_requires_news_category(): void {
+		register_taxonomy( 'location', 'post' );
+		$post_id = self::factory()->post->create();
+		$term_id = self::factory()->term->create( array( 'taxonomy' => 'location', 'name' => 'California' ) );
+		wp_set_object_terms( $post_id, array( $term_id ), 'location' );
+		$term = get_term( $term_id, 'location' );
+		$this->prime_cross_site_links( $term, array( array( 'blog_id' => 9, 'site_key' => 'wire', 'url' => 'https://wire.extrachill.com/location/california', 'term_name' => 'California', 'count' => 1 ) ) );
+
+		$this->assertSame( array(), apply_filters( 'datamachine_internal_linking_candidates', array(), $post_id, 'Song Meaning', array(), array(), 5 ) );
+
+		$category_id = self::factory()->term->create( array( 'taxonomy' => 'category', 'name' => 'Music News', 'slug' => 'music-news' ) );
+		wp_set_post_categories( $post_id, array( $category_id ) );
+		$result = apply_filters( 'datamachine_internal_linking_candidates', array(), $post_id, 'News', array(), array(), 5 );
+		$this->assertSame( 'https://wire.extrachill.com/location/california', $result[0]['url'] );
+	}
 }
