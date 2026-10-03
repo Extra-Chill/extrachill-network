@@ -117,14 +117,20 @@ $artist_id = calendar_demo_term( 'Channel Bluff', 'artist' );
 
 // Upcoming Friday/Saturday/Sunday relative to the rig clock, so "This Weekend"
 // always resolves to these shows.
-$tz       = wp_timezone();
-$friday   = new DateTimeImmutable( 'now', $tz );
-$friday   = 5 === (int) $friday->format( 'N' ) ? $friday : $friday->modify( 'next friday' );
+$tz = wp_timezone();
+// Anchor on the weekend the calendar's "This Weekend" scope shows: the current
+// one when today is Friday-Sunday, otherwise the coming one. Using "next
+// friday" on a Saturday/Sunday jumps a week ahead and empties the scope.
+$today    = new DateTimeImmutable( 'today', $tz );
+$weekday  = (int) $today->format( 'N' );
+$friday   = $weekday >= 5 ? $today->modify( '-' . ( $weekday - 5 ) . ' days' ) : $today->modify( 'next friday' );
 $saturday = $friday->modify( '+1 day' );
 $sunday   = $friday->modify( '+2 days' );
+// The featured show must still be upcoming: on Sunday, Saturday has passed.
+$featured_day = 7 === $weekday ? $sunday : $saturday;
 
 $events = array(
-	array( 'channel-bluff-charleston-pour-house', 'Channel Bluff', $saturday, '21:00', 'Charleston Pour House', 'https://tickets.example.invalid/channel-bluff', true ),
+	array( 'channel-bluff-charleston-pour-house', 'Channel Bluff', $featured_day, '22:00', 'Charleston Pour House', 'https://tickets.example.invalid/channel-bluff', true ),
 	array( 'charleston-weekend-fri-1', 'Marsh Lights', $friday, '20:00', 'The Royal American', '', false ),
 	array( 'charleston-weekend-fri-2', 'Low Country Static', $friday, '21:30', 'Music Farm', '', false ),
 	array( 'charleston-weekend-sat-1', 'Saltwater Saints', $saturday, '19:00', 'Lo-Fi Brewing', '', false ),
