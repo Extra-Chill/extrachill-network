@@ -236,6 +236,10 @@ try {
   await validateJourneyDocument(demoDoc, 'gardner-event-rsvp', topology);
   await assert.rejects(validateJourneyDocument({ ...demoDoc, demo: { ...demoDoc.demo, video: { viewport: 'phone' } } }, 'gardner-event-rsvp', topology), /viewport must be WxH/);
   await assert.rejects(validateJourneyDocument({ ...demoDoc, demo: { ...demoDoc.demo, theme: 'missing.json' } }, 'gardner-event-rsvp', topology), /unknown demo theme/);
+  await assert.rejects(validateJourneyDocument({ ...demoDoc, demo: { ...demoDoc.demo, video: { ...demoDoc.demo.video, maxSeconds: 0 } } }, 'gardner-event-rsvp', topology), /maxSeconds/);
+  const homepageDemo = JSON.parse(await readFile(path.join(packageRoot, 'journeys', 'calendar-going-share', 'journey.json'), 'utf8'));
+  assert.ok(homepageDemo.demo.video.maxSeconds <= 59, 'calendar demo is capped under one minute');
+  assert.match(homepageDemo.steps[0].args.find((arg) => arg.startsWith('url=')), /^url=http:\/\/extrachill\.com\/$/, 'calendar demo starts on the homepage');
   await assert.rejects(validateJourneyDocument({ ...demoDoc, demo: { ...demoDoc.demo, environment: { colorScheme: 'sepia' } } }, 'gardner-event-rsvp', topology), /colorScheme/);
   await assert.rejects(validateJourneyDocument({ ...demoDoc, demo: { ...demoDoc.demo, cover: { marker: 'missing' } } }, 'gardner-event-rsvp', topology), /cover.marker/);
   await assert.rejects(validateJourneyDocument({ ...demoDoc, steps: [{ marker: 'known' }], demo: { ...demoDoc.demo, steps: [{ after: 'missing' }] } }, 'gardner-event-rsvp', topology), /unknown markers/);

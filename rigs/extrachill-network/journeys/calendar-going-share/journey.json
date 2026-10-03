@@ -1,9 +1,10 @@
 {
   "schema": "extrachill-network/journey/v1",
   "id": "calendar-going-share",
-  "title": "Find a Charleston show and share it",
-  "description": "Instructional walkthrough of the events calendar on a phone: search a city, open the Charleston calendar, narrow to This Weekend, open the featured show, tap Going, point at Get Tickets, and share it. Seeds a fictional Charleston weekend at real public venues, dated relative to the rig clock. Doubles as the regression for that path; demo mode renders it as a captioned MP4 (extrachill-network#328).",
+  "title": "From the homepage to a Charleston show, saved and shared",
+  "description": "Instructional walkthrough on a phone, under one minute: start on the extrachill.com homepage, open the events calendar, search Charleston, narrow to This Weekend, open Channel Bluff at Charleston Pour House, tap Going, point at Get Tickets, and share it. Seeds a Charleston weekend at real public venues dated to the current or coming weekend. Doubles as the regression for that path; demo mode renders it as a captioned MP4 (extrachill-network#328).",
   "sites": [
+    "extrachill.com",
     "events.extrachill.com"
   ],
   "seed": {
@@ -19,7 +20,8 @@
         "width": 1080,
         "height": 1920,
         "fps": 30
-      }
+      },
+      "maxSeconds": 59
     },
     "presentation": {
       "pointer": {
@@ -31,11 +33,11 @@
         "enabled": true
       },
       "motion": {
-        "moveDurationMs": 900,
+        "moveDurationMs": 600,
         "easing": "ease-in-out"
       },
       "typing": {
-        "delayMs": 110
+        "delayMs": 80
       }
     },
     "theme": "extra-chill-dark.json",
@@ -43,8 +45,7 @@
       "colorScheme": "dark"
     },
     "pacing": {
-      "settleMs": 1800,
-      "minCaptionMs": 2500
+      "settleMs": 900
     },
     "cover": {
       "marker": "cover"
@@ -54,19 +55,23 @@
     {
       "command": "wordpress.browser-actions",
       "args": [
-        "url=http://events.extrachill.com/",
-        "route-host=events.extrachill.com",
-        "network-policy=block",
+        "url=http://extrachill.com/",
+        "route-host=extrachill.com,events.extrachill.com",
+        "allow-host=extrachill.com",
         "allow-host=events.extrachill.com",
+        "network-policy=block",
         "auth=wordpress-admin",
         "auth-user-id=230",
         "step-timeout=60s",
         "timeout=300s",
-        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/\",\"waitFor\":\"load\",\"marker\":\"calendar-home\"},{\"kind\":\"expect\",\"selector\":\"link#extrachill-style-css\",\"state\":\"attached\"},{\"kind\":\"annotate\",\"shape\":\"caption\",\"text\":\"Find live music near you\",\"position\":\"top\",\"durationMs\":2500},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"2500ms\"},{\"kind\":\"annotate\",\"id\":\"city\",\"shape\":\"highlight\",\"selector\":\"#events-location-search\",\"style\":{\"variant\":\"box\",\"padding\":6}},{\"kind\":\"click\",\"selector\":\"#events-location-search\"},{\"kind\":\"type\",\"selector\":\"#events-location-search\",\"value\":\"Charleston\"},{\"kind\":\"annotate\",\"clear\":[\"city\"]},{\"kind\":\"click\",\"selector\":\".events-location-search button[type=submit]\",\"marker\":\"search-city\"},{\"kind\":\"waitFor\",\"waitFor\":\"load\"},{\"kind\":\"click\",\"selector\":\"a.location-badge.location-charleston\"},{\"kind\":\"waitFor\",\"waitFor\":\"load\"},{\"kind\":\"annotate\",\"shape\":\"caption\",\"text\":\"Every show in town, day by day\",\"position\":\"top\",\"marker\":\"city-calendar\",\"id\":\"city-cap\"},{\"kind\":\"annotate\",\"clear\":[\"city-cap\"]},{\"kind\":\"annotate\",\"id\":\"cover\",\"shape\":\"caption\",\"text\":\"Find your next show\",\"position\":\"center\",\"marker\":\"cover\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"3s\"},{\"kind\":\"annotate\",\"clear\":[\"cover\"]},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"3s\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"2500ms\"},{\"kind\":\"scroll\",\"selector\":\".data-machine-events-scope-chip[data-scope='this-weekend']\",\"behavior\":\"smooth\",\"block\":\"center\",\"durationMs\":1200},{\"kind\":\"annotate\",\"id\":\"weekend\",\"shape\":\"caption\",\"text\":\"Narrow it to this weekend\",\"position\":\"top\"},{\"kind\":\"click\",\"selector\":\".data-machine-events-scope-chip[data-scope='this-weekend']\",\"marker\":\"this-weekend\"},{\"kind\":\"waitFor\",\"selector\":\"a[href*='channel-bluff-charleston-pour-house']:not(.data-machine-more-info-button)\",\"state\":\"attached\",\"timeout\":\"20s\"},{\"kind\":\"annotate\",\"clear\":[\"weekend\"]},{\"kind\":\"scroll\",\"selector\":\"a[href*='channel-bluff-charleston-pour-house']:not(.data-machine-more-info-button)\",\"behavior\":\"smooth\",\"block\":\"center\",\"durationMs\":1200},{\"kind\":\"annotate\",\"id\":\"pick\",\"shape\":\"highlight\",\"selector\":\"a[href*='channel-bluff-charleston-pour-house']:not(.data-machine-more-info-button)\",\"style\":{\"variant\":\"ring\",\"padding\":8},\"marker\":\"pick-a-show\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"1500ms\"},{\"kind\":\"click\",\"selector\":\"a[href*='channel-bluff-charleston-pour-house']:not(.data-machine-more-info-button)\"},{\"kind\":\"waitFor\",\"waitFor\":\"load\"},{\"kind\":\"annotate\",\"clear\":true},{\"kind\":\"scroll\",\"selector\":\".ec-attendance__button\",\"behavior\":\"smooth\",\"block\":\"center\",\"durationMs\":1200},{\"kind\":\"annotate\",\"id\":\"going\",\"shape\":\"highlight\",\"selector\":\".ec-attendance__button\",\"style\":{\"variant\":\"box\",\"padding\":6}},{\"kind\":\"annotate\",\"id\":\"going-cap\",\"shape\":\"caption\",\"text\":\"Tap Going to save the show\",\"position\":\"top\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"1500ms\"},{\"kind\":\"click\",\"selector\":\".ec-attendance__button\",\"marker\":\"going\"},{\"kind\":\"expect\",\"selector\":\".ec-attendance__button[aria-pressed='true']\",\"state\":\"visible\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"1500ms\"},{\"kind\":\"annotate\",\"clear\":[\"going\",\"going-cap\"]},{\"kind\":\"annotate\",\"id\":\"tix\",\"shape\":\"spotlight\",\"selector\":\"a.ticket-button\",\"marker\":\"get-tickets\"},{\"kind\":\"annotate\",\"id\":\"tix-cap\",\"shape\":\"caption\",\"text\":\"Grab tickets from the venue\",\"position\":\"top\"},{\"kind\":\"hover\",\"selector\":\"a.ticket-button\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"2500ms\"},{\"kind\":\"annotate\",\"clear\":[\"tix\",\"tix-cap\"]},{\"kind\":\"annotate\",\"id\":\"share-cap\",\"shape\":\"caption\",\"text\":\"Send it to a friend\",\"position\":\"top\"},{\"kind\":\"click\",\"selector\":\".share-dropdown .ec-mini-dropdown-toggle\",\"marker\":\"share\"},{\"kind\":\"waitFor\",\"selector\":\".share-option.copy-link a\"},{\"kind\":\"click\",\"selector\":\".share-option.copy-link a\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"2s\"},{\"kind\":\"annotate\",\"clear\":true},{\"kind\":\"annotate\",\"shape\":\"caption\",\"text\":\"See you at the show\",\"position\":\"center\",\"durationMs\":3000,\"marker\":\"outro\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"3s\"}]"
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://extrachill.com/\",\"waitFor\":\"load\",\"marker\":\"homepage\"},{\"kind\":\"expect\",\"selector\":\"link#extrachill-style-css\",\"state\":\"attached\"},{\"kind\":\"annotate\",\"id\":\"cap\",\"shape\":\"caption\",\"text\":\"Find live music near you\",\"position\":\"top\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"1800ms\"},{\"kind\":\"scroll\",\"selector\":\".home-network-card a[href*='events.extrachill.com'][href*='utm_campaign=events']:not([href*='/submit'])\",\"behavior\":\"smooth\",\"block\":\"center\",\"durationMs\":800},{\"kind\":\"annotate\",\"id\":\"browse\",\"shape\":\"highlight\",\"selector\":\".home-network-card a[href*='events.extrachill.com'][href*='utm_campaign=events']:not([href*='/submit'])\",\"style\":{\"variant\":\"box\",\"padding\":6}},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"700ms\"},{\"kind\":\"click\",\"selector\":\".home-network-card a[href*='events.extrachill.com'][href*='utm_campaign=events']:not([href*='/submit'])\",\"marker\":\"browse-events\"},{\"kind\":\"waitFor\",\"waitFor\":\"load\"},{\"kind\":\"annotate\",\"clear\":true},{\"kind\":\"annotate\",\"id\":\"cap\",\"shape\":\"caption\",\"text\":\"Search your city\",\"position\":\"top\"},{\"kind\":\"click\",\"selector\":\"#events-location-search\"},{\"kind\":\"type\",\"selector\":\"#events-location-search\",\"value\":\"Charleston\"},{\"kind\":\"click\",\"selector\":\".events-location-search button[type=submit]\",\"marker\":\"search-city\"},{\"kind\":\"waitFor\",\"waitFor\":\"load\"},{\"kind\":\"click\",\"selector\":\"a.location-badge.location-charleston\"},{\"kind\":\"waitFor\",\"waitFor\":\"load\"},{\"kind\":\"annotate\",\"clear\":true},{\"kind\":\"annotate\",\"id\":\"cap\",\"shape\":\"caption\",\"text\":\"Every show in town, day by day\",\"position\":\"top\",\"marker\":\"city-calendar\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"1500ms\"},{\"kind\":\"annotate\",\"clear\":[\"cap\"]},{\"kind\":\"annotate\",\"id\":\"cap\",\"shape\":\"caption\",\"text\":\"Narrow it to this weekend\",\"position\":\"top\"},{\"kind\":\"click\",\"selector\":\".data-machine-events-scope-chip[data-scope='this-weekend']\",\"marker\":\"this-weekend\"},{\"kind\":\"waitFor\",\"selector\":\"a[href*='channel-bluff-charleston-pour-house']:not(.data-machine-more-info-button)\",\"state\":\"attached\",\"timeout\":\"20s\"},{\"kind\":\"annotate\",\"clear\":[\"cap\"]},{\"kind\":\"scroll\",\"selector\":\"a[href*='channel-bluff-charleston-pour-house']:not(.data-machine-more-info-button)\",\"behavior\":\"smooth\",\"block\":\"center\",\"durationMs\":800},{\"kind\":\"annotate\",\"id\":\"pick\",\"shape\":\"highlight\",\"selector\":\"a[href*='channel-bluff-charleston-pour-house']:not(.data-machine-more-info-button)\",\"style\":{\"variant\":\"ring\",\"padding\":8}},{\"kind\":\"annotate\",\"id\":\"cap\",\"shape\":\"caption\",\"text\":\"Channel Bluff, Saturday at the Pour House\",\"position\":\"top\",\"marker\":\"cover\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"1800ms\"},{\"kind\":\"click\",\"selector\":\"a[href*='channel-bluff-charleston-pour-house']:not(.data-machine-more-info-button)\",\"marker\":\"pick-a-show\"},{\"kind\":\"waitFor\",\"waitFor\":\"load\"},{\"kind\":\"annotate\",\"clear\":true},{\"kind\":\"scroll\",\"selector\":\".ec-attendance__button\",\"behavior\":\"smooth\",\"block\":\"center\",\"durationMs\":700},{\"kind\":\"annotate\",\"id\":\"going\",\"shape\":\"highlight\",\"selector\":\".ec-attendance__button\",\"style\":{\"variant\":\"box\",\"padding\":6}},{\"kind\":\"annotate\",\"id\":\"cap\",\"shape\":\"caption\",\"text\":\"Tap Going to save the show\",\"position\":\"top\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"900ms\"},{\"kind\":\"click\",\"selector\":\".ec-attendance__button\",\"marker\":\"going\"},{\"kind\":\"expect\",\"selector\":\".ec-attendance__button[aria-pressed='true']\",\"state\":\"visible\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"1200ms\"},{\"kind\":\"annotate\",\"clear\":true},{\"kind\":\"annotate\",\"id\":\"tix\",\"shape\":\"spotlight\",\"selector\":\"a.ticket-button\",\"marker\":\"get-tickets\"},{\"kind\":\"annotate\",\"id\":\"cap\",\"shape\":\"caption\",\"text\":\"Grab tickets from the venue\",\"position\":\"top\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"1800ms\"},{\"kind\":\"annotate\",\"clear\":true},{\"kind\":\"annotate\",\"id\":\"cap\",\"shape\":\"caption\",\"text\":\"Send it to a friend\",\"position\":\"top\"},{\"kind\":\"click\",\"selector\":\".share-dropdown .ec-mini-dropdown-toggle\",\"marker\":\"share\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"1500ms\"},{\"kind\":\"annotate\",\"clear\":true},{\"kind\":\"annotate\",\"shape\":\"caption\",\"text\":\"See you at the show\",\"position\":\"center\",\"marker\":\"outro\"},{\"kind\":\"waitFor\",\"waitFor\":\"duration\",\"duration\":\"1800ms\"}]"
       ],
       "metadata": {
         "step": "find-going-share"
       }
     }
+  ],
+  "fixtureMuPlugins": [
+    "demo-offline-assets.php"
   ]
 }
