@@ -36,9 +36,9 @@ if ( ! get_user_by( 'id', CALENDAR_DEMO_FAN_ID ) ) {
 		$wpdb->users,
 		array(
 			'ID'              => CALENDAR_DEMO_FAN_ID,
-			'user_login'      => 'charleston_demo_fan',
+			'user_login'      => 'charlestonfan',
 			'user_pass'       => wp_hash_password( wp_generate_password( 32, true, true ) ),
-			'user_nicename'   => 'charleston-demo-fan',
+			'user_nicename'   => 'charlestonfan',
 			'user_email'      => 'charleston-demo-fan@example.invalid',
 			'user_registered' => current_time( 'mysql', true ),
 			'display_name'    => 'Charleston Music Fan',
@@ -195,3 +195,11 @@ if ( $featured_post && function_exists( 'ec_users_unmark_event' ) ) {
 }
 
 restore_current_blog();
+
+// The homepage hero reads cached network stats. A boot-time read may have
+// cached pre-seed values; drop them so the hero reflects the seeded network.
+if ( function_exists( 'ec_network_stats_forget' ) ) {
+	foreach ( array( 'events_count', 'events_cities', 'total_members', 'artist_profiles' ) as $calendar_demo_stat ) {
+		ec_network_stats_forget( $calendar_demo_stat );
+	}
+}

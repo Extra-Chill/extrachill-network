@@ -14,6 +14,16 @@ remove_action( 'wp_print_styles', 'print_emoji_styles' );
 remove_action( 'admin_print_scripts', 'print_emoji_detection_script' );
 add_filter( 'emoji_svg_url', '__return_false' );
 
+// get_avatar() runs the URL through esc_url(), which strips data: URIs unless
+// the protocol is allowed. Allow it for this sandbox fixture only.
+add_filter(
+	'kses_allowed_protocols',
+	static function ( $protocols ) {
+		$protocols[] = 'data';
+		return $protocols;
+	}
+);
+
 add_filter(
 	'pre_get_avatar_data',
 	static function ( $args ) {
