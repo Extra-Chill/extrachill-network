@@ -250,9 +250,10 @@ try {
     { kind: 'expect', videoOffsetMs: { startMs: 49000, endMs: 49100 } },
   ];
   const cuts = demoLoadCuts(recorded, 600);
-  assert.deepEqual(cuts, [[600, 5000], [7610, 26000], [26900, 48000]], 'navigations and navigating clicks (even across a pacing settle) are cut; authored waits and in-page clicks are kept');
-  assert.equal(demoTrimmedTime(49100, cuts), 49100 - 4400 - 18390 - 21100);
-  assert.equal(demoTrimmedTime(3000, cuts), 600, 'a time inside a cut maps to the cut start');
+  assert.deepEqual(cuts, [[0, 5600], [7610, 26000], [26900, 48000]], 'the recorder lead-in through the first loaded frame is cut, as are later loads; authored waits and in-page clicks are kept');
+  assert.equal(demoTrimmedTime(49100, cuts), 49100 - 5600 - 18390 - 21100);
+  assert.equal(demoTrimmedTime(3000, cuts), 0, 'a time inside the initial lead-in maps to the clean opening frame');
+  assert.equal(demoTrimmedTime(6000, cuts), 400, 'marker/still timestamps shift by the removed lead-in');
   assert.match(demoEncodeArgs('in.webm', 'out.mp4', { video: { viewport: '540x960' } }, [[600, 5000]])[6], /^select='not\(between\(t,0\.600,5\.000\)\)',setpts=N\/FRAME_RATE\/TB,format=yuv420p$/);
   assert.deepEqual(demoLoadCuts([{ kind: 'annotate', videoOffsetMs: { startMs: 2500, endMs: 2510 } }]), [[0, 2500]], 'lead-in before the first step is cut');
   assert.match(homepageDemo.steps[0].args.find((arg) => arg.startsWith('url=')), /^url=http:\/\/extrachill\.com\/$/, 'calendar demo starts on the homepage');

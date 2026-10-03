@@ -480,6 +480,14 @@ export function demoLoadCuts(steps, keepMs = 600) {
   // Blank frames before the first step (context start, first request) never show.
   const firstStart = steps.find((step) => step.videoOffsetMs)?.videoOffsetMs.startMs ?? 0;
   if (firstStart > 50) cuts.push([0, firstStart]);
+  const firstLoad = steps.find((step) => {
+    const offset = step.videoOffsetMs;
+    return offset && offset.endMs > offset.startMs && (step.kind === 'navigate' || waitsOnLoad(step));
+  });
+  if (firstLoad) {
+    const end = firstLoad.videoOffsetMs.endMs + keepMs;
+    if (end > 50) cuts.push([0, end]);
+  }
   cuts.sort((a, b) => a[0] - b[0]);
   const merged = [];
   for (const cut of cuts) {
@@ -1379,7 +1387,8 @@ async function renderJourneyDemos(recipe, journeys) {
       const coverMarker = (match.summary.video.markers ?? []).find((marker) => marker.name === journey.demo.cover.marker);
       if (!coverMarker) throw new Error(`Cover marker '${journey.demo.cover.marker}' for journey '${journey.id}' is missing from the recorded video.`);
       const cover = path.join(path.dirname(output), `${journey.id}-cover.png`);
-      const coverArgs = ['-y', '-v', 'error', '-ss', String((coverMarker.endMs + 700) / 1000), '-i', input, '-frames:v', '1'];
+      const coverTime = demoTrimmedTime(coverMarker.endMs + 700, cuts);
+      const coverArgs = ['-y', '-v', 'error', '-ss', String(coverTime / 1000), '-i', output, '-frames:v', '1'];
       const size = journey.demo.video.output;
       if (size) coverArgs.splice(coverArgs.length - 2, 0, '-vf', `scale=${size.width}:${size.height}:flags=lanczos`);
       coverArgs.push(cover);
@@ -1391,7 +1400,8 @@ async function renderJourneyDemos(recipe, journeys) {
       // The cover marker is written above as <id>-cover.png; never overwrite it.
       if (!marker.name || marker.name === journey.demo.cover?.marker) continue;
       const still = path.join(path.dirname(output), `${journey.id}-${marker.name}.png`);
-      spawnSync('ffmpeg', ['-y', '-v', 'error', '-ss', String((marker.endMs + 700) / 1000), '-i', input, '-frames:v', '1', ...stillScale, still], { stdio: 'inherit' });
+      const stillTime = demoTrimmedTime(marker.endMs + 700, cuts);
+      spawnSync('ffmpeg', ['-y', '-v', 'error', '-ss', String(stillTime / 1000), '-i', output, '-frames:v', '1', ...stillScale, still], { stdio: 'inherit' });
     }
   }
 }
