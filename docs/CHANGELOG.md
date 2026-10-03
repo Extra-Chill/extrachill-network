@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.29.4] - 2026-10-03
+
+### Fixed
+- normalize every cross-site URL to its target blog's trailing-slash rule
+
 ## [2.29.3] - 2026-10-03
 
 ### Fixed
