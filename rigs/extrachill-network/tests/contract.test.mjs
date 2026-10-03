@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { assembleDemoArgs, buildRecipe, demoEncodeArgs, demoLoadCuts, demoTrimmedTime, journeyMarkers, paceDemoSteps, domainIdsMuPluginSource, DOMAIN_IDS_MU_PLUGIN_FILENAME, SANDBOX_COMPAT_MU_PLUGIN_FILENAME, journeySeedSetting, journeySelection, validateJourneyDocument } from '../run.mjs';
+import { assembleDemoArgs, buildRecipe, demoEncodeArgs, demoClickLeadMs, demoLoadCuts, demoTrimmedTime, journeyMarkers, paceDemoSteps, domainIdsMuPluginSource, DOMAIN_IDS_MU_PLUGIN_FILENAME, SANDBOX_COMPAT_MU_PLUGIN_FILENAME, journeySeedSetting, journeySelection, validateJourneyDocument } from '../run.mjs';
 
 const packageRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const topology = JSON.parse(await readFile(path.join(packageRoot, 'network-topology.json'), 'utf8'));
@@ -256,6 +256,18 @@ try {
   assert.equal(demoTrimmedTime(6000, cuts), 400, 'marker/still timestamps shift by the removed lead-in');
   assert.match(demoEncodeArgs('in.webm', 'out.mp4', { video: { viewport: '540x960' } }, [[600, 5000]])[6], /^select='not\(between\(t,0\.600,5\.000\)\)',setpts=N\/FRAME_RATE\/TB,format=yuv420p$/);
   assert.deepEqual(demoLoadCuts([{ kind: 'annotate', videoOffsetMs: { startMs: 2500, endMs: 2510 } }]), [[0, 2500]], 'lead-in before the first step is cut');
+  {
+    const clickNav = [
+      { kind: 'navigate', videoOffsetMs: { startMs: 0, endMs: 100 } },
+      { kind: 'click', videoOffsetMs: { startMs: 4000, endMs: 6000 } },
+      { kind: 'waitFor', waitFor: 'load', videoOffsetMs: { startMs: 6000, endMs: 6200 } },
+    ];
+    const lead = demoClickLeadMs({ motion: { moveDurationMs: 600 }, clickFeedback: { enabled: true } });
+    assert.equal(lead, 850, 'click lead covers the cursor glide plus click feedback');
+    assert.deepEqual(demoLoadCuts(clickNav, 500, lead), [[0, 600], [5350, 6200]], 'a navigating click keeps its cursor glide and feedback before the load is cut');
+    assert.deepEqual(demoLoadCuts(clickNav, 500), [[0, 600], [4500, 6200]], 'without presentation timing the old cut is unchanged');
+    assert.equal(demoClickLeadMs(undefined), 250);
+  }
   assert.match(homepageDemo.steps[0].args.find((arg) => arg.startsWith('url=')), /^url=http:\/\/extrachill\.com\/$/, 'calendar demo starts on the homepage');
   await assert.rejects(validateJourneyDocument({ ...demoDoc, demo: { ...demoDoc.demo, environment: { colorScheme: 'sepia' } } }, 'gardner-event-rsvp', topology), /colorScheme/);
   await assert.rejects(validateJourneyDocument({ ...demoDoc, demo: { ...demoDoc.demo, cover: { marker: 'missing' } } }, 'gardner-event-rsvp', topology), /cover.marker/);
