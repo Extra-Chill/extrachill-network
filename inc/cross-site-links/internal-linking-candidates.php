@@ -236,20 +236,20 @@ function extrachill_add_cross_site_linking_candidates( $candidates, $post_id, $s
 		foreach ( $terms as $term ) {
 			$links = (array) extrachill_get_cross_site_term_links( $term, $taxonomy );
 
-			// Events destinations must have enough upcoming published events;
-			// the shared resolver supplies that upcoming-only count and URL.
+			// Past-OK: an artist/festival events archive with only PAST shows
+			// is still a relevant destination for a band article, but the
+			// shared resolver gates the events site on UPCOMING events only and
+			// drops it. For the crosslink path specifically, resolve the events
+			// archive from TOTAL tagged events via the network-active
+			// taxonomy-post-counts ability (no HTTP, no upcoming gate) and
+			// apply a substance floor so we never link a one-event stub. This
+			// path is local to the crosslink builder, so the live "upcoming
+			// shows" UI consumers of the upcoming-count helper are untouched.
 			if ( ! $is_geography && $events_blog_id > 0 ) {
-				$links = array_values(
-					array_filter(
-						$links,
-						static function ( $link ) use ( $events_blog_id, $taxonomy, $post_id ) {
-							if ( (int) ( $link['blog_id'] ?? 0 ) !== $events_blog_id && ( $link['site_key'] ?? '' ) !== 'events' ) {
-								return true;
-							}
-							return (int) ( $link['count'] ?? 0 ) >= extrachill_internal_linking_min_events_archive_count( $taxonomy, $post_id );
-						}
-					)
-				);
+				$events_link = extrachill_internal_linking_events_archive_candidate( $term, $taxonomy, $events_blog_id, $post_id );
+				if ( $events_link ) {
+					$links = extrachill_internal_linking_merge_events_archive_link( $links, $events_link, $events_blog_id );
+				}
 			}
 
 			if ( empty( $links ) ) {
@@ -261,8 +261,8 @@ function extrachill_add_cross_site_linking_candidates( $candidates, $post_id, $s
 					continue;
 				}
 
-				$url     = (string) $link['url'];
-				$site_key   = isset( $link['site_key'] ) ? (string) $link['site_key'] : '';
+				$url      = (string) $link['url'];
+				$site_key = isset( $link['site_key'] ) ? (string) $link['site_key'] : '';
 				if ( 'events' === $site_key && function_exists( 'extrachill_build_term_archive_url' ) ) {
 					$canonical_url = extrachill_build_term_archive_url( (string) $term->slug, $taxonomy, (int) ( $link['blog_id'] ?? $events_blog_id ) );
 					if ( $canonical_url ) {
@@ -277,9 +277,9 @@ function extrachill_add_cross_site_linking_candidates( $candidates, $post_id, $s
 					continue;
 				}
 				$seen_urls[ $url_key ] = true;
-				$is_forward = in_array( $site_key, $forward_keys, true );
-				$term_name  = isset( $link['term_name'] ) ? (string) $link['term_name'] : $term->name;
-				$site_label = isset( $link['label'] ) ? (string) $link['label'] : ucfirst( $site_key );
+				$is_forward            = in_array( $site_key, $forward_keys, true );
+				$term_name             = isset( $link['term_name'] ) ? (string) $link['term_name'] : $term->name;
+				$site_label            = isset( $link['label'] ) ? (string) $link['label'] : ucfirst( $site_key );
 
 				// Title is what the AI weaves the anchor around. Use the term
 				// name so the link reads naturally in prose (e.g. the artist or
@@ -335,3 +335,111 @@ function extrachill_add_cross_site_linking_candidates( $candidates, $post_id, $s
 }
 
 add_filter( 'datamachine_internal_linking_candidates', 'extrachill_add_cross_site_linking_candidates', 10, 6 );
+
+/**
+ * Resolve the events archive candidate for an entity term using TOTAL events.
+ *
+ * The shared cross-site resolver gates the events site on UPCOMING events only,
+ * so an artist with 9 past shows / 0 upcoming is dropped — and the engine then
+ * falls back to an incidental geographic match. For the crosslink path an
+ * archive of past shows is still the on-topic destination, so this counts TOTAL
+ * tagged events (past + upcoming) via the network-active
+ * `extrachill/taxonomy-post-counts` ability. That ability runs in-process under
+ * switch_to_blog (no HTTP loopback, no upcoming gate), counting published
+ * `data_machine_events` posts regardless of date and returning the artist/
+ * festival archive URL. A filterable substance floor keeps thin stubs out.
+ *
+ * @param WP_Term $term           Entity term (artist/festival).
+ * @param string  $taxonomy       Taxonomy slug.
+ * @param int     $events_blog_id Events blog ID.
+ * @param int     $post_id        Source post being linked from.
+ * @return array|null Link row (url/site_key/term_name/label/count) or null.
+ */
+function extrachill_internal_linking_events_archive_candidate( $term, $taxonomy, $events_blog_id, $post_id ) {
+	if ( ! function_exists( 'wp_get_ability' ) || empty( $term->slug ) ) {
+		return null;
+	}
+
+	$ability = wp_get_ability( 'extrachill/taxonomy-post-counts' );
+	if ( ! $ability ) {
+		return null;
+	}
+
+	$result = $ability->execute(
+		array(
+			'taxonomy'  => $taxonomy,
+			'site'      => 'events',
+			'slug'      => (string) $term->slug,
+			'post_type' => 'data_machine_events',
+		)
+	);
+
+	if ( is_wp_error( $result ) || empty( $result['terms'][0] ) ) {
+		return null;
+	}
+
+	$row   = $result['terms'][0];
+	$count = isset( $row['count'] ) ? (int) $row['count'] : 0;
+	$url   = isset( $row['url'] ) ? (string) $row['url'] : '';
+
+	if ( '' === $url ) {
+		return null;
+	}
+
+	// Substance floor: a one-event archive is a stub, not a real archive.
+	if ( $count < extrachill_internal_linking_min_events_archive_count( $taxonomy, $post_id ) ) {
+		return null;
+	}
+
+	$content_type_labels = function_exists( 'extrachill_get_site_content_type_labels' )
+		? extrachill_get_site_content_type_labels()
+		: array();
+
+	return array(
+		'blog_id'   => $events_blog_id,
+		'site_key'  => 'events',
+		'url'       => $url,
+		'label'     => isset( $content_type_labels['events'] ) ? $content_type_labels['events'] : __( 'Events', 'extrachill-network' ),
+		'term_name' => $term->name,
+		'count'     => $count,
+	);
+}
+
+/**
+ * Merge the total-events archive candidate into the resolver's link list.
+ *
+ * The shared resolver may already include an events entry (when the term has
+ * upcoming events) or may have dropped it (past-only). De-dupe on the events
+ * blog so the crosslink builder never offers two events rows for one term:
+ * replace any existing events row with the total-count one, otherwise append.
+ *
+ * @param array $links          Links from extrachill_get_cross_site_term_links().
+ * @param array $events_link    Total-events archive link row.
+ * @param int   $events_blog_id Events blog ID.
+ * @return array Links with exactly one events row (the total-count one).
+ */
+function extrachill_internal_linking_merge_events_archive_link( $links, $events_link, $events_blog_id ) {
+	$merged   = array();
+	$replaced = false;
+
+	foreach ( $links as $link ) {
+		$link_blog_id = isset( $link['blog_id'] ) ? (int) $link['blog_id'] : 0;
+		$link_site    = isset( $link['site_key'] ) ? (string) $link['site_key'] : '';
+
+		if ( $link_blog_id === $events_blog_id || 'events' === $link_site ) {
+			if ( ! $replaced ) {
+				$merged[] = $events_link;
+				$replaced = true;
+			}
+			continue;
+		}
+
+		$merged[] = $link;
+	}
+
+	if ( ! $replaced ) {
+		$merged[] = $events_link;
+	}
+
+	return $merged;
+}
