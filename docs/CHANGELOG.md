@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.29.3] - 2026-10-03
+
+### Fixed
+- Fix canonical URLs and relevance of cross-site linking candidates
+
 ## [2.29.2] - 2026-10-03
 
 ### Fixed
