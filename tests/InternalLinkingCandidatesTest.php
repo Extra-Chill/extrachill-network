@@ -139,6 +139,44 @@ class InternalLinkingCandidatesTest extends WP_UnitTestCase {
 	}
 
 	/**
+	 * An events archive below the UPCOMING-show floor is never linked: crosslinks
+	 * are written permanently, so an archive with only past shows is skipped.
+	 */
+	public function test_events_archive_below_upcoming_floor_is_skipped(): void {
+		if ( ! taxonomy_exists( 'artist' ) ) {
+			register_taxonomy( 'artist', 'post' );
+		}
+
+		$post_id = self::factory()->post->create();
+		$term_id = self::factory()->term->create(
+			array(
+				'taxonomy' => 'artist',
+				'name'     => 'Past Only Band',
+			)
+		);
+		wp_set_object_terms( $post_id, array( (int) $term_id ), 'artist' );
+		$term = get_term( $term_id, 'artist' );
+
+		$this->prime_cross_site_links(
+			$term,
+			array(
+				array(
+					'blog_id'   => 7,
+					'site_key'  => 'events',
+					'url'       => 'https://events.extrachill.com/artist/past-only-band',
+					'label'     => 'Events',
+					'term_name' => 'Past Only Band',
+					'count'     => 2,
+				),
+			)
+		);
+
+		$result = apply_filters( 'datamachine_internal_linking_candidates', array(), $post_id, 'Src', array(), array(), 5 );
+
+		$this->assertSame( array(), $result, 'events archive with fewer than 3 upcoming shows is not a candidate' );
+	}
+
+	/**
 	 * A non-forward cross-site target (e.g. shop) is added but not boosted
 	 * above a forward surface.
 	 */
