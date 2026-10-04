@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.29.5] - 2026-10-04
+
+### Fixed
+- require UPCOMING shows for events archive candidates
+
 ## [2.29.4] - 2026-10-03
 
 ### Fixed
