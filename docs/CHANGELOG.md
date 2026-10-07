@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.29.6] - 2026-10-07
+
+### Fixed
+- stop /login -> /login/ redirect loop on subsites
+
 ## [2.29.5] - 2026-10-04
 
 ### Fixed
