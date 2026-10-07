@@ -61,6 +61,9 @@
     "tests/network-term-classification-smoke.php": {
       "environment": "standalone-php"
     },
+    "tests/nginx-login-no-redirect-smoke.php": {
+      "environment": "standalone-php"
+    },
     "tests/og-card-content-addressed-cache-smoke.php": {
       "environment": "standalone-php"
     },
