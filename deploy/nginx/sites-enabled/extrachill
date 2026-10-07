@@ -89,8 +89,11 @@ server {
         try_files $uri $uri/ /index.php?$args;
     }
 
+    # Both forms hand off to WordPress: subsites canonicalize /login/ to
+    # /login, so redirecting /login to /login/ here loops (#346).
     location = /login {
-        return 301 /login/;
+        limit_req zone=wp_login burst=5 nodelay;
+        try_files $uri $uri/ /index.php?$args;
     }
 
     # PHP handling
