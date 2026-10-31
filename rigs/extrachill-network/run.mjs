@@ -803,9 +803,11 @@ export async function buildRecipe(settings = {}, cwd = process.cwd()) {
       ...(settings.wordpress_runtime_version ? { wp: settings.wordpress_runtime_version } : {}),
       ...(phpVersion ? { phpVersion } : {}),
       blueprint: { steps: [] },
+      workers: 4,
       preview: { siteUrl: `http://${topology.sites.find((site) => site.primary)?.domain ?? topology.sites[0].domain}/` },
     },
     inputs: {
+      pluginRuntime: { php: { bootstrapIniEntries: { 'opcache.enable': '0', 'opcache.enable_cli': '0' } } },
       ...(Object.keys(runtimeEnv).length > 0 ? { runtimeEnv } : {}),
       extra_plugins: extraPlugins,
       ...(theme.extraThemes ? { extra_themes: theme.extraThemes } : {}),
