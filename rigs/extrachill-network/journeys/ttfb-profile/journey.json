@@ -1,0 +1,99 @@
+{
+  "schema": "extrachill-network/journey/v1",
+  "id": "ttfb-profile",
+  "sites": [
+    "events.extrachill.com",
+    "extrachill.com",
+    "community.extrachill.com"
+  ],
+  "seed": {
+    "codeFile": "seed.php",
+    "timeoutMs": 120000
+  },
+  "grade": {
+    "codeFile": "grade.php",
+    "timeoutMs": 120000
+  },
+  "fixtureMuPlugins": [
+    "profiler.php"
+  ],
+  "steps": [
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": {
+        "kind": "journey-browser-step",
+        "step": "events-anon"
+      },
+      "args": [
+        "url=http://events.extrachill.com/",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "viewport=1280x900",
+        "step-timeout=900s",
+        "timeout=1200s",
+        "capture=steps,console,errors,network",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/\",\"waitFor\":\"load\"},{\"kind\":\"evaluate\",\"expression\":\"(async()=>{const out=[];const T=async(u,o)=>{const t=performance.now();let s=0;try{const r=await fetch(u,{credentials:'same-origin',cache:'no-store',...(o||{})});s=r.status;await r.text()}catch(e){s='ERR:'+e.message}return {u,ms:Math.round(performance.now()-t),s}};const seq=async(u,n)=>{for(let i=0;i<n;i++)out.push({...(await T(u)),mode:'seq',i})};const par=async(name,us)=>{const t=performance.now();const r=await Promise.all(us.map((u)=>T(u)));out.push({mode:name,wall:Math.round(performance.now()-t),each:r.map((x)=>x.ms),u:us[0]})};\\nawait seq('/rig-ping.php',5);\\nawait seq('/wp-includes/js/jquery/jquery.min.js?r='+Math.random(),3);\\nfor(const stop of ['mu','plugins_loaded','init','wp_loaded'])await seq('/?rig_ttfb_stop='+stop,3);\\nawait seq('/',3);\\nawait seq('/?rig_ttfb_hooks=1',2);\\nawait seq('/?rig_ttfb_queries=1',2);\\nawait seq('/wp-json/',1);\\nawait seq('/wp-json/wp/v2/types?context=view',2);\\nawait seq(\\\"/my-shows/\\\",2);\\nawait par('par4-ping',[1,2,3,4].map((i)=>'/rig-ping.php?p='+i));\\nawait par('par4-wp_loaded',[1,2,3,4].map((i)=>'/?rig_ttfb_stop=wp_loaded&p='+i));\\nawait fetch('/?rig_ttfb_client=1',{method:'POST',body:JSON.stringify({label:\\\"events-anon\\\",host:location.host,loggedIn:document.body.classList.contains('logged-in'),nav:performance.getEntriesByType('navigation').map((n)=>({ttfb:Math.round(n.responseStart-n.requestStart),dcl:Math.round(n.domContentLoadedEventEnd),load:Math.round(n.loadEventEnd)})),resources:performance.getEntriesByType('resource').length,out})});return out.length})()\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": {
+        "kind": "journey-browser-step",
+        "step": "main-anon"
+      },
+      "args": [
+        "url=http://extrachill.com/",
+        "route-host=extrachill.com",
+        "network-policy=block",
+        "allow-host=extrachill.com",
+        "viewport=1280x900",
+        "step-timeout=900s",
+        "timeout=1200s",
+        "capture=steps,console,errors,network",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://extrachill.com/\",\"waitFor\":\"load\"},{\"kind\":\"evaluate\",\"expression\":\"(async()=>{const out=[];const T=async(u,o)=>{const t=performance.now();let s=0;try{const r=await fetch(u,{credentials:'same-origin',cache:'no-store',...(o||{})});s=r.status;await r.text()}catch(e){s='ERR:'+e.message}return {u,ms:Math.round(performance.now()-t),s}};const seq=async(u,n)=>{for(let i=0;i<n;i++)out.push({...(await T(u)),mode:'seq',i})};const par=async(name,us)=>{const t=performance.now();const r=await Promise.all(us.map((u)=>T(u)));out.push({mode:name,wall:Math.round(performance.now()-t),each:r.map((x)=>x.ms),u:us[0]})};\\nawait seq('/rig-ping.php',5);\\nawait seq('/wp-includes/js/jquery/jquery.min.js?r='+Math.random(),3);\\nfor(const stop of ['mu','plugins_loaded','init','wp_loaded'])await seq('/?rig_ttfb_stop='+stop,3);\\nawait seq('/',3);\\nawait seq('/?rig_ttfb_hooks=1',2);\\nawait seq('/?rig_ttfb_queries=1',2);\\nawait seq('/wp-json/',1);\\nawait seq('/wp-json/wp/v2/types?context=view',2);\\n\\nawait par('par4-ping',[1,2,3,4].map((i)=>'/rig-ping.php?p='+i));\\nawait par('par4-wp_loaded',[1,2,3,4].map((i)=>'/?rig_ttfb_stop=wp_loaded&p='+i));\\nawait fetch('/?rig_ttfb_client=1',{method:'POST',body:JSON.stringify({label:\\\"main-anon\\\",host:location.host,loggedIn:document.body.classList.contains('logged-in'),nav:performance.getEntriesByType('navigation').map((n)=>({ttfb:Math.round(n.responseStart-n.requestStart),dcl:Math.round(n.domContentLoadedEventEnd),load:Math.round(n.loadEventEnd)})),resources:performance.getEntriesByType('resource').length,out})});return out.length})()\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": {
+        "kind": "journey-browser-step",
+        "step": "community-anon"
+      },
+      "args": [
+        "url=http://community.extrachill.com/",
+        "route-host=community.extrachill.com",
+        "network-policy=block",
+        "allow-host=community.extrachill.com",
+        "viewport=1280x900",
+        "step-timeout=900s",
+        "timeout=1200s",
+        "capture=steps,console,errors,network",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://community.extrachill.com/\",\"waitFor\":\"load\"},{\"kind\":\"evaluate\",\"expression\":\"(async()=>{const out=[];const T=async(u,o)=>{const t=performance.now();let s=0;try{const r=await fetch(u,{credentials:'same-origin',cache:'no-store',...(o||{})});s=r.status;await r.text()}catch(e){s='ERR:'+e.message}return {u,ms:Math.round(performance.now()-t),s}};const seq=async(u,n)=>{for(let i=0;i<n;i++)out.push({...(await T(u)),mode:'seq',i})};const par=async(name,us)=>{const t=performance.now();const r=await Promise.all(us.map((u)=>T(u)));out.push({mode:name,wall:Math.round(performance.now()-t),each:r.map((x)=>x.ms),u:us[0]})};\\nawait seq('/rig-ping.php',5);\\nawait seq('/wp-includes/js/jquery/jquery.min.js?r='+Math.random(),3);\\nfor(const stop of ['mu','plugins_loaded','init','wp_loaded'])await seq('/?rig_ttfb_stop='+stop,3);\\nawait seq('/',3);\\nawait seq('/?rig_ttfb_hooks=1',2);\\nawait seq('/?rig_ttfb_queries=1',2);\\nawait seq('/wp-json/',1);\\nawait seq('/wp-json/wp/v2/types?context=view',2);\\n\\nawait par('par4-ping',[1,2,3,4].map((i)=>'/rig-ping.php?p='+i));\\nawait par('par4-wp_loaded',[1,2,3,4].map((i)=>'/?rig_ttfb_stop=wp_loaded&p='+i));\\nawait fetch('/?rig_ttfb_client=1',{method:'POST',body:JSON.stringify({label:\\\"community-anon\\\",host:location.host,loggedIn:document.body.classList.contains('logged-in'),nav:performance.getEntriesByType('navigation').map((n)=>({ttfb:Math.round(n.responseStart-n.requestStart),dcl:Math.round(n.domContentLoadedEventEnd),load:Math.round(n.loadEventEnd)})),resources:performance.getEntriesByType('resource').length,out})});return out.length})()\"}]"
+      ]
+    },
+    {
+      "command": "wordpress.browser-actions",
+      "allowFailure": true,
+      "metadata": {
+        "kind": "journey-browser-step",
+        "step": "events-admin"
+      },
+      "args": [
+        "url=http://events.extrachill.com/",
+        "route-host=events.extrachill.com",
+        "network-policy=block",
+        "allow-host=events.extrachill.com",
+        "viewport=1280x900",
+        "step-timeout=900s",
+        "timeout=1200s",
+        "capture=steps,console,errors,network",
+        "auth=wordpress-admin",
+        "steps-json=[{\"kind\":\"navigate\",\"url\":\"http://events.extrachill.com/\",\"waitFor\":\"load\"},{\"kind\":\"evaluate\",\"expression\":\"(async()=>{const out=[];const T=async(u,o)=>{const t=performance.now();let s=0;try{const r=await fetch(u,{credentials:'same-origin',cache:'no-store',...(o||{})});s=r.status;await r.text()}catch(e){s='ERR:'+e.message}return {u,ms:Math.round(performance.now()-t),s}};const seq=async(u,n)=>{for(let i=0;i<n;i++)out.push({...(await T(u)),mode:'seq',i})};const par=async(name,us)=>{const t=performance.now();const r=await Promise.all(us.map((u)=>T(u)));out.push({mode:name,wall:Math.round(performance.now()-t),each:r.map((x)=>x.ms),u:us[0]})};\\nawait seq('/rig-ping.php',5);\\nawait seq('/wp-includes/js/jquery/jquery.min.js?r='+Math.random(),3);\\nfor(const stop of ['mu','plugins_loaded','init','wp_loaded'])await seq('/?rig_ttfb_stop='+stop,3);\\nawait seq('/',3);\\nawait seq('/?rig_ttfb_hooks=1',2);\\nawait seq('/?rig_ttfb_queries=1',2);\\nawait seq('/wp-json/',1);\\nawait seq('/wp-json/wp/v2/types?context=view',2);\\nawait seq(\\\"/my-shows/\\\",2);await seq(\\\"/wp-admin/\\\",2);\\nawait par('par4-ping',[1,2,3,4].map((i)=>'/rig-ping.php?p='+i));\\nawait par('par4-wp_loaded',[1,2,3,4].map((i)=>'/?rig_ttfb_stop=wp_loaded&p='+i));\\nawait fetch('/?rig_ttfb_client=1',{method:'POST',body:JSON.stringify({label:\\\"events-admin\\\",host:location.host,loggedIn:document.body.classList.contains('logged-in'),nav:performance.getEntriesByType('navigation').map((n)=>({ttfb:Math.round(n.responseStart-n.requestStart),dcl:Math.round(n.domContentLoadedEventEnd),load:Math.round(n.loadEventEnd)})),resources:performance.getEntriesByType('resource').length,out})});return out.length})()\"}]"
+      ]
+    }
+  ]
+}
